@@ -74,3 +74,27 @@ class ShadowUser(models.Model):
 
     def __str__(self):
         return f"Shadow: {self.email}"
+
+class SystemLog(models.Model):
+    class Category(models.TextChoices):
+        FINANCIAL = 'FINANCIAL', _('Financial')
+        SECURITY = 'SECURITY', _('Security')
+        MARKETPLACE = 'MARKETPLACE', _('Marketplace')
+        GROWTH = 'GROWTH', _('Growth')
+    
+    class Level(models.TextChoices):
+        INFO = 'INFO', _('Info')
+        SUCCESS = 'SUCCESS', _('Success')
+        WARNING = 'WARNING', _('Warning')
+        CRITICAL = 'CRITICAL', _('Critical')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    category = models.CharField(max_length=20, choices=Category.choices, default=Category.GROWTH)
+    level = models.CharField(max_length=20, choices=Level.choices, default=Level.INFO)
+    message = models.TextField()
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.category}] {self.message}"

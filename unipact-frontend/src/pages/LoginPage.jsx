@@ -55,11 +55,20 @@ const LoginPage = () => {
       const data = await login(email, password);
       if (data.user.role === 'COMPANY') {
         navigate('/company/dashboard');
+      } else if (data.user.role === 'ADMIN') {
+        navigate('/admin');
       } else {
         navigate('/student/dashboard');
       }
     } catch (err) {
-      setError('Access Denied: Invalid Credentials');
+      console.error(err);
+      if (err.response && err.response.data && err.response.data.error) {
+        setError(err.response.data.error);
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Access Denied: Invalid Credentials');
+      }
       setLoading(false);
     }
   };

@@ -11,3 +11,14 @@ def is_public_domain(email):
         return domain in PUBLIC_DOMAINS
     except IndexError:
         return False
+
+def log_event(category, level, message):
+    from .models import SystemLog
+    try:
+        SystemLog.objects.create(
+            category=category,
+            level=level,
+            message=message
+        )
+    except Exception as e:
+        print(f"Logging Failed: {e}")

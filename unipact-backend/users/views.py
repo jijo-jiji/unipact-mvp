@@ -77,9 +77,21 @@ class LoginView(views.APIView):
                     "verification_status": ver_status,
                 }
             }, status=status.HTTP_200_OK)
-            
+
             set_auth_cookies(response, tokens)
+            
+            # Log Success
+            from .models import SystemLog
+            from .utils import log_event
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.SUCCESS, f"User Login: {email}")
+
             return response
+        
+        # Log Failure
+        from .models import SystemLog
+        from .utils import log_event
+        # Differentiate simple failure vs suspicious later, for now just WARNING
+        log_event(SystemLog.Category.SECURITY, SystemLog.Level.WARNING, f"Failed Login: {email}")
         
         return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -159,6 +171,14 @@ class RegisterCompanyView(generics.CreateAPIView):
         # Generate Tokens & Login
         tokens = get_tokens_for_user(user)
 
+        from .models import SystemLog
+        from .utils import log_event
+
+        if profile.verification_status == CompanyProfile.VerificationStatus.HIGH_RISK:
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.CRITICAL, f"High Risk Reg: {email} (Public Domain)")
+        else:
+            log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Company Joined: {company_name}")
+
         response = Response({
             "message": "Company registered successfully.",
             "user": {
@@ -212,6 +232,10 @@ class RegisterClubView(generics.CreateAPIView):
         # Generate Tokens & Login
         tokens = get_tokens_for_user(user)
 
+        from .models import SystemLog
+        from .utils import log_event
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Club Joined: {club_name} ({university})")
+
         response = Response({
             "message": "Club registered successfully. Please wait for admin verification.",
             "user": {
@@ -224,3 +248,117 @@ class RegisterClubView(generics.CreateAPIView):
 
         set_auth_cookies(response, tokens)
         return response
+
+class AdminDashboardStatsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+        
+        pending_reviews = CompanyProfile.objects.filter(verification_status=CompanyProfile.VerificationStatus.PENDING_REVIEW).count() + \
+                          ClubProfile.objects.filter(verification_status=ClubProfile.VerificationStatus.PENDING_VERIFICATION).count()
+        system_flags = CompanyProfile.objects.filter(verification_status=CompanyProfile.VerificationStatus.HIGH_RISK).count()
+        total_users = User.objects.count()
+        
+        # Mock Revenue for MVP
+        revenue = "RM 120k" 
+
+        return Response({
+            "pending_reviews": pending_reviews,
+            "system_flags": system_flags,
+            "total_users": total_users,
+            "revenue": revenue
+        })
+
+class AdminVerificationQueueView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+
+        pending_companies = CompanyProfile.objects.filter(verification_status__in=[
+            CompanyProfile.VerificationStatus.PENDING_REVIEW,
+            CompanyProfile.VerificationStatus.HIGH_RISK
+        ])
+        
+        pending_clubs = ClubProfile.objects.filter(verification_status=ClubProfile.VerificationStatus.PENDING_VERIFICATION)
+
+        from .serializers import AdminCompanyVerificationSerializer, AdminClubVerificationSerializer
+        
+        company_data = AdminCompanyVerificationSerializer(pending_companies, many=True).data
+        club_data = AdminClubVerificationSerializer(pending_clubs, many=True).data
+        
+        # Combine and structure for frontend
+        results = []
+        for c in company_data:
+            c['type'] = 'COMPANY'
+            results.append(c)
+        
+        for c in club_data:
+            c['type'] = 'CLUB'
+            results.append(c)
+            
+        return Response(results)
+
+class AdminVerifyEntityView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, entity_type, entity_id):
+        if request.user.role != User.Role.ADMIN:
+             raise exceptions.PermissionDenied("Admin access required.")
+        
+        action = request.data.get('action') # 'approve', 'reject', 'high_risk'
+        
+        if entity_type == 'COMPANY':
+            try:
+                profile = CompanyProfile.objects.get(id=entity_id)
+                if action == 'approve':
+                    profile.verification_status = CompanyProfile.VerificationStatus.VERIFIED
+                elif action == 'reject':
+                    profile.verification_status = CompanyProfile.VerificationStatus.REJECTED
+                elif action == 'high_risk':
+                    profile.verification_status = CompanyProfile.VerificationStatus.HIGH_RISK
+                profile.save()
+            except CompanyProfile.DoesNotExist:
+                return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        elif entity_type == 'CLUB':
+            try:
+                profile = ClubProfile.objects.get(id=entity_id)
+                if action == 'approve':
+                    profile.verification_status = ClubProfile.VerificationStatus.VERIFIED
+                elif action == 'reject':
+                    profile.verification_status = ClubProfile.VerificationStatus.REJECTED
+                profile.save()
+            except ClubProfile.DoesNotExist:
+                return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        else:
+             return Response({"error": "Invalid entity type"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from .models import SystemLog
+        from .utils import log_event
+        
+        log_event(
+            SystemLog.Category.SECURITY,
+            SystemLog.Level.INFO,
+            f"Admin {action.upper()}D entity {entity_id} ({entity_type})"
+        )
+
+        return Response({"message": f"Entity {action}d successfully"})
+
+class AdminSystemLogsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.ADMIN:
+             raise exceptions.PermissionDenied("Admin access required.")
+        
+        from .models import SystemLog
+        from .serializers import SystemLogSerializer
+        
+        logs = SystemLog.objects.all()[:50] # Last 50 logs
+        serializer = SystemLogSerializer(logs, many=True)
+        return Response(serializer.data)

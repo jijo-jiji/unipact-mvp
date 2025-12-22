@@ -31,7 +31,12 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         if company_profile.verification_status == CompanyProfile.VerificationStatus.HIGH_RISK:
              raise exceptions.PermissionDenied("Your account is under review (High Risk). You cannot post campaigns yet.")
 
-        serializer.save(company=self.request.user.company_profile, status=Campaign.Status.OPEN)
+        instance = serializer.save(company=self.request.user.company_profile, status=Campaign.Status.OPEN)
+
+        # Log Event
+        from users.models import SystemLog
+        from users.utils import log_event
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"New Quest: '{instance.title}' posted by {self.request.user.company_profile.company_name}")
 
 class CampaignDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Campaign.objects.all()
@@ -106,6 +111,10 @@ class AwardApplicationView(APIView):
         # Update Campaign Status
         campaign.status = Campaign.Status.IN_PROGRESS
         campaign.save()
+
+        from users.models import SystemLog
+        from users.utils import log_event
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.SUCCESS, f"Contract Awarded: {application.club.club_name} -> {company_profile.company_name}")
 
         return Response({"message": "Application awarded successfully."}, status=status.HTTP_200_OK)
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import CompanyProfile, ClubProfile, ShadowUser
+from .models import CompanyProfile, ClubProfile, ShadowUser, SystemLog
 
 User = get_user_model()
 
@@ -48,3 +48,22 @@ class ShadowUserSerializer(serializers.ModelSerializer):
         model = ShadowUser
         fields = ['email', 'role', 'invited_by', 'created_at']
         read_only_fields = ['invited_by', 'created_at']
+
+class AdminCompanyVerificationSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email')
+    
+    class Meta:
+        model = CompanyProfile
+        fields = ['id', 'company_name', 'email', 'company_details', 'verification_status', 'ssm_document']
+
+class AdminClubVerificationSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email')
+
+    class Meta:
+        model = ClubProfile
+        fields = ['id', 'club_name', 'email', 'university', 'verification_status', 'verification_document']
+
+class SystemLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemLog
+        fields = ['id', 'category', 'level', 'message', 'created_at']
