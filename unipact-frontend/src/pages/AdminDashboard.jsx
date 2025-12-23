@@ -6,9 +6,11 @@ import {
   Search,
   Activity,
   Database,
-  Lock
+  Lock,
+  LogOut
 } from 'lucide-react';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const AdminDashboard = () => {
   const [reviews, setReviews] = useState([]);
@@ -20,6 +22,7 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState([]);
+  const { logout } = useAuth();
 
   // FETCH DATA
   useEffect(() => {
@@ -104,9 +107,15 @@ const AdminDashboard = () => {
             Uptime: 99.9% | Active Nodes: {stats.total_users} | Threat Level: <span className="text-white">NOMINAL</span>
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end gap-2">
           <div className="text-xs text-gray-500 uppercase">Administrator</div>
           <div className="text-white font-bold">ROOT_USER</div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 text-xs text-red-500 hover:text-red-400 border border-red-900 hover:border-red-500 px-3 py-1 bg-red-900/10 transition-all mt-1"
+          >
+            <LogOut size={12} /> TERMINATE SESSION
+          </button>
         </div>
       </div>
 

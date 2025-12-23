@@ -57,7 +57,7 @@ const StudentDashboard = () => {
 
         <div className="flex gap-6 text-xs text-[var(--text-blue)] uppercase tracking-wider">
           <span
-            onClick={() => navigate('/student/profile/me')}
+            onClick={() => navigate('/club/profile/:id')}
             className="cursor-pointer hover:text-white transition-colors"
           >
             My Profile

@@ -18,3 +18,4 @@ class CookieJWTAuthentication(JWTAuthentication):
             return self.get_user(validated_token), validated_token
         except AuthenticationFailed:
             return None
+
