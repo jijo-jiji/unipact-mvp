@@ -9,15 +9,23 @@ import {
   AlertTriangle,
   Search,
   ChevronRight,
-  Shield
+  Shield,
+  Plus,
+  X
 } from 'lucide-react';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   /* API INTEGRATION */
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // INVITE MODAL STATE
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('Committee Member');
+  const [inviteStatus, setInviteStatus] = useState(null); // 'success', 'error', 'loading'
 
   useEffect(() => {
     const fetchApps = async () => {
@@ -33,14 +41,93 @@ const StudentDashboard = () => {
     fetchApps();
   }, []);
 
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setInviteStatus('loading');
+    try {
+      await api.post('/users/invite/', { email: inviteEmail, role: inviteRole });
+      setInviteStatus('success');
+      setInviteEmail('');
+      setTimeout(() => {
+        setShowInvite(false);
+        setInviteStatus(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Invite failed", error);
+      setInviteStatus('error');
+    }
+  }
+
   // Filter Applications
   const activeMissions = applications.filter(app => app.status === 'AWARDED');
   const otherBids = applications.filter(app => app.status !== 'AWARDED');
 
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] p-6 text-white">
+    <div className="min-h-screen bg-[var(--bg-void)] p-6 text-white relative">
 
-      {/* 1. HUNTER NAV (Purple Accent) - Kept Same */}
+      {/* INVITE MODAL */}
+      {showInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 w-full max-w-md relative shadow-[0_0_50px_rgba(160,32,240,0.3)]">
+            <button
+              onClick={() => setShowInvite(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+
+            <h2 className="text-xl font-display font-bold text-white mb-2 uppercase tracking-wider">Recruit Crew</h2>
+            <p className="text-xs text-gray-400 mb-6">Send an encrypted invite token to a new member.</p>
+
+            {inviteStatus === 'success' ? (
+              <div className="bg-green-500/20 text-green-400 p-4 border border-green-500/50 text-center uppercase tracking-wider text-sm font-bold animate-pulse">
+                Invitation Sent Successfully
+              </div>
+            ) : (
+              <form onSubmit={handleInvite} className="space-y-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Member Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full bg-black border border-[var(--border-tech)] text-white p-3 focus:border-[#a020f0] outline-none transition-colors"
+                    placeholder="hunter@university.edu.my"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Role Assignment</label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full bg-black border border-[var(--border-tech)] text-white p-3 focus:border-[#a020f0] outline-none transition-colors"
+                  >
+                    <option>Committee Member</option>
+                    <option>Treasurer</option>
+                    <option>Secretary</option>
+                    <option>Vice President</option>
+                  </select>
+                </div>
+
+                {inviteStatus === 'error' && (
+                  <div className="text-red-500 text-xs text-center">Failed to send invite. User may already exist.</div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={inviteStatus === 'loading'}
+                  className="w-full bg-[#a020f0] text-white font-bold uppercase tracking-widest py-3 hover:bg-[#8010c0] transition-colors border border-white/20"
+                >
+                  {inviteStatus === 'loading' ? 'Encrypting...' : 'Send Invite'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 1. HUNTER NAV (Purple Accent) */}
       <nav className="flex justify-between items-center mb-8 bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] shadow-lg relative overflow-hidden">
         {/* Decorative Purple Line */}
         <div className="absolute top-0 left-0 w-full h-0.5 bg-[#a020f0] shadow-[0_0_10px_#a020f0]"></div>
@@ -50,19 +137,27 @@ const StudentDashboard = () => {
             <Zap className="text-[#a020f0]" size={20} />
           </div>
           <div>
-            <div className="font-display tracking-widest uppercase text-sm">UM Business Club</div>
+            <div className="font-display tracking-widest uppercase text-sm">
+              {user?.name || 'Loading Guild...'}
+            </div>
             <div className="text-[10px] text-[#a020f0] tracking-[0.2em]">HUNTER RANK: B</div>
           </div>
         </div>
 
-        <div className="flex gap-6 text-xs text-[var(--text-blue)] uppercase tracking-wider">
+        <div className="flex items-center gap-6 text-xs text-[var(--text-blue)] uppercase tracking-wider">
+          <button
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-1 text-[#a020f0] border border-[#a020f0]/30 px-3 py-1 hover:bg-[#a020f0] hover:text-white transition-all"
+          >
+            <Plus size={14} /> Invite Crew
+          </button>
+
           <span
-            onClick={() => navigate('/club/profile/:id')}
+            onClick={() => navigate(`/club/profile/${user?.id}`)}
             className="cursor-pointer hover:text-white transition-colors"
           >
-            My Profile
+            View Roster
           </span>
-          <span className="cursor-pointer hover:text-white transition-colors">Roster</span>
           <span onClick={logout} className="cursor-pointer hover:text-white transition-colors">Logout</span>
         </div>
       </nav>

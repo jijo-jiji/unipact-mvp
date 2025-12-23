@@ -2,7 +2,8 @@ from django.urls import path
 from django.urls import path
 from .views import (
     RegisterCompanyView, RegisterClubView, LoginView, LogoutView, InviteMemberView, UserView,
-    AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView
+    AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView,
+    ClubPublicProfileView, ClubRosterView
 )
 
 urlpatterns = [
@@ -12,6 +13,10 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('invite/', InviteMemberView.as_view(), name='invite_member'),
     path('me/', UserView.as_view(), name='user_details'),
+    
+    # Public Club Profile & Roster
+    path('club/<int:user_id>/', ClubPublicProfileView.as_view(), name='club_public_profile'),
+    path('club/<int:user_id>/roster/', ClubRosterView.as_view(), name='club_roster'),
     
     # Admin Enpoints
     path('admin/stats/', AdminDashboardStatsView.as_view(), name='admin_stats'),

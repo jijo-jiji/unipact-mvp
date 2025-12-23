@@ -40,13 +40,18 @@ class UserView(views.APIView):
         ver_status = None
         if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
             ver_status = user.company_profile.verification_status
+            name = user.company_profile.company_name
         elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
             ver_status = user.club_profile.verification_status
+            name = user.club_profile.club_name
+        else:
+            name = user.username
 
         return Response({
             "id": user.id,
             "email": user.email,
             "role": user.role,
+            "name": name,
             "verification_status": ver_status,
         })
 
@@ -130,6 +135,33 @@ class InviteMemberView(generics.CreateAPIView):
 
         # Mock Email Sending
         print(f"Sending invitation to {email} with token {token}")
+
+class ClubPublicProfileView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            profile = ClubProfile.objects.get(user_id=user_id)
+            from .serializers import PublicClubProfileSerializer
+            serializer = PublicClubProfileSerializer(profile)
+            return Response(serializer.data)
+        except ClubProfile.DoesNotExist:
+            return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ClubRosterView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            club_profile = ClubProfile.objects.get(user_id=user_id)
+        except ClubProfile.DoesNotExist:
+            return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        shadow_users = ShadowUser.objects.filter(invited_by=club_profile)
+        # Reuse ShadowUserSerializer
+        from .serializers import ShadowUserSerializer
+        serializer = ShadowUserSerializer(shadow_users, many=True)
+        return Response(serializer.data)
 
 class RegisterCompanyView(generics.CreateAPIView):
     queryset = CompanyProfile.objects.all()

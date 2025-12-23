@@ -64,7 +64,7 @@ const CompanyDashboard = () => {
       <nav className="flex justify-between items-center mb-8 bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] shadow-lg">
         <div className="flex items-center gap-2">
           <div className="text-[var(--text-gold)] font-display text-xl tracking-widest uppercase">
-            TechCorp Guild
+            {useAuth().user?.name || 'Loading Corporation...'}
           </div>
           <span className="text-[var(--text-blue)] text-xs border border-[var(--text-blue)] px-2 py-0.5 rounded-sm">
             LVL 5
@@ -73,7 +73,9 @@ const CompanyDashboard = () => {
         <div className="flex items-center gap-4 text-sm text-[var(--text-blue)]">
           <span className="hover:text-[var(--text-gold)] cursor-pointer" onClick={() => navigate('/company/treasury')}>Treasury</span>
           <span className="hover:text-[var(--text-gold)] cursor-pointer" onClick={logout}>Logout</span>
-          <div className="w-8 h-8 bg-[var(--text-gold)] rounded-full flex items-center justify-center text-black font-bold">T</div>
+          <div className="w-8 h-8 bg-[var(--text-gold)] rounded-full flex items-center justify-center text-black font-bold">
+            {useAuth().user?.name?.[0] || 'C'}
+          </div>
         </div>
       </nav>
 

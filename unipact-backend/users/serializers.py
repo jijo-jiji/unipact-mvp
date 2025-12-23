@@ -43,6 +43,11 @@ class ClubProfileSerializer(serializers.ModelSerializer):
         fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document']
         read_only_fields = ['verification_status']
 
+class PublicClubProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubProfile
+        fields = ['id', 'club_name', 'university', 'verification_status']
+
 class ShadowUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShadowUser
