@@ -163,15 +163,17 @@ const StudentDashboard = () => {
       </nav>
 
       {/* 2. SYSTEM ALERT (Verification Status) */}
-      <div className="mb-8 bg-red-500/10 border border-red-500/50 p-4 flex items-start gap-4 rounded-sm animate-pulse">
-        <AlertTriangle className="text-red-500 shrink-0" />
-        <div>
-          <h3 className="text-red-500 font-bold uppercase tracking-wider text-sm">System Restriction: License Pending</h3>
-          <p className="text-gray-400 text-xs mt-1">
-            Your verification documents are under review by the High Council. You cannot accept High-Rank Quests yet.
-          </p>
+      {user?.verification_status !== 'VERIFIED' && (
+        <div className="mb-8 bg-red-500/10 border border-red-500/50 p-4 flex items-start gap-4 rounded-sm animate-pulse">
+          <AlertTriangle className="text-red-500 shrink-0" />
+          <div>
+            <h3 className="text-red-500 font-bold uppercase tracking-wider text-sm">System Restriction: License Pending</h3>
+            <p className="text-gray-400 text-xs mt-1">
+              Your verification documents are under review by the High Council. You cannot accept High-Rank Quests yet.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 3. STATS GRID */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
