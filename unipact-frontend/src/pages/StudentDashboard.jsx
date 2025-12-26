@@ -19,6 +19,7 @@ const StudentDashboard = () => {
   const { logout, user } = useAuth();
   /* API INTEGRATION */
   const [applications, setApplications] = useState([]);
+  const [bounties, setBounties] = useState([]); // [NEW] State for Bounties
   const [loading, setLoading] = useState(true);
 
   // INVITE MODAL STATE
@@ -28,17 +29,29 @@ const StudentDashboard = () => {
   const [inviteStatus, setInviteStatus] = useState(null); // 'success', 'error', 'loading'
 
   useEffect(() => {
-    const fetchApps = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/campaigns/applications/me/');
-        setApplications(response.data);
+        setLoading(true);
+        // 1. Fetch My Applications
+        const appsRes = await api.get('/campaigns/applications/me/');
+        setApplications(appsRes.data);
+
+        // 2. Fetch Open Bounties (Campaigns)
+        const campaignsRes = await api.get('/campaigns/');
+        // Filter for OPEN campaigns that I haven't applied to yet
+        const myAppIds = new Set(appsRes.data.map(app => app.campaign));
+        const openBounties = campaignsRes.data.filter(
+          c => c.status === 'OPEN' && !myAppIds.has(c.id)
+        );
+        setBounties(openBounties.slice(0, 3)); // Top 3
+
       } catch (error) {
-        console.error("Failed to fetch applications", error);
+        console.error("Failed to fetch dashboard data", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchApps();
+    fetchData();
   }, []);
 
   const handleInvite = async (e) => {
@@ -181,7 +194,7 @@ const StudentDashboard = () => {
           { label: 'Active Raids', value: activeMissions.length, icon: Target, color: 'text-[#a020f0]' },
           { label: 'Pending Bids', value: otherBids.filter(a => a.status === 'PENDING').length, icon: Clock, color: 'text-blue-400' },
           { label: 'Quest Wins', value: applications.filter(a => a.status === 'AWARDED').length, icon: Shield, color: 'text-green-400' },
-          { label: 'Total Loot', value: 'RM 0', icon: Zap, color: 'text-yellow-400' },
+          { label: 'Total Loot', value: 'RM ' + activeMissions.reduce((acc, curr) => acc + (curr.budget || 0), 0), icon: Zap, color: 'text-yellow-400' },
         ].map((stat, index) => (
           <div key={index} className="bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] relative group">
             <div className="flex justify-between items-start mb-2">
@@ -215,7 +228,7 @@ const StudentDashboard = () => {
                   In Progress
                 </div>
                 <h3 className="text-xl font-bold text-white mb-1">{app.campaign_title}</h3>
-                <p className="text-sm text-gray-400 mb-4">Application Status: {app.status}</p>
+                <p className="text-sm text-gray-400 mb-4">Status: {app.status}</p>
 
                 <div className="w-full bg-black/50 h-1.5 mb-4">
                   <div className="bg-[#a020f0] h-1.5 w-[50%] shadow-[0_0_10px_#a020f0]"></div>
@@ -235,7 +248,7 @@ const StudentDashboard = () => {
           <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-4">
             <div className="text-xs text-gray-500 uppercase mb-4 tracking-wider">Recent Bids</div>
             <div className="space-y-3">
-              {otherBids.map(app => (
+              {otherBids.length > 0 ? otherBids.map(app => (
                 <div key={app.id} className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
                   <div>
                     <div className="text-white font-bold">{app.campaign_title}</div>
@@ -246,7 +259,7 @@ const StudentDashboard = () => {
                     {app.status.replace('_', ' ')}
                   </span>
                 </div>
-              ))}
+              )) : <div className="text-xs text-gray-600 italic">No recent activity.</div>}
             </div>
           </div>
         </div>
@@ -257,29 +270,30 @@ const StudentDashboard = () => {
             <h2 className="text-lg font-display uppercase tracking-wider text-white">Bounty Board</h2>
           </div>
 
-          {/* Bounty Card 1 */}
-          <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-4 hover:border-[#a020f0] transition-colors cursor-pointer group">
-            <div className="flex justify-between items-start mb-2">
-              <div className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 border border-green-500/30 uppercase">
-                RM 2,000
+          {loading ? (
+            <div className="text-xs text-center text-gray-500 animate-pulse py-8">Scanning Network...</div>
+          ) : bounties.length > 0 ? (
+            bounties.map(campaign => (
+              <div
+                key={campaign.id}
+                onClick={() => navigate(`/quest/${campaign.id}`)}
+                className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-4 hover:border-[#a020f0] transition-colors cursor-pointer group"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 border border-green-500/30 uppercase">
+                    RM {campaign.budget}
+                  </div>
+                  <ChevronRight className="text-gray-600 group-hover:text-[#a020f0] transition-colors" size={16} />
+                </div>
+                <h4 className="font-bold text-white mb-1 group-hover:text-[#a020f0] transition-colors">{campaign.title}</h4>
+                <p className="text-xs text-gray-400">{campaign.company_name || 'Anonymous Client'}</p>
               </div>
-              <ChevronRight className="text-gray-600 group-hover:text-[#a020f0] transition-colors" size={16} />
+            ))
+          ) : (
+            <div className="text-xs text-gray-500 text-center py-8 border border-dashed border-gray-800">
+              No open bounties available in sector.
             </div>
-            <h4 className="font-bold text-white mb-1 group-hover:text-[#a020f0] transition-colors">Cybersecurity Awareness</h4>
-            <p className="text-xs text-gray-400">TechCorp Inc.</p>
-          </div>
-
-          {/* Bounty Card 2 */}
-          <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-4 hover:border-[#a020f0] transition-colors cursor-pointer group">
-            <div className="flex justify-between items-start mb-2">
-              <div className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 border border-green-500/30 uppercase">
-                RM 500
-              </div>
-              <ChevronRight className="text-gray-600 group-hover:text-[#a020f0] transition-colors" size={16} />
-            </div>
-            <h4 className="font-bold text-white mb-1 group-hover:text-[#a020f0] transition-colors">Logo Redesign</h4>
-            <p className="text-xs text-gray-400">StartUp PLT</p>
-          </div>
+          )}
 
           <button onClick={() => navigate('/quests')}
             className="w-full py-3 border border-dashed border-gray-600 text-gray-400 text-xs uppercase tracking-widest hover:border-[#a020f0] hover:text-[#a020f0] transition-all flex items-center justify-center gap-2">

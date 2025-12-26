@@ -2,12 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { ArrowLeft, Users, Trophy, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import PaymentModal from '../components/PaymentModal';
+
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const ManageCampaign = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [campaign, setCampaign] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [pendingAwardId, setPendingAwardId] = useState(null);
+
+    // Confirmation State
+    const [confirmState, setConfirmState] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        isDanger: false
+    });
 
     useEffect(() => {
         const fetchCampaign = async () => {
@@ -24,11 +39,7 @@ const ManageCampaign = () => {
         fetchCampaign();
     }, [id]);
 
-    const handleAward = async (applicationId, clubName) => {
-        if (!window.confirm(`Are you sure you want to award the contract to ${clubName}? This action is irreversible.`)) {
-            return;
-        }
-
+    const executeAward = async (applicationId, clubName) => {
         try {
             await api.post(`/campaigns/application/${applicationId}/award/`);
             alert("Contract Awarded Successfully!");
@@ -36,16 +47,47 @@ const ManageCampaign = () => {
             const response = await api.get(`/campaigns/${id}/`);
             setCampaign(response.data);
         } catch (error) {
-            console.error("Failed to award", error);
-            alert("Awarding Failed: " + (error.response?.data?.error || "Unknown Error"));
+            if (error.response?.status === 402) {
+                // Payment Required - Trigger Custom Confirmation
+                setConfirmState({
+                    isOpen: true,
+                    title: 'Payment Required',
+                    message: "A Finder's Fee (RM 100) is required to award this contract. Proceed to payment?",
+                    confirmText: 'Procure Funds',
+                    cancelText: 'Abort',
+                    isDanger: false,
+                    onConfirm: () => {
+                        setPendingAwardId({ applicationId, clubName });
+                        setPaymentModalOpen(true);
+                    }
+                });
+            } else {
+                console.error("Failed to award", error);
+                alert("Awarding Failed: " + (error.response?.data?.error || "Unknown Error"));
+            }
         }
     };
 
-    const handleComplete = async () => {
-        if (!window.confirm("Confirm Mission Completion? This will release funds and close the project.")) {
-            return;
-        }
+    const handleAwardClick = (applicationId, clubName) => {
+        setConfirmState({
+            isOpen: true,
+            title: 'Confirm Contract Award',
+            message: `Are you sure you want to award the contract to ${clubName}? This action is irreversible.`,
+            confirmText: 'Award Contract',
+            isDanger: false,
+            onConfirm: () => executeAward(applicationId, clubName)
+        });
+    };
 
+    const handlePaymentSuccess = () => {
+        if (pendingAwardId) {
+            // Retry award after payment
+            executeAward(pendingAwardId.applicationId, pendingAwardId.clubName);
+            setPendingAwardId(null);
+        }
+    };
+
+    const executeComplete = async () => {
         try {
             await api.post(`/campaigns/${id}/complete/`);
             alert("Mission Accomplished! Report Generated.");
@@ -56,6 +98,17 @@ const ManageCampaign = () => {
             console.error("Completion failed", error);
             alert("Failed to complete campaign: " + (error.response?.data?.error || "Unknown Error"));
         }
+    };
+
+    const handleCompleteClick = () => {
+        setConfirmState({
+            isOpen: true,
+            title: 'Confirm Mission Completion',
+            message: "Confirm Mission Completion? This will release funds and close the project.",
+            confirmText: 'Complete Mission',
+            isDanger: true,
+            onConfirm: () => executeComplete()
+        });
     };
 
     if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
@@ -95,7 +148,13 @@ const ManageCampaign = () => {
                                 <div key={app.id} className="bg-black/30 border border-white/10 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <h3 className="text-lg font-bold text-white">{app.club_name}</h3>
+                                            <h3
+                                                className="text-lg font-bold text-white hover:text-[#a020f0] cursor-pointer transition-colors"
+                                                onClick={() => navigate(`/club/profile/${app.club_user_id}`)}
+                                                title="View Club Profile"
+                                            >
+                                                {app.club_name}
+                                            </h3>
                                             {app.status === 'AWARDED' && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30 font-bold uppercase">Winner</span>}
                                         </div>
                                         <p className="text-gray-400 text-sm mt-1">"{app.message}"</p>
@@ -109,7 +168,7 @@ const ManageCampaign = () => {
                                         {/* AWARDING PHASE */}
                                         {campaign.status === 'OPEN' && app.status === 'PENDING' && (
                                             <button
-                                                onClick={() => handleAward(app.id, app.club_name)}
+                                                onClick={() => handleAwardClick(app.id, app.club_name)}
                                                 className="bg-[#a020f0] hover:bg-[#8e1cc1] text-white px-4 py-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
                                             >
                                                 <Trophy size={14} /> Award Contract
@@ -140,7 +199,7 @@ const ManageCampaign = () => {
                                                 )}
 
                                                 <button
-                                                    onClick={handleComplete}
+                                                    onClick={handleCompleteClick}
                                                     className="mt-4 bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
                                                 >
                                                     <CheckCircle size={14} /> Approve & Complete
@@ -155,6 +214,25 @@ const ManageCampaign = () => {
                 </div>
 
             </div>
+
+            <PaymentModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setPaymentModalOpen(false)}
+                amount={100}
+                description={`Finder's Fee for ${campaign.title}`}
+                onSuccess={handlePaymentSuccess}
+                campaignId={campaign.id}
+            />
+
+            <ConfirmationModal
+                isOpen={confirmState.isOpen}
+                onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmState.onConfirm}
+                title={confirmState.title}
+                message={confirmState.message}
+                confirmText={confirmState.confirmText}
+                isDanger={confirmState.isDanger}
+            />
         </div>
     );
 };

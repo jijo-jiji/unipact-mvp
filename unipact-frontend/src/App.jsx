@@ -109,7 +109,7 @@ function App() {
         <Route
           path="/club/profile/:id"
           element={
-            <ProtectedRoute allowedRole="CLUB">
+            <ProtectedRoute allowedRole={['CLUB', 'COMPANY']}>
               <ClubProfile />
             </ProtectedRoute>
           }

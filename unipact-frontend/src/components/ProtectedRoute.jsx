@@ -21,14 +21,19 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     }
 
     // 2. Role Verification
-    if (allowedRole && user.role !== allowedRole) {
-        // Redirect to their appropriate dashboard if they try to access wrong area
-        if (user.role === 'COMPANY') {
-            return <Navigate to="/company/dashboard" replace />;
-        } else if (user.role === 'CLUB') {
-            return <Navigate to="/student/dashboard" replace />;
-        } else if (user.role === 'ADMIN') {
-            return <Navigate to="/admin" replace />;
+    // 2. Role Verification
+    if (allowedRole) {
+        const roles = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
+
+        if (!roles.includes(user.role)) {
+            // Redirect to their appropriate dashboard if they try to access wrong area
+            if (user.role === 'COMPANY') {
+                return <Navigate to="/company/dashboard" replace />;
+            } else if (user.role === 'CLUB') {
+                return <Navigate to="/student/dashboard" replace />;
+            } else if (user.role === 'ADMIN') {
+                return <Navigate to="/admin" replace />;
+            }
         }
     }
 

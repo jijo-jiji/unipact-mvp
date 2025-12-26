@@ -17,9 +17,17 @@ class IsClub(permissions.BasePermission):
         return request.user.role == User.Role.CLUB
 
 class CampaignListCreateView(generics.ListCreateAPIView):
-    queryset = Campaign.objects.all()
     serializer_class = CampaignSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        mode = self.request.query_params.get('mode')
+        # Mode: my_campaigns (For Companies to manage their own)
+        if mode == 'my_campaigns' and self.request.user.role == User.Role.COMPANY:
+            return Campaign.objects.filter(company=self.request.user.company_profile)
+        
+        # Default: Only show OPEN campaigns (Public Board)
+        return Campaign.objects.filter(status=Campaign.Status.OPEN)
 
     def perform_create(self, serializer):
         # Ensure only companies can create

@@ -39,6 +39,10 @@ class CompanyProfile(models.Model):
         default=VerificationStatus.PENDING_REVIEW
     )
     ssm_document = models.FileField(upload_to='company_docs/', blank=True, null=True)
+    
+    # Payment Method Details (Mock Storage)
+    card_last_4 = models.CharField(max_length=4, blank=True, null=True)
+    card_brand = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
         return self.company_name

@@ -34,7 +34,7 @@ const CompanyDashboard = () => {
   useEffect(() => {
     const fetchCampaigns = async () => {
       try {
-        const response = await api.get('/campaigns/');
+        const response = await api.get('/campaigns/?mode=my_campaigns');
         setCampaigns(response.data);
       } catch (error) {
         console.error("Failed to fetch campaigns", error);
@@ -100,12 +100,13 @@ const CompanyDashboard = () => {
       </div>
 
       {/* 3. STATS GRID */}
+      {/* 3. STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Recruiting', value: '02', icon: Users },
-          { label: 'Active Raids', value: '01', icon: Activity },
-          { label: 'Completed', value: '14', icon: Trophy },
-          { label: 'Guild Rank', value: 'S', icon: Star, color: 'text-[var(--text-gold)]' },
+          { label: 'Recruiting', value: campaigns.filter(c => c.status === 'OPEN').length.toString().padStart(2, '0'), icon: Users },
+          { label: 'Active Raids', value: campaigns.filter(c => c.status === 'IN_PROGRESS').length.toString().padStart(2, '0'), icon: Activity },
+          { label: 'Completed', value: campaigns.filter(c => c.status === 'COMPLETED').length.toString().padStart(2, '0'), icon: Trophy },
+          { label: 'Guild Rank', value: 'S', icon: Star, color: 'text-[var(--text-gold)]' }, // Still static for now
         ].map((stat, index) => (
           <div key={index} className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 relative group hover:border-[var(--text-gold)] transition-all">
             <div className="flex justify-between items-start mb-2">

@@ -38,9 +38,16 @@ class UserView(views.APIView):
     def get(self, request):
         user = request.user
         ver_status = None
+        tier = None
+        card_last_4 = None
+        card_brand = None
+        
         if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
             ver_status = user.company_profile.verification_status
+            tier = user.company_profile.tier
             name = user.company_profile.company_name
+            card_last_4 = user.company_profile.card_last_4
+            card_brand = user.company_profile.card_brand
         elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
             ver_status = user.club_profile.verification_status
             name = user.club_profile.club_name
@@ -53,6 +60,9 @@ class UserView(views.APIView):
             "role": user.role,
             "name": name,
             "verification_status": ver_status,
+            "tier": tier,
+            "card_last_4": card_last_4,
+            "card_brand": card_brand,
         })
 
 class LoginView(views.APIView):
@@ -66,12 +76,15 @@ class LoginView(views.APIView):
         if user:
             tokens = get_tokens_for_user(user)
             
-            # Determine verification status based on role
+            # Determine verification status and name based on role
             ver_status = None
+            name = user.username
             if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
                 ver_status = user.company_profile.verification_status
+                name = user.company_profile.company_name
             elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
                 ver_status = user.club_profile.verification_status
+                name = user.club_profile.club_name
 
             response = Response({
                 "message": "Login successful",
@@ -79,6 +92,7 @@ class LoginView(views.APIView):
                     "id": user.id,
                     "email": user.email,
                     "role": user.role,
+                    "name": name,
                     "verification_status": ver_status,
                 }
             }, status=status.HTTP_200_OK)
@@ -217,6 +231,7 @@ class RegisterCompanyView(generics.CreateAPIView):
                 "id": user.id,
                 "email": user.email,
                 "role": user.role,
+                "name": company_name,
                 "verification_status": profile.verification_status,
             }
         }, status=status.HTTP_201_CREATED)
@@ -274,6 +289,7 @@ class RegisterClubView(generics.CreateAPIView):
                 "id": user.id,
                 "email": user.email,
                 "role": user.role,
+                "name": club_name,
                 "verification_status": profile.verification_status,
             }
         }, status=status.HTTP_201_CREATED)
