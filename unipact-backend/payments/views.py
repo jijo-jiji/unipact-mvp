@@ -82,7 +82,6 @@ class TransactionHistoryView(APIView):
         
         transactions = Transaction.objects.filter(company=request.user.company_profile).order_by('-created_at')
         serializer = TransactionSerializer(transactions, many=True)
-        serializer = TransactionSerializer(transactions, many=True)
         return Response(serializer.data)
 
 class TreasurySummaryView(APIView):

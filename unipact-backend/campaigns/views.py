@@ -24,10 +24,10 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         mode = self.request.query_params.get('mode')
         # Mode: my_campaigns (For Companies to manage their own)
         if mode == 'my_campaigns' and self.request.user.role == User.Role.COMPANY:
-            return Campaign.objects.filter(company=self.request.user.company_profile)
+            return Campaign.objects.filter(company=self.request.user.company_profile).select_related('company')
         
         # Default: Only show OPEN campaigns (Public Board)
-        return Campaign.objects.filter(status=Campaign.Status.OPEN)
+        return Campaign.objects.filter(status=Campaign.Status.OPEN).select_related('company')
 
     def perform_create(self, serializer):
         # Ensure only companies can create
@@ -53,9 +53,10 @@ class CampaignDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         # Companies can only edit their own
+        # Companies can only edit their own
         if self.request.user.role == User.Role.COMPANY:
-            return Campaign.objects.filter(company=self.request.user.company_profile)
-        return Campaign.objects.all() # Clubs can view all (read-only logic needed in serializer or permission)
+            return Campaign.objects.filter(company=self.request.user.company_profile).prefetch_related('applications__club__user')
+        return Campaign.objects.all().select_related('company').prefetch_related('applications__club__user') # Clubs can view all (read-only logic needed in serializer or permission)
 
 class ApplicationCreateView(generics.CreateAPIView):
     serializer_class = ApplicationSerializer
