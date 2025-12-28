@@ -1,13 +1,13 @@
 from rest_framework import serializers
-from .models import Transaction, Subscription
-
-class TransactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Transaction
-        fields = ['id', 'company', 'amount', 'transaction_type', 'status', 'related_campaign', 'created_at']
-        read_only_fields = ['company', 'status', 'created_at']
+from .models import Subscription, Transaction
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
-        fields = ['id', 'company', 'plan_name', 'status', 'start_date', 'end_date', 'auto_renew']
+        fields = ['plan_name', 'status', 'start_date', 'end_date', 'auto_renew']
+
+class TreasurySummarySerializer(serializers.Serializer):
+    subscription = SubscriptionSerializer(read_only=True)
+    transactions = serializers.ListField(child=serializers.DictField())
+    tier = serializers.CharField()
+    balance = serializers.DecimalField(max_digits=12, decimal_places=2) # Mocked available balance

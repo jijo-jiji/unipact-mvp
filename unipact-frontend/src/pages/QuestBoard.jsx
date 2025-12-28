@@ -101,9 +101,12 @@ const QuestBoard = () => {
             >
               {/* Left: Info */}
               <div className="flex items-center gap-6 w-full md:w-auto">
-                {/* Rank Badge - Static for MVP or calculated based on Budget? */}
-                <div className={`w-12 h-12 flex items-center justify-center font-display font-bold text-xl border-2 border-purple-500 text-purple-500`}>
-                  A
+                {/* Dynamic Rank Badge */}
+                <div className={`w-12 h-12 flex items-center justify-center font-display font-bold text-xl border-2 
+                  ${quest.budget >= 5000 ? 'border-yellow-400 text-yellow-400' :
+                    quest.budget >= 1000 ? 'border-purple-500 text-purple-500' :
+                      'border-gray-500 text-gray-500'}`}>
+                  {quest.budget >= 5000 ? 'S' : quest.budget >= 1000 ? 'A' : 'B'}
                 </div>
 
                 <div>

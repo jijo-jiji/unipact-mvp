@@ -5,8 +5,9 @@ from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
 from .models import Transaction
-from .serializers import TransactionSerializer
 from campaigns.models import Campaign
+from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
+from .models import Transaction, Subscription
 
 class CreatePaymentIntentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -81,6 +82,39 @@ class TransactionHistoryView(APIView):
         
         transactions = Transaction.objects.filter(company=request.user.company_profile).order_by('-created_at')
         serializer = TransactionSerializer(transactions, many=True)
+        serializer = TransactionSerializer(transactions, many=True)
+        return Response(serializer.data)
+
+class TreasurySummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.COMPANY:
+             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        company = request.user.company_profile
+        
+        # Get/Create Mock Subscription (for MVP)
+        subscription, _ = Subscription.objects.get_or_create(
+            company=company,
+            defaults={
+                'plan_name': company.tier,
+                'status': Subscription.Status.ACTIVE,
+                'start_date': "2024-01-01T00:00:00Z",
+                'end_date': "2025-01-01T00:00:00Z"
+            }
+        )
+
+        transactions = Transaction.objects.filter(company=company).order_by('-created_at')[:5]
+        
+        data = {
+            "tier": company.tier,
+            "subscription": subscription,
+            "transactions": TransactionSerializer(transactions, many=True).data,
+            "balance": 15000.00 # Mock Balance
+        }
+        
+        serializer = TreasurySummarySerializer(data)
         return Response(serializer.data)
 
 class CreateTransactionView(generics.CreateAPIView):

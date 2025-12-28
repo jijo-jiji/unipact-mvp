@@ -10,6 +10,20 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'username', 'role', 'is_verified']
         read_only_fields = ['role', 'is_verified']
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.role == User.Role.COMPANY:
+            try:
+                representation['company_profile'] = CompanyProfileSerializer(instance.company_profile).data
+            except CompanyProfile.DoesNotExist:
+                representation['company_profile'] = None
+        elif instance.role == User.Role.CLUB:
+            try:
+                representation['club_profile'] = ClubProfileSerializer(instance.club_profile).data
+            except ClubProfile.DoesNotExist:
+                representation['club_profile'] = None
+        return representation
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     

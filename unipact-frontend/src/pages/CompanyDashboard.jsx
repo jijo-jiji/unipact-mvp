@@ -28,22 +28,27 @@ const CompanyDashboard = () => {
 
   // STATE: Campaigns
   const [campaigns, setCampaigns] = useState([]);
+  const [treasury, setTreasury] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // FETCH CAMPAIGNS
+  // FETCH DATA
   useEffect(() => {
-    const fetchCampaigns = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/campaigns/?mode=my_campaigns');
-        setCampaigns(response.data);
+        const [campaignsRes, treasuryRes] = await Promise.all([
+          api.get('/campaigns/?mode=my_campaigns'),
+          api.get('/payments/treasury/')
+        ]);
+        setCampaigns(campaignsRes.data);
+        setTreasury(treasuryRes.data);
       } catch (error) {
-        console.error("Failed to fetch campaigns", error);
+        console.error("Failed to fetch dashboard data", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCampaigns();
+    fetchData();
   }, []);
 
   // Filter the list based on the selected tab
@@ -64,10 +69,10 @@ const CompanyDashboard = () => {
       <nav className="flex justify-between items-center mb-8 bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] shadow-lg">
         <div className="flex items-center gap-2">
           <div className="text-[var(--text-gold)] font-display text-xl tracking-widest uppercase">
-            {useAuth().user?.name || 'Loading Corporation...'}
+            {useAuth().user?.company_profile?.company_name || useAuth().user?.name || 'Loading...'}
           </div>
           <span className="text-[var(--text-blue)] text-xs border border-[var(--text-blue)] px-2 py-0.5 rounded-sm">
-            LVL 5
+            {treasury?.tier || 'FREE'}
           </span>
         </div>
         <div className="flex items-center gap-4 text-sm text-[var(--text-blue)]">
@@ -106,7 +111,7 @@ const CompanyDashboard = () => {
           { label: 'Recruiting', value: campaigns.filter(c => c.status === 'OPEN').length.toString().padStart(2, '0'), icon: Users },
           { label: 'Active Raids', value: campaigns.filter(c => c.status === 'IN_PROGRESS').length.toString().padStart(2, '0'), icon: Activity },
           { label: 'Completed', value: campaigns.filter(c => c.status === 'COMPLETED').length.toString().padStart(2, '0'), icon: Trophy },
-          { label: 'Guild Rank', value: 'S', icon: Star, color: 'text-[var(--text-gold)]' }, // Still static for now
+          { label: 'Guild Rank', value: treasury?.tier === 'PRO' ? 'S' : 'B', icon: Star, color: 'text-[var(--text-gold)]' },
         ].map((stat, index) => (
           <div key={index} className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 relative group hover:border-[var(--text-gold)] transition-all">
             <div className="flex justify-between items-start mb-2">
@@ -202,7 +207,7 @@ const CompanyDashboard = () => {
 
                     {/* ACTION BUTTON - The crucial link to the next step */}
                     <button
-                      onClick={() => navigate(`/company/campaign/${camp.id}/manage`)}
+                      onClick={() => navigate(`/manage-campaign/${camp.id}`)}
                       className="flex items-center gap-2 text-xs uppercase font-bold text-[var(--text-gold)] border border-[var(--text-gold)] px-4 py-2 hover:bg-[var(--text-gold)] hover:text-black transition-colors"
                     >
                       {activeTab === 'recruiting' && <><Search size={14} /> Inspect Candidates</>}
@@ -227,11 +232,13 @@ const CompanyDashboard = () => {
           </h2>
 
           <div className="bg-gradient-to-b from-[var(--text-gold)]/10 to-transparent p-6 text-center border border-[var(--text-gold)]/30 mb-4">
-            <h3 className="text-xl text-white font-bold mb-1">Diamond Tier</h3>
-            <p className="text-[var(--text-blue)] text-xs mb-4">Active until Dec 20, 2025</p>
-            <div className="text-green-400 text-xs flex items-center justify-center gap-1">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              System Optimal
+            <h3 className="text-xl text-white font-bold mb-1">{treasury?.subscription?.plan_name || 'Free Tier'}</h3>
+            <p className="text-[var(--text-blue)] text-xs mb-4">
+              {treasury?.subscription?.auto_renew ? 'Auto-renews' : 'Expires'} on {new Date(treasury?.subscription?.end_date).toLocaleDateString()}
+            </p>
+            <div className={`text-xs flex items-center justify-center gap-1 ${treasury?.subscription?.status === 'ACTIVE' ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`w-2 h-2 rounded-full animate-pulse ${treasury?.subscription?.status === 'ACTIVE' ? 'bg-green-400' : 'bg-red-400'}`}></span>
+              {treasury?.subscription?.status || 'Inactive'}
             </div>
           </div>
 
