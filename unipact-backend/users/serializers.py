@@ -54,13 +54,40 @@ class ClubProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ClubProfile
-        fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document']
-        read_only_fields = ['verification_status']
+        fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document', 'rank']
+        read_only_fields = ['verification_status', 'rank']
 
 class PublicClubProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClubProfile
-        fields = ['id', 'club_name', 'university', 'verification_status']
+        fields = ['id', 'club_name', 'university', 'verification_status', 'rank']
+
+class AdminEntityListSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+    entity_name = serializers.SerializerMethodField()
+    details = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'role', 'entity_name', 'status', 'details', 'is_verified']
+
+    def get_entity_name(self, obj):
+        if obj.role == User.Role.CLUB and hasattr(obj, 'club_profile'):
+            return obj.club_profile.club_name
+        elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
+            return obj.company_profile.company_name
+        return "Unknown"
+
+    def get_details(self, obj):
+        if obj.role == User.Role.CLUB and hasattr(obj, 'club_profile'):
+            return f"Rank: {obj.club_profile.rank}"
+        elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
+            return f"Tier: {obj.company_profile.tier}"
+        return "-"
+
+    def get_status(self, obj):
+        return "Active" if obj.is_active else "Blocked"
 
 class ShadowUserSerializer(serializers.ModelSerializer):
     class Meta:

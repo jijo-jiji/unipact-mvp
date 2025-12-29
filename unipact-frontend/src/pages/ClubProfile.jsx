@@ -20,7 +20,7 @@ const ClubProfile = () => {
       try {
         setLoading(true);
         // 1. Fetch Club Details
-        const clubRes = await api.get(`/users/club/${id}/`);
+        const clubRes = await api.get(`/users/club/${id}/profile/`);
         setClub(clubRes.data);
 
         // 2. Fetch Roster

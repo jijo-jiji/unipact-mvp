@@ -5,9 +5,18 @@ from django.contrib.auth import authenticate, logout
 from django.db import transaction
 from rest_framework import exceptions
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import CompanyProfileSerializer, ClubProfileSerializer, UserSerializer, ShadowUserSerializer
-from .models import User, CompanyProfile, ClubProfile, ShadowUser
+from .models import User, CompanyProfile, ClubProfile, ShadowUser, SystemLog
 from .utils import is_public_domain
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+from rest_framework.pagination import PageNumberPagination
+from .serializers import (
+    CompanyProfileSerializer, 
+    ClubProfileSerializer, 
+    UserSerializer, 
+    ShadowUserSerializer, 
+    AdminEntityListSerializer
+)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -309,8 +318,12 @@ class AdminDashboardStatsView(views.APIView):
         system_flags = CompanyProfile.objects.filter(verification_status=CompanyProfile.VerificationStatus.HIGH_RISK).count()
         total_users = User.objects.count()
         
-        # Mock Revenue for MVP
-        revenue = "RM 120k" 
+        # Dynamic Revenue
+        from payments.models import Transaction
+        from django.db.models import Sum
+        
+        total_rev = Transaction.objects.filter(status=Transaction.Status.SUCCESS).aggregate(Sum('amount'))['amount__sum'] or 0
+        revenue = f"RM {total_rev:,.2f}" 
 
         return Response({
             "pending_reviews": pending_reviews,
@@ -407,6 +420,42 @@ class AdminSystemLogsView(views.APIView):
         from .models import SystemLog
         from .serializers import SystemLogSerializer
         
-        logs = SystemLog.objects.all()[:50] # Last 50 logs
+        logs = SystemLog.objects.all()[:50]
         serializer = SystemLogSerializer(logs, many=True)
         return Response(serializer.data)
+        
+class AdminEntityListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AdminEntityListSerializer
+    pagination_class = PageNumberPagination
+    pagination_class.page_size = 10 # Explicitly set page size
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['role', 'company_profile__tier', 'club_profile__rank']
+    search_fields = ['email', 'company_profile__company_name', 'club_profile__club_name']
+
+    def get_queryset(self):
+        if self.request.user.role != User.Role.ADMIN:
+             raise exceptions.PermissionDenied("Admin access required.")
+        return User.objects.filter(role__in=[User.Role.CLUB, User.Role.COMPANY]).order_by('-date_joined')
+
+class AdminBlockUserView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        if request.user.role != User.Role.ADMIN:
+             raise exceptions.PermissionDenied("Admin access required.")
+        
+        try:
+            user = User.objects.get(id=user_id)
+            # Toggle status
+            user.is_active = not user.is_active
+            user.save()
+            
+            from .models import SystemLog
+            from .utils import log_event
+            status_str = "Unblocked" if user.is_active else "Blocked"
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.WARNING, f"Admin {status_str} User: {user.email}")
+            
+            return Response({"message": f"User {status_str} successfully", "is_active": user.is_active})
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)

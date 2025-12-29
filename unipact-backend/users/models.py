@@ -53,6 +53,12 @@ class ClubProfile(models.Model):
         VERIFIED = 'VERIFIED', _('Verified')
         REJECTED = 'REJECTED', _('Rejected')
 
+    class Rank(models.TextChoices):
+        S = 'S', _('S-Class')
+        A = 'A', _('A-Class')
+        B = 'B', _('B-Class')
+        C = 'C', _('C-Class')
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='club_profile')
     club_name = models.CharField(max_length=255)
     university = models.CharField(max_length=255)
@@ -61,7 +67,19 @@ class ClubProfile(models.Model):
         choices=VerificationStatus.choices, 
         default=VerificationStatus.PENDING_VERIFICATION
     )
+    rank = models.CharField(
+        max_length=2,
+        choices=Rank.choices,
+        default=Rank.C
+    )
     verification_document = models.FileField(upload_to='club_docs/', blank=True, null=True)
+
+    def calculate_rank(self):
+        """
+        Stub for rank calculation logic based on campaign budget and ratings.
+        To be implemented later.
+        """
+        pass
 
     def __str__(self):
         return self.club_name
