@@ -79,11 +79,17 @@ class ClubProfile(models.Model):
         # Avoid circular import
         from reviews.models import Review
         from django.db.models import Avg
+        from django.utils import timezone
+        from datetime import timedelta
 
-        avg_rating = Review.objects.filter(reviewee=self).aggregate(Avg('rating'))['rating__avg']
+        # Rolling Window: Last 365 Days
+        one_year_ago = timezone.now() - timedelta(days=365)
+        
+        recent_reviews = Review.objects.filter(reviewee=self, created_at__gte=one_year_ago)
+        avg_rating = recent_reviews.aggregate(Avg('rating'))['rating__avg']
         
         if avg_rating is None:
-            self.rank = 'C' # Default start
+            self.rank = 'C' # Default start or Reset if inactive
         elif avg_rating >= 4.5:
             self.rank = 'S'
         elif avg_rating >= 4.0:
