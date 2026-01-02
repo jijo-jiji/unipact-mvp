@@ -6,6 +6,8 @@ from django.db import transaction
 from rest_framework import exceptions
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, CompanyProfile, ClubProfile, ShadowUser, SystemLog
+from django.shortcuts import get_object_or_404
+
 from .utils import is_public_domain
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -15,7 +17,8 @@ from .serializers import (
     ClubProfileSerializer, 
     UserSerializer, 
     ShadowUserSerializer, 
-    AdminEntityListSerializer
+    AdminEntityListSerializer,
+    ClaimProfileSerializer
 )
 
 def get_tokens_for_user(user):
@@ -159,6 +162,97 @@ class InviteMemberView(generics.CreateAPIView):
         # Mock Email Sending
         print(f"Sending invitation to {email} with token {token}")
 
+class ClaimProfileView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ClaimProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        token = serializer.validated_data['token']
+        password = serializer.validated_data['password']
+        first_name = serializer.validated_data.get('first_name', '')
+        last_name = serializer.validated_data.get('last_name', '')
+
+        try:
+            shadow = ShadowUser.objects.get(token=token, is_claimed=False)
+        except ShadowUser.DoesNotExist:
+            return Response({"error": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Create User
+            user = User.objects.create_user(
+                username=shadow.email, # Use email as username
+                email=shadow.email,
+                password=password,
+                role=User.Role.CLUB,  # Or a new 'STUDENT' role? For now Club Member is just a user
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Link & Claim
+            shadow.user = user
+            shadow.is_claimed = True
+            shadow.save()
+
+        # Generate tokens
+        tokens = get_tokens_for_user(user)
+        response = Response({
+            "message": "Profile claimed successfully!",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": f"{first_name} {last_name}"
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+        set_auth_cookies(response, tokens)
+        return response
+
+class TransferOwnershipView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Only existing President (Club Profile Owner) can do this
+        if request.user.role != User.Role.CLUB or not hasattr(request.user, 'club_profile'):
+             raise exceptions.PermissionDenied("Only Club Presidents can transfer ownership.")
+        
+        club_profile = request.user.club_profile
+        new_owner_email = request.data.get('new_owner_email')
+        
+        if not new_owner_email:
+            return Response({"error": "New owner email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the new owner
+        # They must be a claimed member (linked via ShadowUser) OR just a valid User
+        try:
+            new_owner = User.objects.get(email=new_owner_email)
+        except User.DoesNotExist:
+             return Response({"error": "User not found. Invite them first."}, status=status.HTTP_404_NOT_FOUND)
+
+        if new_owner.role != User.Role.CLUB:
+             return Response({"error": "New owner must be a Club/Student user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Logic: Swap
+        # The ClubProfile is OneToOne with User. We need to update that FK.
+        # But OneToOne is unique. request.user is currently holding it.
+        # So:
+        # 1. Update request.user.club_profile = None? No, accessed via related_name.
+        #    We set club_profile.user = new_owner.
+        
+        with transaction.atomic():
+            club_profile.user = new_owner
+            club_profile.save()
+            
+            # Log
+            from .models import SystemLog
+            from .utils import log_event
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.WARNING, f"Club Ownership Transferred: {club_profile.club_name} from {request.user.email} -> {new_owner_email}")
+
+        return Response({
+            "message": f"Ownership transferred to {new_owner_email}. You are no longer the President."
+        })
+
 class ClubPublicProfileView(views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -181,19 +275,39 @@ class ClubRosterView(views.APIView):
             return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
 
         shadow_users = ShadowUser.objects.filter(invited_by=club_profile)
-        # Reuse ShadowUserSerializer
-        from .serializers import ShadowUserSerializer
-        serializer = ShadowUserSerializer(shadow_users, many=True)
         
-        # Manually add President
+        roster_data = []
+        
+        # Add President
         president = {
+            'id': club_profile.user.id,
             'email': club_profile.user.email,
+            'name': club_profile.user.first_name + " " + club_profile.user.last_name if club_profile.user.first_name else "President",
             'role': 'President',
-            'invited_by': None,
-            'created_at': club_profile.user.date_joined
+            'status': 'ACTIVE',
+            'joined_at': club_profile.user.date_joined
         }
+        roster_data.append(president)
+
+        for shadow in shadow_users:
+            member = {
+                'email': shadow.email,
+                'role': shadow.role,
+                'invited_by': shadow.invited_by.club_name,
+                'created_at': shadow.created_at
+            }
+            
+            if shadow.is_claimed and shadow.user:
+                member['id'] = shadow.user.id
+                member['name'] = shadow.user.first_name + " " + shadow.user.last_name
+                member['status'] = 'Active Member'
+            else:
+                member['id'] = None
+                member['name'] = "Pending Invitation"
+                member['status'] = 'Pending'
+            
+            roster_data.append(member)
         
-        roster_data = [president] + serializer.data
         return Response(roster_data)
 
 class RegisterCompanyView(generics.CreateAPIView):

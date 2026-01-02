@@ -105,7 +105,9 @@ class ShadowUser(models.Model):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=50) # e.g. "Committee Member"
     invited_by = models.ForeignKey(ClubProfile, on_delete=models.CASCADE, related_name='invited_shadows')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='shadow_membership')
     token = models.CharField(max_length=64, unique=True)
+    is_claimed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -4,7 +4,8 @@ from .views import (
     RegisterCompanyView, RegisterClubView, LoginView, LogoutView, InviteMemberView, UserView,
     AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView,
     ClubPublicProfileView, ClubRosterView,
-    AdminEntityListView, AdminBlockUserView
+    AdminEntityListView, AdminBlockUserView,
+    ClaimProfileView, TransferOwnershipView
 )
 
 urlpatterns = [
@@ -27,5 +28,6 @@ urlpatterns = [
     
     # Checkpoint 2 Additions
     path('admin/entities/', AdminEntityListView.as_view(), name='admin_entities'),
-    path('admin/users/<int:user_id>/block/', AdminBlockUserView.as_view(), name='admin_block_user'),
+    path('club/transfer-ownership/', TransferOwnershipView.as_view(), name='club_transfer_ownership'),
+    path('users/claim/', ClaimProfileView.as_view(), name='user_claim_profile'),
 ]

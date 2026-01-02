@@ -53,7 +53,7 @@ class ShadowUserTests(APITestCase):
             university="Uni A",
             verification_status=ClubProfile.VerificationStatus.VERIFIED
         )
-        self.url = reverse('invite_member')
+        self.url = reverse('club_invite')
 
     def test_invite_member(self):
         self.client.force_authenticate(user=self.club_user)

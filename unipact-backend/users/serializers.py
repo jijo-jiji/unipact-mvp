@@ -127,3 +127,10 @@ class SystemLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemLog
         fields = ['id', 'category', 'level', 'message', 'created_at']
+
+class ClaimProfileSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+

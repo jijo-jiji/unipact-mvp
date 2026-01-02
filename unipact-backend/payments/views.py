@@ -7,7 +7,9 @@ from users.utils import log_event
 from .models import Transaction
 from campaigns.models import Campaign
 from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
+from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
 from .models import Transaction, Subscription
+from .services import MockStripeService
 
 class CreatePaymentIntentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -27,17 +29,21 @@ class CreatePaymentIntentView(APIView):
         if campaign_id:
             campaign = get_object_or_404(Campaign, pk=campaign_id)
 
+        # Create Intent via Service
+        intent = MockStripeService.create_payment_intent(amount=int(amount * 100)) # Stripe uses cents
+        
         # Create Pending Transaction
         transaction = Transaction.objects.create(
             company=request.user.company_profile,
             amount=amount,
             transaction_type=transaction_type,
             status=Transaction.Status.PENDING,
-            related_campaign=campaign
+            related_campaign=campaign,
+            stripe_payment_id=intent['id']
         )
         
         return Response({
-            "clientSecret": "mock_secret_" + str(transaction.id), # Mocking Stripe Secret
+            "clientSecret": intent['client_secret'],
             "transactionId": transaction.id,
             "amount": transaction.amount
         })
@@ -52,6 +58,21 @@ class ConfirmPaymentView(APIView):
         if transaction.company != request.user.company_profile:
              return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
         
+        # Security Check: Verify with Stripe
+        intent_id = transaction.stripe_payment_id
+        if not intent_id:
+             return Response({"error": "Invalid transaction state"}, status=status.HTTP_400_BAD_REQUEST)
+             
+        intent = MockStripeService.retrieve_payment_intent(intent_id)
+        if not intent:
+             return Response({"error": "Payment intent not found"}, status=status.HTTP_404_NOT_FOUND)
+             
+        if intent['status'] != 'succeeded':
+             return Response({
+                 "error": f"Payment not successful. Current status: {intent['status']}",
+                 "code": "payment_failed"
+             }, status=status.HTTP_400_BAD_REQUEST)
+
         # Update Status
         transaction.status = Transaction.Status.SUCCESS
         transaction.save()
