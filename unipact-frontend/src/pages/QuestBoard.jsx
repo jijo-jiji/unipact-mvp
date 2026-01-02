@@ -22,11 +22,11 @@ const QuestBoard = () => {
     const fetchQuests = async () => {
       try {
         const response = await api.get('/campaigns/');
-        // Filter out drafts or archived? Backend logic should handle it or filter here
-        // Assuming /campaigns returns all, let's filter for OPEN ones 
-        // Need to check API response structure from serializers
-        // Serializer returns: status.
-        const openQuests = response.data.filter(q => q.status === 'OPEN');
+        // Handle both paginated and non-paginated responses
+        const rawData = response.data;
+        const dataArray = Array.isArray(rawData) ? rawData : (rawData.results || []);
+
+        const openQuests = dataArray.filter(q => q.status === 'OPEN');
         setQuests(openQuests);
       } catch (error) {
         console.error("Failed to fetch quests", error);
@@ -36,6 +36,14 @@ const QuestBoard = () => {
     };
     fetchQuests();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-white font-display uppercase tracking-widest animate-pulse">
+        Loading Active Bounties...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-void)] p-6 text-white flex justify-center">

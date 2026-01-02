@@ -3,9 +3,6 @@ import { X, CreditCard, Lock, CheckCircle, Loader } from 'lucide-react';
 import api from '../api/client';
 
 const PaymentModal = ({ isOpen, onClose, amount, description, onSuccess, campaignId, type = 'FINDERS_FEE' }) => {
-    // 1. Modal Visibility Check
-    if (!isOpen) return null;
-
     // 2. State Hooks
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState('payment'); // 'payment' | 'success'
@@ -14,6 +11,9 @@ const PaymentModal = ({ isOpen, onClose, amount, description, onSuccess, campaig
     const [cardNum, setCardNum] = useState('');
     const [expiry, setExpiry] = useState('');
     const [cvc, setCvc] = useState('');
+
+    // 1. Modal Visibility Check
+    if (!isOpen) return null;
 
     // 3. Formatting Helpers
     const formatCardNumber = (value) => {
@@ -53,7 +53,7 @@ const PaymentModal = ({ isOpen, onClose, amount, description, onSuccess, campaig
     };
 
     // 5. Payment Logic
-    const handlePayment = async (e, isGooglePay = false) => {
+    const handlePayment = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
 
         setLoading(true);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Shield, Clock, FileText, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, FileText, CheckCircle } from 'lucide-react';
 import api from '../api/client';
 import PaymentModal from '../components/PaymentModal';
 
@@ -36,6 +36,14 @@ const Treasury = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-white font-display uppercase tracking-widest animate-pulse">
+        Calculating Ledger...
+      </div>
+    );
+  }
 
   const openPayment = (amount, desc, type = 'SUBSCRIPTION') => {
     setPaymentAmount(amount);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import { ArrowLeft, UploadCloud, FileText, CheckCircle } from 'lucide-react';
+import { ArrowLeft, UploadCloud, FileText } from 'lucide-react';
 
 const SubmitDeliverable = () => {
     const { applicationId } = useParams();
@@ -82,8 +82,8 @@ const SubmitDeliverable = () => {
                         type="submit"
                         disabled={!file || uploading}
                         className={`w-full py-3 font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${file && !uploading
-                                ? 'bg-[#a020f0] hover:bg-[#8e1cc1] text-white shadow-[0_0_15px_#a020f0]'
-                                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                            ? 'bg-[#a020f0] hover:bg-[#8e1cc1] text-white shadow-[0_0_15px_#a020f0]'
+                            : 'bg-gray-800 text-gray-500 cursor-not-allowed'
                             }`}
                     >
                         {uploading ? 'Transmitting...' : 'Confirm Upload'}

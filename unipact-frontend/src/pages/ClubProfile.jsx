@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/client';
 import {
-  ArrowLeft, MapPin, Link as LinkIcon, Mail, Shield, Users, Trophy
+  ArrowLeft, MapPin, Shield, Users, Trophy
 } from 'lucide-react';
 
 const ClubProfile = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [activeYear, setActiveYear] = useState('2025/2026');
 
   // STATE: Club & Roster
   const [club, setClub] = useState(null);

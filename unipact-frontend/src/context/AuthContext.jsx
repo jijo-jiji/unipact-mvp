@@ -3,6 +3,7 @@ import api from '../api/client';
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -19,7 +20,7 @@ export const AuthProvider = ({ children }) => {
             const response = await api.get('/users/me/');
             setUser(response.data);
         } catch (error) {
-            console.log("Not logged in");
+            console.log("Not logged in", error);
             setUser(null);
         } finally {
             setLoading(false);

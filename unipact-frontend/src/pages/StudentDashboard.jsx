@@ -75,6 +75,14 @@ const StudentDashboard = () => {
   const activeMissions = applications.filter(app => app.status === 'AWARDED');
   const otherBids = applications.filter(app => app.status !== 'AWARDED');
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-white font-display uppercase tracking-widest animate-pulse">
+        Establishing Link...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg-void)] p-6 text-white relative">
 

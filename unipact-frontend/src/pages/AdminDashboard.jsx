@@ -54,6 +54,7 @@ const AdminDashboard = () => {
     fetchDashboardData();
     const interval = setInterval(fetchLogs, 5000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // FETCH ENTITIES WHEN TAB/FILTERS CHANGE
@@ -61,6 +62,7 @@ const AdminDashboard = () => {
     if (activeTab === 'entities') {
       fetchEntities();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, entityPage, entityFilters]);
 
   const fetchDashboardData = async () => {
@@ -118,6 +120,7 @@ const AdminDashboard = () => {
       setStats(prev => ({ ...prev, pending_reviews: prev.pending_reviews - 1 }));
       alert(`Entity ${action.toUpperCase()}D successfully.`);
     } catch (err) {
+      console.error(err);
       alert("Failed to process verdict.");
     }
   };
@@ -129,6 +132,7 @@ const AdminDashboard = () => {
       // Update local state
       setEntities(entities.map(e => e.id === userId ? { ...e, status: res.data.is_active ? 'Active' : 'Blocked' } : e));
     } catch (err) {
+      console.error(err);
       alert("Failed to update block status.");
     }
   };

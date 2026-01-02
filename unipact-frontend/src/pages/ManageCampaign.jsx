@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import { ArrowLeft, Users, Trophy, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Clock, CheckCircle } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
 
 import ConfirmationModal from '../components/ConfirmationModal';

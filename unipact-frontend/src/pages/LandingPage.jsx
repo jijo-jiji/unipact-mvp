@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase,
@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 
 const LandingPage = () => {
-  const [activeTab, setActiveTab] = useState('student');
 
   return (
     <div className="min-h-screen bg-[var(--bg-void)] text-white overflow-x-hidden relative">

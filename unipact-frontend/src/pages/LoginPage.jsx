@@ -14,37 +14,7 @@ const LoginPage = () => {
 
   const { login } = useAuth();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
 
-    try {
-      await login(email, password);
-
-      // Navigate based on role (handled by component logic or context, 
-      // but here we can check the user object if login returned it, 
-      // or rely on a useEffect in the page listening to 'user')
-      // For simplicity, we'll assume Company for now or let the protected route handle it?
-      // Actually the plan said "Handle redirection based on role".
-      // login returns { user: ... }.
-      // We can also let the Dashboard route redirect if role is wrong, but better here.
-      // But verify login response structure in AuthContext.
-      // It returns response.data which is { user: {...}, message: ... }
-      // So:
-      // const data = await login(email, password);
-      // if (data.user.role === 'COMPANY') navigate('/company/dashboard');
-      // else navigate('/student/dashboard');
-
-      // Let's implement that.
-    } catch (err) {
-      console.error(err);
-      setError('Access Denied: Invalid Credentials');
-      setLoading(false); // Stop loading on error
-      return;
-    }
-    // Loading state cleanup happens after navigation? No, component unmounts.
-  };
 
   // Re-write handleSubmit properly
   const handleLogin = async (e) => {

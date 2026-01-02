@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 
 const CompanyDashboard = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   // STATE: Active Tab for Campaign Management
   // Default to 'recruiting' to focus on finding talent immediately
@@ -51,6 +51,10 @@ const CompanyDashboard = () => {
     fetchData();
   }, []);
 
+  if (loading) {
+    return <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-[var(--text-gold)] animate-pulse">Initializing Command Center...</div>;
+  }
+
   // Filter the list based on the selected tab
   // Backend returns status: DRAFT, OPEN, IN_PROGRESS, COMPLETED, ARCHIVED
   // Our tabs: recruiting (OPEN), active (IN_PROGRESS), completed (COMPLETED)
@@ -69,7 +73,7 @@ const CompanyDashboard = () => {
       <nav className="flex justify-between items-center mb-8 bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] shadow-lg">
         <div className="flex items-center gap-2">
           <div className="text-[var(--text-gold)] font-display text-xl tracking-widest uppercase">
-            {useAuth().user?.company_profile?.company_name || useAuth().user?.name || 'Loading...'}
+            {user?.company_profile?.company_name || user?.name || 'Loading...'}
           </div>
           <span className="text-[var(--text-blue)] text-xs border border-[var(--text-blue)] px-2 py-0.5 rounded-sm">
             {treasury?.tier || 'FREE'}
@@ -79,7 +83,7 @@ const CompanyDashboard = () => {
           <span className="hover:text-[var(--text-gold)] cursor-pointer" onClick={() => navigate('/company/treasury')}>Treasury</span>
           <span className="hover:text-[var(--text-gold)] cursor-pointer" onClick={logout}>Logout</span>
           <div className="w-8 h-8 bg-[var(--text-gold)] rounded-full flex items-center justify-center text-black font-bold">
-            {useAuth().user?.name?.[0] || 'C'}
+            {user?.name?.[0] || 'C'}
           </div>
         </div>
       </nav>
