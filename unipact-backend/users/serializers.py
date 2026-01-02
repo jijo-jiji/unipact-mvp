@@ -58,9 +58,23 @@ class ClubProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['verification_status', 'rank']
 
 class PublicClubProfileSerializer(serializers.ModelSerializer):
+    campaign_history = serializers.SerializerMethodField()
+
     class Meta:
         model = ClubProfile
-        fields = ['id', 'club_name', 'university', 'verification_status', 'rank']
+        fields = ['id', 'club_name', 'university', 'verification_status', 'rank', 'campaign_history']
+
+    def get_campaign_history(self, obj):
+        # Fetch awarded applications
+        awarded_apps = obj.applications.filter(status='AWARDED').select_related('campaign')
+        history = []
+        for app in awarded_apps:
+            history.append({
+                'title': app.campaign.title,
+                'date': app.campaign.updated_at.strftime("%b %Y"),
+                'status': 'Mission Accomplished'
+            })
+        return history
 
 class AdminEntityListSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()

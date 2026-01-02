@@ -74,12 +74,26 @@ class ClubProfile(models.Model):
     )
     verification_document = models.FileField(upload_to='club_docs/', blank=True, null=True)
 
+    # Rank Calculation
     def calculate_rank(self):
-        """
-        Stub for rank calculation logic based on campaign budget and ratings.
-        To be implemented later.
-        """
-        pass
+        # Avoid circular import
+        from reviews.models import Review
+        from django.db.models import Avg
+
+        avg_rating = Review.objects.filter(reviewee=self).aggregate(Avg('rating'))['rating__avg']
+        
+        if avg_rating is None:
+            self.rank = 'C' # Default start
+        elif avg_rating >= 4.5:
+            self.rank = 'S'
+        elif avg_rating >= 4.0:
+            self.rank = 'A'
+        elif avg_rating >= 3.0:
+            self.rank = 'B'
+        else:
+            self.rank = 'C'
+        
+        self.save()
 
     def __str__(self):
         return self.club_name

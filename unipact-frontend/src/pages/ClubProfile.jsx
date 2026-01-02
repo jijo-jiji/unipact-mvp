@@ -80,7 +80,7 @@ const ClubProfile = () => {
               </div>
               <div className="text-center">
                 <div className="text-[10px] text-[var(--text-blue)] uppercase tracking-widest mb-1">Rank</div>
-                <div className="text-4xl font-display font-bold text-yellow-500">S</div>
+                <div className="text-4xl font-display font-bold text-yellow-500">{club.rank || 'C'}</div>
               </div>
             </div>
 
@@ -132,12 +132,22 @@ const ClubProfile = () => {
           <h3 className="text-white font-bold uppercase tracking-wider text-sm mb-4 flex items-center gap-2">
             <Trophy size={16} className="text-[#a020f0]" /> Campaign History
           </h3>
-          <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 flex justify-between items-center">
-            <div>
-              <div className="text-[10px] text-green-400 uppercase font-bold mb-1">Mission Accomplished</div>
-              <h4 className="text-lg font-bold text-white">Maxis 5G Campus Hackathon</h4>
-            </div>
-            <div className="text-right text-sm text-gray-500">Nov 2025</div>
+          <div className="space-y-4">
+            {club.campaign_history && club.campaign_history.length > 0 ? (
+              club.campaign_history.map((campaign, idx) => (
+                <div key={idx} className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 flex justify-between items-center">
+                  <div>
+                    <div className="text-[10px] text-green-400 uppercase font-bold mb-1">{campaign.status}</div>
+                    <h4 className="text-lg font-bold text-white">{campaign.title}</h4>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">{campaign.date}</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-500 text-xs uppercase tracking-widest border border-dashed border-gray-800 p-6 text-center">
+                No campaigns completed yet.
+              </div>
+            )}
           </div>
         </div>
 

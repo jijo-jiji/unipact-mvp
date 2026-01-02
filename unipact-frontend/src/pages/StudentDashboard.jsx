@@ -153,7 +153,7 @@ const StudentDashboard = () => {
             <div className="font-display tracking-widest uppercase text-sm">
               {user?.name || 'Loading Guild...'}
             </div>
-            <div className="text-[10px] text-[#a020f0] tracking-[0.2em]">HUNTER RANK: B</div>
+            <div className="text-[10px] text-[#a020f0] tracking-[0.2em]">HUNTER RANK: {user?.club_profile?.rank || 'C'}</div>
           </div>
         </div>
 

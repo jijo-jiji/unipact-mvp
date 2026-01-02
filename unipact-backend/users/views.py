@@ -184,7 +184,17 @@ class ClubRosterView(views.APIView):
         # Reuse ShadowUserSerializer
         from .serializers import ShadowUserSerializer
         serializer = ShadowUserSerializer(shadow_users, many=True)
-        return Response(serializer.data)
+        
+        # Manually add President
+        president = {
+            'email': club_profile.user.email,
+            'role': 'President',
+            'invited_by': None,
+            'created_at': club_profile.user.date_joined
+        }
+        
+        roster_data = [president] + serializer.data
+        return Response(roster_data)
 
 class RegisterCompanyView(generics.CreateAPIView):
     queryset = CompanyProfile.objects.all()
