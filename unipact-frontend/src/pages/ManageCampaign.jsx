@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import api from '../api/client';
 import { ArrowLeft, Users, Trophy, Clock, CheckCircle } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
@@ -9,6 +10,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 const ManageCampaign = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [campaign, setCampaign] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -31,7 +33,7 @@ const ManageCampaign = () => {
                 setCampaign(response.data);
             } catch (error) {
                 console.error("Failed to fetch campaign", error);
-                alert("Failed to load campaign data.");
+                showToast("Failed to load campaign data.", "error");
             } finally {
                 setLoading(false);
             }
@@ -42,7 +44,7 @@ const ManageCampaign = () => {
     const executeAward = async (applicationId, clubName) => {
         try {
             await api.post(`/campaigns/application/${applicationId}/award/`);
-            alert("Contract Awarded Successfully!");
+            showToast("Contract Awarded Successfully!", "success");
             // Refresh data
             const response = await api.get(`/campaigns/${id}/`);
             setCampaign(response.data);
@@ -63,7 +65,7 @@ const ManageCampaign = () => {
                 });
             } else {
                 console.error("Failed to award", error);
-                alert("Awarding Failed: " + (error.response?.data?.error || "Unknown Error"));
+                showToast("Awarding Failed: " + (error.response?.data?.error || "Unknown Error"), "error");
             }
         }
     };
@@ -87,29 +89,39 @@ const ManageCampaign = () => {
         }
     };
 
-    const executeComplete = async () => {
+    // Review State
+    const [reviewState, setReviewState] = useState({
+        isOpen: false,
+        rating: 5, // Default S
+        comment: ''
+    });
+
+    const handleOpenReview = () => {
+        setReviewState({
+            isOpen: true,
+            rating: 5,
+            comment: ''
+        });
+    };
+
+    const submitReviewAndComplete = async () => {
         try {
-            await api.post(`/campaigns/${id}/complete/`);
-            alert("Mission Accomplished! Report Generated.");
+            await api.post(`/campaigns/${id}/complete/`, {
+                rating: reviewState.rating,
+                feedback: reviewState.comment
+            });
+            showToast("Mission Accomplished! Review Submitted & Contract Closed.", "success");
+            setReviewState(prev => ({ ...prev, isOpen: false }));
             // Refresh data
             const response = await api.get(`/campaigns/${id}/`);
             setCampaign(response.data);
         } catch (error) {
             console.error("Completion failed", error);
-            alert("Failed to complete campaign: " + (error.response?.data?.error || "Unknown Error"));
+            showToast("Failed to complete: " + (error.response?.data?.error || "Unknown Error"), "error");
         }
     };
 
-    const handleCompleteClick = () => {
-        setConfirmState({
-            isOpen: true,
-            title: 'Confirm Mission Completion',
-            message: "Confirm Mission Completion? This will release funds and close the project.",
-            confirmText: 'Complete Mission',
-            isDanger: true,
-            onConfirm: () => executeComplete()
-        });
-    };
+
 
     if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
     if (!campaign) return null;
@@ -148,14 +160,23 @@ const ManageCampaign = () => {
                                 <div key={app.id} className="bg-black/30 border border-white/10 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
+
                                             <h3
-                                                className="text-lg font-bold text-white hover:text-[#a020f0] cursor-pointer transition-colors"
                                                 onClick={() => navigate(`/club/profile/${app.club_user_id}`)}
-                                                title="View Club Profile"
+                                                className="text-white font-bold uppercase cursor-pointer hover:text-[var(--text-blue)] transition-colors"
                                             >
                                                 {app.club_name}
                                             </h3>
-                                            {app.status === 'AWARDED' && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30 font-bold uppercase">Winner</span>}
+
+                                            {/* Status Badges - Prioritize Campaign Status */}
+                                            {(app.status === 'COMPLETED' || (campaign.status === 'COMPLETED' && ['AWARDED', 'SUBMITTED'].includes(app.status))) ? (
+                                                <span className="text-xs bg-[#a020f0]/20 text-[#a020f0] px-2 py-0.5 rounded border border-[#a020f0]/30 font-bold uppercase">Mission Accomplished</span>
+                                            ) : (
+                                                <>
+                                                    {app.status === 'AWARDED' && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30 font-bold uppercase">Winner</span>}
+                                                    {app.status === 'SUBMITTED' && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30 font-bold uppercase animate-pulse">Under Review</span>}
+                                                </>
+                                            )}
                                         </div>
                                         <p className="text-gray-400 text-sm mt-1">"{app.message}"</p>
                                         <div className="text-xs text-gray-600 mt-2 flex items-center gap-2">
@@ -164,48 +185,57 @@ const ManageCampaign = () => {
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div>
+                                    < div >
                                         {/* AWARDING PHASE */}
-                                        {campaign.status === 'OPEN' && app.status === 'PENDING' && (
-                                            <button
-                                                onClick={() => handleAwardClick(app.id, app.club_name)}
-                                                className="bg-[#a020f0] hover:bg-[#8e1cc1] text-white px-4 py-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
-                                            >
-                                                <Trophy size={14} /> Award Contract
-                                            </button>
-                                        )}
-                                        {app.status === 'NOT_SELECTED' && (
-                                            <span className="text-gray-500 text-sm uppercase">Not Selected</span>
-                                        )}
-
-                                        {/* REVIEW PHASE */}
-                                        {campaign.status === 'IN_PROGRESS' && app.status === 'AWARDED' && (
-                                            <div className="flex flex-col gap-2 items-end">
-                                                <div className="text-sm font-bold text-white mb-2">Deliverables for Review:</div>
-                                                {app.deliverables && app.deliverables.length > 0 ? (
-                                                    app.deliverables.map(del => (
-                                                        <a
-                                                            key={del.id}
-                                                            href={del.file}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="flex items-center gap-2 text-[#a020f0] hover:text-white text-xs underline"
-                                                        >
-                                                            <CheckCircle size={10} /> View Submission ({new Date(del.uploaded_at).toLocaleDateString()})
-                                                        </a>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-gray-500 text-xs italic">No deliverables yet.</span>
-                                                )}
-
+                                        {
+                                            campaign.status === 'OPEN' && app.status === 'PENDING' && (
                                                 <button
-                                                    onClick={handleCompleteClick}
-                                                    className="mt-4 bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
+                                                    onClick={() => handleAwardClick(app.id, app.club_name)}
+                                                    className="bg-[#a020f0] hover:bg-[#8e1cc1] text-white px-4 py-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
                                                 >
-                                                    <CheckCircle size={14} /> Approve & Complete
+                                                    <Trophy size={14} /> Award Contract
                                                 </button>
-                                            </div>
-                                        )}
+                                            )
+                                        }
+                                        {
+                                            app.status === 'NOT_SELECTED' && (
+                                                <span className="text-gray-500 text-sm uppercase">Not Selected</span>
+                                            )
+                                        }
+
+                                        {/* REVIEW PHASE - Visible for any Awarded/Submitted app */}
+                                        {
+                                            ['AWARDED', 'SUBMITTED'].includes(app.status) && (
+                                                <div className="flex flex-col gap-2 items-end">
+                                                    <div className="text-sm font-bold text-white mb-2">Deliverables:</div>
+                                                    {app.deliverables && app.deliverables.length > 0 ? (
+                                                        app.deliverables.map(del => (
+                                                            <a
+                                                                key={del.id}
+                                                                href={del.file}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="flex items-center gap-2 text-[#a020f0] hover:text-white text-xs underline"
+                                                            >
+                                                                <CheckCircle size={10} /> View Submission ({new Date(del.uploaded_at).toLocaleDateString()})
+                                                            </a>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-gray-500 text-xs italic">No deliverables yet.</span>
+                                                    )}
+
+                                                    {/* Only show "Review & Complete" if campaign is IN PROGRESS and app is strictly SUBMITTED */}
+                                                    {campaign.status === 'IN_PROGRESS' && app.status === 'SUBMITTED' && (
+                                                        <button
+                                                            onClick={handleOpenReview}
+                                                            className="mt-4 bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
+                                                        >
+                                                            <CheckCircle size={14} /> Review & Complete
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )
+                                        }
                                     </div>
                                 </div>
                             ))
@@ -213,7 +243,68 @@ const ManageCampaign = () => {
                     </div>
                 </div>
 
-            </div>
+            </div >
+
+            {/* REVIEW MODAL */}
+            {reviewState.isOpen && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+                    <div className="bg-[var(--bg-panel)] border border-[var(--text-gold)] p-8 max-w-md w-full relative">
+                        <h2 className="text-2xl font-display font-bold text-[var(--text-gold)] uppercase mb-2"> performance evaluation</h2>
+                        <p className="text-sm text-gray-400 mb-6">Rate the performance of the mercenary club.</p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs uppercase font-bold text-[var(--text-blue)] block mb-2">Rank Assesment</label>
+                                <div className="flex gap-2">
+                                    {[
+                                        { label: 'S', value: 5, color: 'text-yellow-400 border-yellow-400' },
+                                        { label: 'A', value: 4, color: 'text-purple-400 border-purple-400' },
+                                        { label: 'B', value: 3, color: 'text-blue-400 border-blue-400' },
+                                        { label: 'C', value: 2, color: 'text-green-400 border-green-400' },
+                                        { label: 'D', value: 1, color: 'text-gray-400 border-gray-400' },
+                                    ].map((rank) => (
+                                        <button
+                                            key={rank.label}
+                                            onClick={() => setReviewState(prev => ({ ...prev, rating: rank.value }))}
+                                            className={`w-10 h-10 border font-bold flex items-center justify-center transition-all ${reviewState.rating === rank.value
+                                                ? `bg-white/10 ${rank.color} shadow-[0_0_10px_currentColor]`
+                                                : 'border-gray-700 text-gray-700 hover:border-white hover:text-white'
+                                                }`}
+                                        >
+                                            {rank.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs uppercase font-bold text-[var(--text-blue)] block mb-2">Officer's Notes</label>
+                                <textarea
+                                    value={reviewState.comment}
+                                    onChange={(e) => setReviewState(prev => ({ ...prev, comment: e.target.value }))}
+                                    className="w-full bg-black/50 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] outline-none h-32"
+                                    placeholder="Describe their performance..."
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-8">
+                            <button
+                                onClick={() => setReviewState(prev => ({ ...prev, isOpen: false }))}
+                                className="flex-1 py-3 border border-gray-600 text-gray-400 font-bold uppercase text-xs hover:bg-gray-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={submitReviewAndComplete}
+                                className="flex-1 py-3 bg-[var(--text-gold)] text-black font-bold uppercase text-xs hover:bg-white transition-colors"
+                            >
+                                Confirm Evaluation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <PaymentModal
                 isOpen={isPaymentModalOpen}
@@ -233,7 +324,7 @@ const ManageCampaign = () => {
                 confirmText={confirmState.confirmText}
                 isDanger={confirmState.isDanger}
             />
-        </div>
+        </div >
     );
 };
 

@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Shield,
   Plus,
-  X
+  X,
+  Star
 } from 'lucide-react';
 
 const StudentDashboard = () => {
@@ -58,7 +59,7 @@ const StudentDashboard = () => {
     e.preventDefault();
     setInviteStatus('loading');
     try {
-      await api.post('/users/invite/', { email: inviteEmail, role: inviteRole });
+      await api.post('/users/club/invite/', { email: inviteEmail, role: inviteRole });
       setInviteStatus('success');
       setInviteEmail('');
       setTimeout(() => {
@@ -72,8 +73,8 @@ const StudentDashboard = () => {
   }
 
   // Filter Applications
-  const activeMissions = applications.filter(app => app.status === 'AWARDED');
-  const otherBids = applications.filter(app => app.status !== 'AWARDED');
+  const activeMissions = applications.filter(app => ['AWARDED', 'SUBMITTED', 'COMPLETED'].includes(app.status));
+  const otherBids = applications.filter(app => !['AWARDED', 'SUBMITTED', 'COMPLETED'].includes(app.status));
 
   if (loading) {
     return (
@@ -170,14 +171,14 @@ const StudentDashboard = () => {
             onClick={() => setShowInvite(true)}
             className="flex items-center gap-1 text-[#a020f0] border border-[#a020f0]/30 px-3 py-1 hover:bg-[#a020f0] hover:text-white transition-all"
           >
-            <Plus size={14} /> Invite Crew
+            <Plus size={14} /> Invite HUNTER
           </button>
 
           <span
             onClick={() => navigate(`/club/profile/${user?.id}`)}
             className="cursor-pointer hover:text-white transition-colors"
           >
-            View Roster
+            View Profile
           </span>
           <span onClick={logout} className="cursor-pointer hover:text-white transition-colors">Logout</span>
         </div>
@@ -197,12 +198,13 @@ const StudentDashboard = () => {
       )}
 
       {/* 3. STATS GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
-          { label: 'Active Raids', value: activeMissions.length, icon: Target, color: 'text-[#a020f0]' },
+          { label: 'Hunter Rank', value: user?.club_profile?.rank || '-', icon: Star, color: 'text-[var(--text-gold)]' },
+          { label: 'Active Raids', value: activeMissions.filter(a => a.status !== 'COMPLETED' && a.campaign_status !== 'COMPLETED').length, icon: Target, color: 'text-[#a020f0]' },
           { label: 'Pending Bids', value: otherBids.filter(a => a.status === 'PENDING').length, icon: Clock, color: 'text-blue-400' },
-          { label: 'Quest Wins', value: applications.filter(a => a.status === 'AWARDED').length, icon: Shield, color: 'text-green-400' },
-          { label: 'Total Loot', value: 'RM ' + activeMissions.reduce((acc, curr) => acc + (curr.budget || 0), 0), icon: Zap, color: 'text-yellow-400' },
+          { label: 'Quest Wins', value: applications.filter(a => ['AWARDED', 'SUBMITTED', 'COMPLETED'].includes(a.status)).length, icon: Shield, color: 'text-green-400' },
+          { label: 'Total Loot', value: 'RM ' + applications.filter(a => ['AWARDED', 'SUBMITTED', 'COMPLETED'].includes(a.status)).reduce((acc, curr) => acc + (parseFloat(curr.campaign_budget) || 0), 0).toFixed(2), icon: Zap, color: 'text-yellow-400' },
         ].map((stat, index) => (
           <div key={index} className="bg-[var(--bg-panel)] p-4 border border-[var(--border-tech)] relative group">
             <div className="flex justify-between items-start mb-2">
@@ -233,21 +235,33 @@ const StudentDashboard = () => {
             activeMissions.map(app => (
               <div key={app.id} className="bg-[var(--bg-panel)] border-l-4 border-[#a020f0] p-6 relative overflow-hidden mb-4">
                 <div className="absolute top-0 right-0 bg-[#a020f0] text-black text-[10px] font-bold px-2 py-1 uppercase">
-                  In Progress
+                  {(app.status === 'COMPLETED' || app.campaign_status === 'COMPLETED') ? 'Mission Complete' : app.status === 'SUBMITTED' ? 'Under Review' : 'In Progress'}
                 </div>
                 <h3 className="text-xl font-bold text-white mb-1">{app.campaign_title}</h3>
-                <p className="text-sm text-gray-400 mb-4">Status: {app.status}</p>
+                <p className="text-sm text-gray-400 mb-4">Status: {(app.status === 'COMPLETED' || app.campaign_status === 'COMPLETED') ? 'COMPLETED' : app.status}</p>
 
                 <div className="w-full bg-black/50 h-1.5 mb-4">
-                  <div className="bg-[#a020f0] h-1.5 w-[50%] shadow-[0_0_10px_#a020f0]"></div>
+                  <div className={`h-1.5 bg-[#a020f0] shadow-[0_0_10px_#a020f0] transition-all duration-1000`} style={{ width: app.status === 'AWARDED' ? '50%' : '100%' }}></div>
                 </div>
 
-                <button
-                  onClick={() => navigate(`/quest/deliver/${app.id}`)}
-                  className="text-xs bg-[#a020f0]/20 text-[#a020f0] border border-[#a020f0] px-4 py-2 hover:bg-[#a020f0] hover:text-white transition-all uppercase tracking-wider font-bold"
-                >
-                  Submit Deliverables
-                </button>
+                {app.status === 'AWARDED' && app.campaign_status !== 'COMPLETED' && (
+                  <button
+                    onClick={() => navigate(`/quest/deliver/${app.id}`)}
+                    className="text-xs bg-[#a020f0]/20 text-[#a020f0] border border-[#a020f0] px-4 py-2 hover:bg-[#a020f0] hover:text-white transition-all uppercase tracking-wider font-bold"
+                  >
+                    Submit Deliverables
+                  </button>
+                )}
+                {app.status === 'SUBMITTED' && app.campaign_status !== 'COMPLETED' && (
+                  <div className="text-xs text-yellow-400 font-bold uppercase tracking-wider border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 inline-block animate-pulse">
+                    Deliverable Transmitted - Awaiting Review
+                  </div>
+                )}
+                {(app.status === 'COMPLETED' || app.campaign_status === 'COMPLETED') && (
+                  <div className="text-xs text-green-400 font-bold uppercase tracking-wider border border-green-500/30 bg-green-500/10 px-4 py-2 inline-block">
+                    Contract Closed - Payment Released
+                  </div>
+                )}
               </div>
             ))
           )}

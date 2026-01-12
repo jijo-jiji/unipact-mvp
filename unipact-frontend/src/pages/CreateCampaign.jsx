@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import { Scroll, Coins, Calendar, Plus, Trash, ArrowLeft, Save } from 'lucide-react';
 import api from '../api/client';
 
 const CreateCampaign = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   // === STATE MANAGEMENT (The Brain) ===
   // React needs to "remember" what the user types.
@@ -59,11 +61,11 @@ const CreateCampaign = () => {
 
     try {
       await api.post('/campaigns/', payload);
-      alert("Quest Activated Successfully!");
+      showToast("Quest Activated Successfully!", "success");
       navigate('/company/dashboard');
     } catch (error) {
       console.error("Failed to create campaign", error);
-      alert("System Error: Failed to activate quest.");
+      showToast("System Error: Failed to activate quest.", "error");
     }
   };
 

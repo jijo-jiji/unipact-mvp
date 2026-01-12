@@ -145,8 +145,14 @@ class DeliverableCreateView(generics.CreateAPIView):
 
         serializer.save(application=application)
         
-        # Optional: Auto-mark campaign/application as Completed? 
-        # For now, we leave it as IN_PROGRESS until manually completed or by some other logic.
+        # Update Status to SUBMITTED
+        application.status = Application.Status.SUBMITTED
+        application.save()
+        
+        # Log Logic
+        from users.models import SystemLog
+        from users.utils import log_event
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Deliverable Submitted: {application.club.club_name} -> {application.campaign.title}")
 
 class MarkCampaignCompletedView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCompany]
@@ -162,7 +168,42 @@ class MarkCampaignCompletedView(APIView):
         if campaign.status != Campaign.Status.IN_PROGRESS:
             return Response({"error": "Campaign must be in progress to complete."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Mark as completed
+        # 1. HANDLE REVIEW CREATION
+        rating = request.data.get('rating')
+        feedback = request.data.get('feedback')
+
+        try:
+            # Find the accepted application (could be AWARDED or SUBMITTED)
+            accepted_app = campaign.applications.filter(
+                status__in=[Application.Status.AWARDED, Application.Status.SUBMITTED]
+            ).first()
+
+            if accepted_app:
+                if rating:
+                    club = accepted_app.club
+                    from reviews.models import Review
+                    Review.objects.create(
+                        reviewer=request.user.company_profile,
+                        reviewee=club,
+                        campaign=campaign,
+                        rating=rating,
+                        comment=feedback or "No feedback provided."
+                    )
+                    # Recalculate Rank
+                    club.calculate_rank()
+                
+                # Mark Application as COMPLETED
+                accepted_app.status = Application.Status.COMPLETED
+                accepted_app.save()
+
+            else:
+                 print("No awarded/submitted application found for this campaign.")
+
+        except Exception as e:
+            print(f"Error processing review/completion: {e}")
+            # We don't fail the completion if review fails, but we log it.
+
+        # 2. MARK AS COMPLETED
         campaign.status = Campaign.Status.COMPLETED
         campaign.save()
 

@@ -54,15 +54,20 @@ class UserView(views.APIView):
         card_last_4 = None
         card_brand = None
         
+        company_profile_data = None
+        club_profile_data = None
+
         if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
             ver_status = user.company_profile.verification_status
             tier = user.company_profile.tier
             name = user.company_profile.company_name
             card_last_4 = user.company_profile.card_last_4
             card_brand = user.company_profile.card_brand
+            company_profile_data = CompanyProfileSerializer(user.company_profile).data
         elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
             ver_status = user.club_profile.verification_status
             name = user.club_profile.club_name
+            club_profile_data = ClubProfileSerializer(user.club_profile).data
         else:
             name = user.username
 
@@ -75,6 +80,8 @@ class UserView(views.APIView):
             "tier": tier,
             "card_last_4": card_last_4,
             "card_brand": card_brand,
+            "company_profile": company_profile_data,
+            "club_profile": club_profile_data
         })
 
 class LoginView(views.APIView):
@@ -90,13 +97,18 @@ class LoginView(views.APIView):
             
             # Determine verification status and name based on role
             ver_status = None
+            company_profile_data = None
+            club_profile_data = None
             name = user.username
+
             if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
                 ver_status = user.company_profile.verification_status
                 name = user.company_profile.company_name
+                company_profile_data = CompanyProfileSerializer(user.company_profile).data
             elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
                 ver_status = user.club_profile.verification_status
                 name = user.club_profile.club_name
+                club_profile_data = ClubProfileSerializer(user.club_profile).data
 
             response = Response({
                 "message": "Login successful",
@@ -106,6 +118,8 @@ class LoginView(views.APIView):
                     "role": user.role,
                     "name": name,
                     "verification_status": ver_status,
+                    "company_profile": company_profile_data,
+                    "club_profile": club_profile_data
                 }
             }, status=status.HTTP_200_OK)
 
@@ -140,27 +154,38 @@ class InviteMemberView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
+        print("DEBUG: InviteMemberView perform_create reached")
         # Validate that requester is a Club
         if self.request.user.role != User.Role.CLUB:
              raise exceptions.PermissionDenied("Only clubs can invite members.")
         
         email = serializer.validated_data['email']
         
-        # Check if User already exists
-        if User.objects.filter(email=email).exists():
-            raise exceptions.ValidationError("User with this email already exists.")
-
-        # Check if already invited
-        if ShadowUser.objects.filter(email=email).exists():
-            raise exceptions.ValidationError("User already invited.")
+        # Check if already in roster (ShadowUser exists for this club)
+        if ShadowUser.objects.filter(email=email, invited_by=self.request.user.club_profile).exists():
+             raise exceptions.ValidationError("User is already a member or has a pending invite.")
 
         import uuid
         token = str(uuid.uuid4())
 
-        serializer.save(invited_by=self.request.user.club_profile, token=token)
+        # Check if User already exists in the system
+        existing_user = User.objects.filter(email=email).first()
 
-        # Mock Email Sending
-        print(f"Sending invitation to {email} with token {token}")
+        if existing_user:
+            # Directly add them to the roster as a claimed member
+            # Prevent adding irrelevant roles? For now allow any user to be added.
+            serializer.save(
+                invited_by=self.request.user.club_profile, 
+                token=token,
+                user=existing_user,
+                is_claimed=True
+            )
+            print(f"Added existing user {email} to roster of {self.request.user.club_profile.club_name}")
+        else:
+            # Standard Invite for new user
+            serializer.save(invited_by=self.request.user.club_profile, token=token)
+            # Mock Email Sending
+            print(f"Sending invitation to {email} with token {token}")
 
 class ClaimProfileView(views.APIView):
     permission_classes = [AllowAny]

@@ -31,6 +31,8 @@ class Application(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
         AWARDED = 'AWARDED', 'Awarded'
+        SUBMITTED = 'SUBMITTED', 'Submitted'
+        COMPLETED = 'COMPLETED', 'Completed'
         REJECTED = 'REJECTED', 'Rejected'
         NOT_SELECTED = 'NOT_SELECTED', 'Not Selected'
 
