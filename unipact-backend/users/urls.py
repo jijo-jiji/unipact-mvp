@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     RegisterCompanyView, RegisterClubView, RegisterStudentView, LoginView, LogoutView, InviteMemberView, UserView,
     AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView,
-    ClubPublicProfileView, ClubRosterView,
+    ClubPublicProfileView, ClubRosterView, StudentPublicProfileView,
     AdminEntityListView, AdminBlockUserView,
     ClaimProfileView, TransferOwnershipView
 )
@@ -16,6 +16,9 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('me/', UserView.as_view(), name='me'),
     
+    # Student Specific
+    path('student/<int:user_id>/profile/', StudentPublicProfileView.as_view(), name='student_public_profile'),
+
     # Club Specific
     path('club/invite/', InviteMemberView.as_view(), name='club_invite'),
     path('club/<int:user_id>/profile/', ClubPublicProfileView.as_view(), name='club_public_profile'),

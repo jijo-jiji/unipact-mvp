@@ -247,49 +247,55 @@ const AdminDashboard = () => {
   if (dashboardLoading) return <div className="text-white p-10 font-mono">Loading System Core...</div>;
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono p-6">
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body p-6 md:p-10 selection:bg-[#00AEEF] selection:text-white">
 
       {/* 1. SYSTEM HEADER */}
-      <div className="border-b border-green-900 pb-4 mb-8 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl text-green-500 font-bold uppercase tracking-widest flex items-center gap-3">
-            <Database size={24} /> System Core // Admin
-          </h1>
-          <p className="text-green-800 text-xs mt-1">
-            Uptime: 99.9% | Active Nodes: {stats.total_users} | Threat Level: <span className="text-white">NOMINAL</span>
-          </p>
+      <div className="bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-6 mb-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center font-heading font-extrabold text-xl shadow-sm">
+            UP
+          </div>
+          <div>
+            <h1 className="font-heading font-extrabold text-2xl text-[#0A1748] tracking-tight flex items-center gap-2">
+              UniPact Admin Operations Hub
+            </h1>
+            <p className="text-xs text-[#5B6478] mt-0.5">
+              Curated Talent Matching • Entity Verification • System Audit Logs
+            </p>
+          </div>
         </div>
-        <div className="text-right flex flex-col items-end gap-2">
-          <div className="text-xs text-gray-500 uppercase">Administrator</div>
-          <div className="text-white font-bold">ROOT_USER</div>
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <span className="px-3 py-1 rounded-full bg-[#00AEEF]/10 text-[#0090C6] text-xs font-bold">
+            Total Users: {stats.total_users}
+          </span>
           <button
             onClick={logout}
-            className="flex items-center gap-2 text-xs text-red-500 hover:text-red-400 border border-red-900 hover:border-red-500 px-3 py-1 bg-red-900/10 transition-all mt-1"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#5B6478] hover:text-red-600 border border-[rgba(10,23,72,0.15)] hover:border-red-300 px-3.5 py-1.5 rounded-md transition-all"
           >
-            <LogOut size={12} /> TERMINATE SESSION
+            <LogOut size={14} /> Sign Out
           </button>
         </div>
       </div>
 
       {/* 2. NAVIGATION TABS */}
-      <div className="flex gap-4 mb-8 border-b border-gray-800">
+      <div className="flex gap-6 mb-8 border-b border-[rgba(10,23,72,0.12)]">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`pb-2 px-4 text-sm uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'dashboard' ? 'border-green-500 text-green-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+          className={`pb-3 px-2 text-xs uppercase font-bold tracking-wider transition-colors border-b-2 ${activeTab === 'dashboard' ? 'border-[#00AEEF] text-[#00AEEF]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'}`}
         >
-          <div className="flex items-center gap-2"><Activity size={16} /> Dashboard</div>
+          <div className="flex items-center gap-2"><Activity size={16} /> Operations Dashboard</div>
         </button>
         <button
           onClick={() => setActiveTab('entities')}
-          className={`pb-2 px-4 text-sm uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'entities' ? 'border-green-500 text-green-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+          className={`pb-3 px-2 text-xs uppercase font-bold tracking-wider transition-colors border-b-2 ${activeTab === 'entities' ? 'border-[#00AEEF] text-[#00AEEF]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'}`}
         >
-          <div className="flex items-center gap-2"><Users size={16} /> Entity Management</div>
+          <div className="flex items-center gap-2"><Users size={16} /> Entity Directory</div>
         </button>
         <button
           onClick={() => setActiveTab('matchmaking')}
-          className={`pb-2 px-4 text-sm uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'matchmaking' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+          className={`pb-3 px-2 text-xs uppercase font-bold tracking-wider transition-colors border-b-2 ${activeTab === 'matchmaking' ? 'border-[#00AEEF] text-[#00AEEF]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'}`}
         >
-          <div className="flex items-center gap-2"><Sparkles size={16} /> Matchmaking Hub (V3.0)</div>
+          <div className="flex items-center gap-2"><Sparkles size={16} /> Talent Matchmaking Hub (V3.0)</div>
         </button>
       </div>
 
@@ -304,7 +310,7 @@ const AdminDashboard = () => {
               { label: 'Total Users', value: stats.total_users, color: 'text-blue-500' },
               { label: 'Revenue Pool', value: stats.revenue, color: 'text-green-500' },
             ].map((stat, i) => (
-              <div key={i} className="bg-gray-900/50 border border-gray-800 p-4">
+              <div key={i} className="bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-5 shadow-sm">
                 <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider">{stat.label}</div>
               </div>
@@ -322,7 +328,7 @@ const AdminDashboard = () => {
 
               <div className="space-y-4">
                 {reviews.map((entity) => (
-                  <div key={`${entity.type}-${entity.id}`} className="bg-gray-900 border border-gray-800 p-4 hover:border-gray-600 transition-colors">
+                  <div key={`${entity.type}-${entity.id}`} className="bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-5 hover:border-[#00AEEF] transition-all shadow-sm">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-white">
@@ -368,7 +374,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* LIVE FEED */}
-            <div className="bg-gray-900/30 border border-gray-800 p-4 h-[600px] overflow-y-auto">
+            <div className="bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-5 h-[600px] overflow-y-auto shadow-sm">
               <h3 className="text-gray-400 text-xs uppercase tracking-widest mb-4 flex items-center gap-2 sticky top-0 bg-[#111] py-2 border-b border-gray-800">
                 <Activity size={14} /> Live Feed {logs.length > 0 && <span className="text-[10px] bg-green-900 text-green-400 px-1 rounded animate-pulse">LIVE</span>}
               </h3>
@@ -389,14 +395,14 @@ const AdminDashboard = () => {
       {activeTab === 'entities' && (
         <div className="">
           {/* FILTERS */}
-          <div className="bg-gray-900/50 border border-gray-800 p-4 mb-6 flex flex-wrap gap-4 items-end">
+          <div className="bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-5 mb-6 flex flex-wrap gap-4 items-end shadow-sm">
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs text-gray-500 mb-1 block">Search Entity</label>
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Name or Email..."
-                  className="w-full bg-black border border-gray-700 text-white pl-8 pr-3 py-2 text-sm focus:border-green-500 outline-none"
+                  className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] pl-8 pr-3 py-2 text-xs rounded-md focus:border-[#00AEEF] outline-none"
                   value={entityFilters.search}
                   onChange={(e) => setEntityFilters({ ...entityFilters, search: e.target.value })}
                 />
@@ -407,7 +413,7 @@ const AdminDashboard = () => {
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Entity Type</label>
               <select
-                className="bg-black border border-gray-700 text-white px-3 py-2 text-sm focus:border-green-500 outline-none min-w-[150px]"
+                className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] px-3 py-2 text-xs rounded-md focus:border-[#00AEEF] outline-none min-w-[150px]"
                 value={entityFilters.role}
                 onChange={(e) => setEntityFilters({ ...entityFilters, role: e.target.value, rank: '', tier: '' })}
               >
@@ -423,7 +429,7 @@ const AdminDashboard = () => {
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Club Rank</label>
                 <select
-                  className="bg-black border border-gray-700 text-white px-3 py-2 text-sm focus:border-green-500 outline-none min-w-[100px]"
+                  className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] px-3 py-2 text-xs rounded-md focus:border-[#00AEEF] outline-none min-w-[100px]"
                   value={entityFilters.rank}
                   onChange={(e) => setEntityFilters({ ...entityFilters, rank: e.target.value })}
                 >
@@ -440,7 +446,7 @@ const AdminDashboard = () => {
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Company Tier</label>
                 <select
-                  className="bg-black border border-gray-700 text-white px-3 py-2 text-sm focus:border-green-500 outline-none min-w-[100px]"
+                  className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] px-3 py-2 text-xs rounded-md focus:border-[#00AEEF] outline-none min-w-[100px]"
                   value={entityFilters.tier}
                   onChange={(e) => setEntityFilters({ ...entityFilters, tier: e.target.value })}
                 >

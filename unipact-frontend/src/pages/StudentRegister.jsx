@@ -1,77 +1,82 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { GraduationCap, ArrowLeft, Upload, CheckCircle, ShieldAlert, Sparkles } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Upload, ShieldAlert, CheckCircle, ArrowRight } from 'lucide-react';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+
+const MALAYSIAN_UNIVERSITIES = [
+  "Universiti Malaya (UM)",
+  "Universiti Sains Malaysia (USM)",
+  "Universiti Kebangsaan Malaysia (UKM)",
+  "Universiti Putra Malaysia (UPM)",
+  "Universiti Teknologi Malaysia (UTM)",
+  "Taylor's University",
+  "Sunway University",
+  "Monash University Malaysia",
+  "Asia Pacific University (APU)",
+  "Multimedia University (MMU)",
+  "Universiti Teknologi MARA (UiTM)",
+  "UCSI University",
+  "Other Institution"
+];
 
 const StudentRegister = () => {
   const navigate = useNavigate();
-  const { registerStudent } = useAuth();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
-    full_name: '',
     email: '',
-    secondary_email: '',
     password: '',
-    confirm_password: '',
-    university: 'Universiti Malaya (UM)',
+    full_name: '',
+    university: MALAYSIAN_UNIVERSITIES[0],
     major: '',
     domain_focus: 'SOFTWARE_DEV',
+    skills: '',
+    bio: '',
     club_affiliation_name: '',
     club_affiliation_role: ''
   });
 
-  const [verificationDoc, setVerificationDoc] = useState(null);
+  const [docFile, setDocFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const universities = [
-    'Universiti Malaya (UM)',
-    'Universiti Sains Malaysia (USM)',
-    'Universiti Kebangsaan Malaysia (UKM)',
-    'Universiti Putra Malaysia (UPM)',
-    'Universiti Teknologi Malaysia (UTM)',
-    'Sunway University',
-    'Taylor\'s University',
-    'Monash University Malaysia',
-    'Asia Pacific University (APU)',
-    'Multimedia University (MMU)',
-    'Other Malaysian University'
-  ];
-
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setVerificationDoc(e.target.files[0]);
-    }
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirm_password) {
-      setError('Passwords do not match.');
-      return;
-    }
-
     setLoading(true);
-    try {
-      const data = new FormData();
-      data.append('full_name', formData.full_name);
-      data.append('email', formData.email);
-      if (formData.secondary_email) data.append('secondary_email', formData.secondary_email);
-      data.append('password', formData.password);
-      data.append('university', formData.university);
-      data.append('major', formData.major);
-      data.append('domain_focus', formData.domain_focus);
-      if (formData.club_affiliation_name) data.append('club_affiliation_name', formData.club_affiliation_name);
-      if (formData.club_affiliation_role) data.append('club_affiliation_role', formData.club_affiliation_role);
-      if (verificationDoc) data.append('verification_doc', verificationDoc);
 
-      await registerStudent(data);
+    try {
+      const payload = new FormData();
+      payload.append('email', formData.email);
+      payload.append('password', formData.password);
+      payload.append('full_name', formData.full_name);
+      payload.append('university', formData.university);
+      payload.append('major', formData.major);
+      payload.append('domain_focus', formData.domain_focus);
+
+      const skillsArray = formData.skills
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+      payload.append('skills', JSON.stringify(skillsArray));
+
+      if (formData.bio) payload.append('bio', formData.bio);
+      if (formData.club_affiliation_name) payload.append('club_affiliation_name', formData.club_affiliation_name);
+      if (formData.club_affiliation_role) payload.append('club_affiliation_role', formData.club_affiliation_role);
+      if (docFile) payload.append('verification_document', docFile);
+
+      await api.post('/users/register/student/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      // Auto-login
+      await login(formData.email, formData.password);
       navigate('/student/dashboard');
     } catch (err) {
       console.error(err);
@@ -87,28 +92,23 @@ const StudentRegister = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 relative animate-fade-in shadow-2xl">
-        {/* Decorative Corners */}
-        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-cyan-400"></div>
-        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-cyan-400"></div>
-        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-cyan-400"></div>
-        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-cyan-400"></div>
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex items-center justify-center p-6 selection:bg-[#00AEEF] selection:text-white">
+      <div className="w-full max-w-2xl bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-8 sm:p-10 shadow-sm relative animate-fade-in">
 
-        {/* HEADER */}
+        {/* Header */}
         <div className="mb-6">
-          <Link to="/register" className="text-cyan-400 text-xs uppercase flex items-center gap-2 hover:text-white mb-4">
+          <Link to="/register" className="text-xs font-semibold text-[#5B6478] hover:text-[#0A1748] flex items-center gap-1.5 mb-6 transition-colors">
             <ArrowLeft size={14} /> Back to Selection
           </Link>
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 bg-cyan-400/10 border border-cyan-400/40 rounded">
-              <GraduationCap className="text-cyan-400" size={24} />
+            <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center shadow-sm">
+              <GraduationCap size={24} />
             </div>
             <div>
-              <h1 className="text-2xl text-white font-bold tracking-wide">
+              <h1 className="font-heading font-bold text-2xl text-[#0A1748] tracking-tight">
                 Join as Verified Student Talent
               </h1>
-              <p className="text-slate-400 text-xs mt-0.5">
+              <p className="text-xs text-[#5B6478] mt-0.5">
                 Get matched to real-world paid projects in Software Development & Digital Marketing.
               </p>
             </div>
@@ -116,23 +116,23 @@ const StudentRegister = () => {
         </div>
 
         {/* Status notice */}
-        <div className="mb-6 bg-cyan-950/40 border-l-4 border-cyan-400 p-3.5 text-xs text-cyan-200">
-          <strong className="block text-white uppercase mb-0.5">Verification Notice</strong>
+        <div className="mb-6 bg-amber-50 border border-amber-200 p-3.5 rounded-lg text-xs text-amber-900">
+          <strong className="block font-bold mb-0.5">Verification Notice</strong>
           Your account will default to <strong>Pending Verification</strong> until UniPact Admin validates your student status.
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-950/40 border-l-4 border-red-500 p-3 text-xs text-red-300 flex items-center gap-2">
-            <ShieldAlert size={16} />
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs flex items-center gap-2">
+            <ShieldAlert size={16} className="shrink-0 text-red-600" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Full Name & Domain */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Full Legal Name (*)</label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Full Legal Name (*)</label>
               <input
                 type="text"
                 name="full_name"
@@ -140,51 +140,48 @@ const StudentRegister = () => {
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="e.g. Sarah Tan Shu Min"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Primary Domain Track (*)</label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Primary Domain Track (*)</label>
               <select
                 name="domain_focus"
                 value={formData.domain_focus}
                 onChange={handleChange}
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               >
-                <option value="SOFTWARE_DEV">Software Development & Automation</option>
-                <option value="MARKETING">Digital Marketing & Content</option>
-                <option value="BOTH">Both Specialized Tracks</option>
+                <option value="SOFTWARE_DEV">Software Development (Full-Stack, Mobile, DevOps)</option>
+                <option value="MARKETING">Digital Marketing (Social Media, Content, SEO)</option>
+                <option value="BOTH">Dual Specialist (Dev & Marketing)</option>
               </select>
             </div>
           </div>
 
-          {/* Academic Email & Secondary Email */}
+          {/* Email & Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Academic Email (*) <span className="text-cyan-400 text-[10px]">(Preferred)</span>
-              </label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">University / Personal Email (*)</label>
               <input
                 type="email"
                 name="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="e.g. sarah@siswa.um.edu.my"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                placeholder="student@university.edu.my"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Personal Secondary Email <span className="text-slate-400 text-[10px]">(Post-Graduation Access)</span>
-              </label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Password (*)</label>
               <input
-                type="email"
-                name="secondary_email"
-                value={formData.secondary_email}
+                type="password"
+                name="password"
+                required
+                value={formData.password}
                 onChange={handleChange}
-                placeholder="e.g. sarahtan.dev@gmail.com"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                placeholder="••••••••••••"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               />
             </div>
           </div>
@@ -192,20 +189,20 @@ const StudentRegister = () => {
           {/* University & Major */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">University / Institution (*)</label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Institution (*)</label>
               <select
                 name="university"
                 value={formData.university}
                 onChange={handleChange}
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               >
-                {universities.map((u) => (
-                  <option key={u} value={u}>{u}</option>
+                {MALAYSIAN_UNIVERSITIES.map((u, i) => (
+                  <option key={i} value={u}>{u}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Degree / Major (*)</label>
+              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Degree Major (*)</label>
               <input
                 type="text"
                 name="major"
@@ -213,98 +210,99 @@ const StudentRegister = () => {
                 value={formData.major}
                 onChange={handleChange}
                 placeholder="e.g. B.Sc. Computer Science"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Verification Document */}
-          <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">
-              Student ID Card / Proof of Enrolment (*)
-            </label>
-            <div className="border-2 border-dashed border-[var(--border-tech)] hover:border-cyan-400 rounded p-4 text-center cursor-pointer relative bg-black/20 transition-colors">
-              <input
-                type="file"
-                required
-                onChange={handleFileChange}
-                accept=".pdf,.jpg,.jpeg,.png"
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-              <Upload className="mx-auto text-cyan-400 mb-1.5 w-6 h-6" />
-              {verificationDoc ? (
-                <div className="text-xs text-green-400 font-medium flex items-center justify-center gap-1">
-                  <CheckCircle size={14} /> {verificationDoc.name}
-                </div>
-              ) : (
-                <div className="text-xs text-slate-400">
-                  <span className="text-cyan-400 font-semibold">Click to upload</span> student matric card or confirmation letter (PDF, JPG, PNG)
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Club Affiliation (Lightweight per REQ-3.6.2) */}
-          <div className="p-3.5 bg-slate-900/50 border border-slate-700/60 rounded space-y-3">
-            <span className="text-xs font-semibold text-slate-300 block">
-              Club / Society Affiliation <span className="text-slate-400 text-[10px] font-normal">(Optional Profile Field)</span>
+          {/* Club / Guild Affiliation (SRS v2.2.1 Coexistence) */}
+          <div className="p-3.5 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg">
+            <span className="text-[11px] font-bold text-[#0B1E63] uppercase tracking-wider block mb-2">
+              Club / Guild Affiliation (Optional)
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                type="text"
-                name="club_affiliation_name"
-                value={formData.club_affiliation_name}
-                onChange={handleChange}
-                placeholder="Club Name (e.g. UM Coding Club)"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2 text-xs rounded focus:border-cyan-400 focus:outline-none"
-              />
-              <input
-                type="text"
-                name="club_affiliation_role"
-                value={formData.club_affiliation_role}
-                onChange={handleChange}
-                placeholder="Your Role (e.g. President / Member)"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2 text-xs rounded focus:border-cyan-400 focus:outline-none"
-              />
+              <div>
+                <label className="text-[11px] text-[#5B6478] block mb-1">Club / Society Name</label>
+                <input
+                  type="text"
+                  name="club_affiliation_name"
+                  value={formData.club_affiliation_name}
+                  onChange={handleChange}
+                  placeholder="e.g. UM Coding Society"
+                  className="w-full bg-white border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2 text-xs rounded focus:border-[#00AEEF] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-[#5B6478] block mb-1">Your Role in Club</label>
+                <input
+                  type="text"
+                  name="club_affiliation_role"
+                  value={formData.club_affiliation_role}
+                  onChange={handleChange}
+                  placeholder="e.g. Tech Lead / Vice President"
+                  className="w-full bg-white border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2 text-xs rounded focus:border-[#00AEEF] focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Password & Confirm */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Password (*)</label>
-              <input
-                type="password"
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Min 8 characters"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Confirm Password (*)</label>
-              <input
-                type="password"
-                name="confirm_password"
-                required
-                value={formData.confirm_password}
-                onChange={handleChange}
-                placeholder="Repeat password"
-                className="w-full bg-black/40 border border-[var(--border-tech)] text-white p-2.5 text-sm rounded focus:border-cyan-400 focus:outline-none"
-              />
-            </div>
+          {/* Skills */}
+          <div>
+            <label className="text-xs font-semibold text-[#0A1748] block mb-1">Key Technical / Marketing Skills (*)</label>
+            <input
+              type="text"
+              name="skills"
+              required
+              value={formData.skills}
+              onChange={handleChange}
+              placeholder="e.g. React, Django, Tailwind CSS, PostgreSQL, Figma"
+              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
+            />
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label className="text-xs font-semibold text-[#0A1748] block mb-1">Brief Bio & Strengths</label>
+            <textarea
+              name="bio"
+              rows={2}
+              value={formData.bio}
+              onChange={handleChange}
+              placeholder="Tell clients what projects you excel at..."
+              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
+            />
+          </div>
+
+          {/* Student ID Proof Upload */}
+          <div>
+            <label className="text-xs font-semibold text-[#0A1748] block mb-1">
+              Student ID or Enrollment Confirmation Proof (PDF, PNG, JPG)
+            </label>
+            <input
+              type="file"
+              onChange={(e) => e.target.files && setDocFile(e.target.files[0])}
+              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#5B6478] p-2 text-xs rounded-md focus:outline-none"
+            />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-bold uppercase tracking-wider text-sm transition-colors shadow-lg disabled:opacity-50"
+            className="w-full mt-4 py-3.5 px-4 rounded-md bg-[#00AEEF] hover:bg-[#0090C6] text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? 'Submitting Application...' : 'Register as Verified Talent'}
+            {loading ? 'Submitting Application...' : (
+              <>Register as Student Talent <ArrowRight size={15} /></>
+            )}
           </button>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-xs text-[#5B6478]">
+          Already registered?{' '}
+          <Link to="/login" className="font-bold text-[#00AEEF] hover:underline">
+            Sign In to Workspace
+          </Link>
+        </div>
+
       </div>
     </div>
   );

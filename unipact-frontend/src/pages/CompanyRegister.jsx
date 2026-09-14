@@ -1,179 +1,167 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, AlertTriangle, Upload, FileText, ArrowLeft } from 'lucide-react';
-
-import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, Building2, Upload, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
+import api from '../api/client';
 
 const CompanyRegister = () => {
   const navigate = useNavigate();
 
-  // STATE
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
     companyName: '',
     ssmNumber: '',
-    password: '',
-    confirmPassword: ''
   });
 
   const [isPublicDomain, setIsPublicDomain] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // LOGIC: Check for Gmail/Yahoo/Hotmail (PDF Page 2 Requirement)
+  const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];
+
   const handleEmailChange = (e) => {
     const email = e.target.value;
     setFormData({ ...formData, email });
 
-    const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
-    const domain = email.split('@')[1];
-    if (domain && publicDomains.includes(domain)) {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (publicDomains.includes(domain)) {
       setIsPublicDomain(true);
     } else {
       setIsPublicDomain(false);
     }
   };
 
-  const { registerCompany } = useAuth(); // Import from context
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Validate password match
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
+    setLoading(true);
+    setError('');
 
     try {
-      await registerCompany({
+      await api.post('/users/register/company/', {
         email: formData.email,
         password: formData.password,
         company_name: formData.companyName,
-        company_details: formData.ssmNumber, // Mapping SSM to details for now, or need schema update? Schema has ssm_document.
-        // Wait, serializer fields: company_name, company_details, email, password, verification_status, tier, ssm_document.
-        // The form has "SSM Registration ID" -> I'll put that in company_details or just company_details.
-        // Let's assume company_details for SSM Number for now.
+        company_details: formData.ssmNumber,
       });
       navigate('/company/dashboard');
-    } catch (error) {
-      console.error("Registration failed", error);
-      alert("Registration Failed: " + (error.response?.data?.email || "Unknown Error"));
+    } catch (err) {
+      console.error("Registration failed", err);
+      setError(err.response?.data?.email?.[0] || err.response?.data?.error || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 relative animate-fade-in">
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex items-center justify-center p-6 selection:bg-[#00AEEF] selection:text-white">
+      <div className="w-full max-w-2xl bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-8 sm:p-10 shadow-sm relative animate-fade-in">
 
-        {/* Decorative Corners */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--text-gold)]"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--text-gold)]"></div>
-
-        {/* HEADER */}
+        {/* Header */}
         <div className="mb-8">
-          <Link to="/" className="text-[var(--text-blue)] text-xs uppercase flex items-center gap-2 hover:text-white mb-4">
-            <ArrowLeft size={14} /> Cancel Protocol
+          <Link to="/" className="text-xs font-semibold text-[#5B6478] hover:text-[#0A1748] flex items-center gap-1.5 mb-6 transition-colors">
+            <ArrowLeft size={14} /> Back to Home
           </Link>
+
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-[var(--text-gold)]/10 border border-[var(--text-gold)] rounded-sm">
-              <Building2 className="text-[var(--text-gold)]" size={24} />
+            <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center shadow-sm">
+              <Building2 size={24} />
             </div>
-            <h1 className="text-2xl text-white font-display uppercase tracking-widest">
-              Establish Guild Charter
-            </h1>
+            <div>
+              <h1 className="font-heading font-bold text-2xl text-[#0A1748] tracking-tight">
+                Register Enterprise Client Account
+              </h1>
+              <p className="text-xs text-[#5B6478] mt-0.5">
+                Connect your organization directly with verified university student talent.
+              </p>
+            </div>
           </div>
-          <p className="text-[var(--text-blue)] text-sm">Register your organization to recruit S-Rank talent.</p>
         </div>
 
-        {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="mb-6 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+            <AlertTriangle size={16} className="shrink-0 text-red-600" />
+            <span>{error}</span>
+          </div>
+        )}
 
-          {/* 1. Business Email */}
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider block mb-2">Business Email</label>
+            <label className="block text-xs font-semibold text-[#0A1748] mb-1">Business Email (*)</label>
             <input
               type="email"
               required
-              placeholder="marketing@company.com"
+              placeholder="e.g. corporate@company.com"
               value={formData.email}
               onChange={handleEmailChange}
-              className="w-full bg-black/30 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] focus:outline-none transition-colors"
+              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-3 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
             />
-            {/* PUBLIC DOMAIN WARNING (PDF Requirement) */}
             {isPublicDomain && (
-              <div className="mt-2 bg-yellow-900/20 border border-yellow-600/50 p-3 flex items-start gap-3 text-yellow-500 text-xs">
-                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <div className="mt-2 bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2.5 text-amber-900 text-xs">
+                <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
                 <div>
-                  <strong className="block uppercase mb-1">Security Alert: Public Domain Detected</strong>
-                  To protect our Hunters, using a public email requires uploading your SSM Certificate for verification.
+                  <strong className="block font-bold mb-0.5">Verification Notice: Public Email Domain</strong>
+                  To protect student talent, accounts using public email providers require manual SSM validation before project order finalization.
                 </div>
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 2. Company Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider block mb-2">Guild / Company Name</label>
+              <label className="block text-xs font-semibold text-[#0A1748] mb-1">Company / Entity Name (*)</label>
               <input
                 type="text"
                 required
-                placeholder="TechCorp PLT"
-                className="w-full bg-black/30 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] focus:outline-none transition-colors"
+                placeholder="TechCorp Sdn Bhd"
+                value={formData.companyName}
+                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-3 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
               />
             </div>
 
-            {/* 3. SSM Number */}
             <div>
-              <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider block mb-2">SSM Registration ID</label>
+              <label className="block text-xs font-semibold text-[#0A1748] mb-1">SSM Registration Number (*)</label>
               <input
                 type="text"
                 required
                 placeholder="202501001234"
-                className="w-full bg-black/30 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] focus:outline-none transition-colors"
+                value={formData.ssmNumber}
+                onChange={(e) => setFormData({ ...formData, ssmNumber: e.target.value })}
+                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-3 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
               />
             </div>
           </div>
 
-          {/* 4. Verification Doc (Only if Public Domain) */}
-          {isPublicDomain && (
-            <div className="border border-dashed border-[var(--text-gold)] bg-[var(--text-gold)]/5 p-6 text-center cursor-pointer hover:bg-[var(--text-gold)]/10 transition-colors">
-              <Upload className="mx-auto text-[var(--text-gold)] mb-2" size={20} />
-              <div className="text-[var(--text-gold)] font-bold text-sm">Upload SSM Certificate</div>
-              <div className="text-[var(--text-blue)] text-xs mt-1">PDF Format Only (Max 5MB)</div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 5. Password */}
-            <div>
-              <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider block mb-2">Set Security Key</label>
-              <input
-                type="password"
-                required
-                className="w-full bg-black/30 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] focus:outline-none transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider block mb-2">Confirm Key</label>
-              <input
-                type="password"
-                required
-                className="w-full bg-black/30 border border-gray-700 text-white p-3 text-sm focus:border-[var(--text-gold)] focus:outline-none transition-colors"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#0A1748] mb-1">Account Password (*)</label>
+            <input
+              type="password"
+              required
+              placeholder="••••••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-3 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
+            />
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-[var(--border-tech)]">
-            <button className="w-full bg-[var(--text-gold)] text-black font-bold py-4 uppercase tracking-widest hover:bg-white hover:shadow-[0_0_20px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-2">
-              <FileText size={18} /> Sign Charter
-            </button>
-            <div className="text-center mt-4 text-xs text-[var(--text-blue)]">
-              Already hold a charter? <Link to="/login" className="text-[var(--text-gold)] hover:underline">Log In Sequence</Link>
-            </div>
-          </div>
-
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-4 py-3.5 px-4 rounded-md bg-[#00AEEF] hover:bg-[#0090C6] text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? 'Creating Client Account...' : (
+              <>Register Enterprise Account <ArrowRight size={15} /></>
+            )}
+          </button>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-xs text-[#5B6478]">
+          Already have an enterprise account?{' '}
+          <Link to="/login" className="font-bold text-[#00AEEF] hover:underline">
+            Sign In Here
+          </Link>
+        </div>
 
       </div>
     </div>

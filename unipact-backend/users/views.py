@@ -297,6 +297,44 @@ class ClubPublicProfileView(views.APIView):
         except ClubProfile.DoesNotExist:
             return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
 
+class StudentPublicProfileView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, user_id):
+        from users.models import StudentProfile
+        from django.db.models import Q
+        profile = StudentProfile.objects.filter(Q(user_id=user_id) | Q(id=user_id)).first()
+        if not profile:
+            return Response({"error": "Student profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        completed = profile.assigned_jobs.filter(status='COMPLETED')
+        showcase = []
+        for c in completed:
+            showcase.append({
+                'id': c.id,
+                'title': c.title,
+                'company_name': c.company.company_name,
+                'type': c.type,
+                'requirements': c.requirements,
+                'completed_at': c.updated_at
+            })
+
+        return Response({
+            'id': profile.id,
+            'user_id': profile.user.id,
+            'full_name': profile.full_name,
+            'university': profile.university,
+            'major': profile.major,
+            'domain_focus': profile.domain_focus,
+            'skills': profile.skills,
+            'bio': profile.bio,
+            'rating': str(profile.rating),
+            'verification_status': profile.verification_status,
+            'club_affiliation_name': profile.club_affiliation_name,
+            'club_affiliation_role': profile.club_affiliation_role,
+            'completed_projects': showcase
+        })
+
 class ClubRosterView(views.APIView):
     permission_classes = [IsAuthenticated]
 
