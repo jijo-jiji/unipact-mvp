@@ -1,48 +1,80 @@
-# 🛡️ UniPact — Gamified B2B & Student Guild Marketplace (MVP)
+# 🚀 UniPact v3.0 — Enterprise Student Talent Marketplace & Collaboration Platform
 
-> **"Where Ambition Meets Opportunity"**  
-> UniPact is a cyberpunk-themed, gamified B2B and higher-education marketplace platform connecting corporate sponsors (*"Patrons"*) with university student clubs and societies (*"Guilds / Hunters"*) for bounties, brand ambassadorships, and hackathons.
+> **"Connecting Ambitious Student Talent with Verified Enterprise Opportunities"**  
+> UniPact is an enterprise-grade higher-education talent marketplace and collaboration platform. UniPact connects corporate clients with curated university student talent across **Software Development** and **Digital Marketing**, featuring admin-curated matching, peer-to-peer student squad collaboration, transparent milestone payouts, and verifiable student portfolios.
 
 ---
 
 ## 📑 Table of Contents
 1. [Executive Overview](#-executive-overview)
-2. [Tech Stack & Architecture](#-tech-stack--architecture)
-3. [User Roles & Key Workflows](#-user-roles--key-workflows)
-4. [Subsystem Breakdown](#-subsystem-breakdown)
-   - [Quest & Application Pipeline](#1-quest--application-pipeline)
-   - [Reputation & Rank Decay Engine](#2-reputation--rank-decay-engine)
-   - [Shadow Users & Succession Vector](#3-shadow-users--leadership-succession)
-   - [Freemium Monetization & Treasury](#4-freemium-monetization--treasury)
-   - [High Council Admin Terminal](#5-high-council-admin-terminal)
-5. [Project Structure](#-project-structure)
-6. [Quickstart & Local Setup](#-quickstart--local-setup)
-7. [API Endpoint Reference](#-api-endpoint-reference)
-8. [Test & Verification Scripts](#-test--verification-scripts)
-9. [Pre-Seeded Test Credentials](#-pre-seeded-test-credentials)
+2. [Dual-Track Architecture (V3.0 & V2.2.1 Coexistence)](#-dual-track-architecture)
+3. [Design System & UI Style Lock](#-design-system--ui-style-lock)
+4. [Tech Stack & System Architecture](#-tech-stack--system-architecture)
+5. [User Roles & Key Workflows](#-user-roles--key-workflows)
+6. [Core Subsystems](#-core-subsystems)
+   - [Client Job Order Pipeline & Milestones](#1-client-job-order-pipeline--milestones)
+   - [Admin Curation & Talent Matching](#2-admin-curation--talent-matching)
+   - [Student Squad Collaboration & P2P Invitations](#3-student-squad-collaboration--p2p-invitations)
+   - [Deliverables, Milestone Reviews & Portfolios](#4-deliverables-milestone-reviews--portfolios)
+   - [Postponed V2.2.1 Club & Guild Sponsorship Engine](#5-postponed-v221-club--guild-sponsorship-engine)
+7. [Project Directory Structure](#-project-directory-structure)
+8. [Quickstart & Local Setup](#-quickstart--local-setup)
+9. [API Endpoint Reference](#-api-endpoint-reference)
+10. [Test & Verification Protocol](#-test--verification-protocol)
 
 ---
 
 ## 🌟 Executive Overview
 
-Traditional university sponsorship and campus recruitment are fragmented, slow, and lack verifiable performance tracking. **UniPact** streamlines this by providing:
-- **Gamified Quest Board**: Companies post structured missions (*Mercenary Bounties* and *Brand Ambassadorships*) with clear deliverables and reward pools (*"Loot"*).
-- **Verified Student Guilds**: University clubs build immutable institutional prestige through an automated 365-day rolling reputation engine (**S / A / B / C Class**).
-- **Institutional Continuity**: Solves annual student committee turnover with encrypted **Shadow User invitations** and **Presidency Ownership Succession**.
-- **Integrated Treasury & Freemium Monetization**: Automated Finder's Fees for Free Tier patrons, waivable via Pro Tier monthly subscriptions, backed by a mock Stripe payment intent pipeline.
+Traditional university freelancing and internship placements are fragmented, lack accountability, and fail to track individual student contributions in team settings. **UniPact v3.0** modernizes campus talent acquisition through:
+- **Curated Enterprise Matching**: Companies submit structured job orders (Software Development or Digital Marketing). UniPact Admin curates and matches verified students based on skills, academic focus, and track ratings.
+- **Peer-to-Peer Squad Collaboration**: When a project requires multi-disciplinary talent (e.g. Lead Engineer, UI/UX Designer, and Content Creator), assigned students can directly invite peer students to form a squad, delegate roles, and define transparent payout share splits.
+- **Centralized Workspaces & Milestone Tracking**: Centralized repository URLs, raw client marketing assets, revision threads (up to 2 revisions per milestone), and artifact uploads.
+- **Automated Verifiable Portfolios**: Each completed project automatically creates an immutable showcase item on the student's public portfolio highlighting their exact contribution statement and verified client rating.
 
 ---
 
-## 🏗️ Tech Stack & Architecture
+## ⚖️ Dual-Track Architecture
+
+UniPact operates a dual-track architecture designed for seamless coexistence:
+
+| Track | Target Audience | Primary Focus | Status |
+| :--- | :--- | :--- | :--- |
+| **V3.0 (Primary)** | Individual Students (`role: "STUDENT"`) & Companies (`role: "COMPANY"`) | Individual talent marketplace, curated admin matching, peer squad collaboration, milestone deliverables. | **Active & Live** |
+| **V2.2.1 (Preserved)** | Student Clubs/Guilds (`role: "CLUB"`) & Corporate Patrons | Club sponsorships, hackathons, brand ambassadorships, 365-day rank decay, shadow users & presidency succession. | **Postponed (Fully Intact)** |
+
+> [!IMPORTANT]
+> Per architectural locks, SRS v2.2.1 models and endpoints (`ClubProfile`, `ShadowUser`, `Application`, `Membership`) are strictly preserved and tested to prevent future migration conflicts.
+
+---
+
+## 🎨 Design System & UI Style Lock
+
+All user interfaces strictly comply with [`STYLE_GUIDE.md`](./STYLE_GUIDE.md) and [`AGENTS.md`](./AGENTS.md), projecting a trustworthy, enterprise B2B aesthetic:
+
+- **Color Tokens**:
+  - Primary Navy (`#0B1E63`) & Deep Navy (`#0A1748`)
+  - Action Cyan (`#00AEEF`) & Deep Cyan hover (`#0090C6`)
+  - Canvas Background (`#F5F7FC`) & Surface White (`#FFFFFF`)
+  - Main Text (`#0A1748`) & Muted Text (`#5B6478`)
+  - Soft Border (`rgba(10, 23, 72, 0.12)`) & Strong Border (`rgba(10, 23, 72, 0.22)`)
+- **Typography**:
+  - Headings: `Outfit` (Bold 700, `#0A1748`)
+  - Body & Controls: `Inter` (Regular 400, Medium 500, Semi-bold 600)
+- **Layout**: Container max-width `1160px`, sticky glassmorphic navbar (`76px`), cyan eyebrow tags with diamond accents, zero attribute occlusion.
+
+---
+
+## 🏗️ Tech Stack & System Architecture
 
 ```
                                   +---------------------------------------+
                                   |         React 19 + Vite 7 SPA         |
-                                  |    Tailwind CSS 3 (Cyberpunk Theme)   |
+                                  |   Tailwind CSS 3 (Enterprise Navy/Cyan) |
                                   |    Axios Client (withCredentials)     |
                                   +-------------------+-------------------+
                                                       |
-                                        REST API / HttpOnly Cookies
+                                         REST API / HttpOnly Cookies
                                                       |
                                   +-------------------v-------------------+
                                   |         Django 6 / Django REST        |
@@ -52,24 +84,24 @@ Traditional university sponsorship and campus recruitment are fragmented, slow, 
                  +--------------------+           |           |       +--------------------+
                  v                                v           v                            v
           [ users app ]                   [ campaigns app ] [ payments app ]       [ reviews app ]
-   - Custom User (RBAC)                  - Quests / Bounties - Subscriptions       - 5-Star / S-Rank
-   - Company & Club Profiles             - Applications      - Transactions        - 365d Rank Decay
-   - ShadowUser & Token Claim            - Deliverables      - Mock Stripe Service - Reputation Engine
-   - SystemLog Real-Time Feed            - ReportLab PDF Gen - Treasury Summary
+   - Custom User (STUDENT, COMPANY,      - Job Orders        - Treasury Summary    - 5-Star Ratings
+     ADMIN, CLUB)                        - Admin Matching    - Subscriptions       - 365d Rolling Rank Decay
+   - StudentProfile (Portfolio & Skills) - Squad Invitations - Mock Stripe Gateway - Client Feedback
+   - CompanyProfile & SSM Verification   - Deliverables
+   - ShadowUser (V2.2.1 Coexistence)     - Milestones & Assets
 ```
 
 ### Frontend
 - **Framework**: React 19, Vite 7, React Router DOM v7
-- **Styling**: Tailwind CSS 3.4 + Custom RPG Cyberpunk Dark Palette (`#a020f0` Neon Purple, `#deb874` Gold, Tech Grids)
+- **Styling**: Tailwind CSS 3.4 + Custom Enterprise Tokens (`STYLE_GUIDE.md`)
 - **Icons**: Lucide React
 - **HTTP Client**: Axios configured with `withCredentials: true`
 
 ### Backend
 - **Framework**: Python 3.12+ / Django 6.0 with Django REST Framework (DRF)
 - **Authentication**: `djangorestframework-simplejwt` wrapped in custom `CookieJWTAuthentication` (reads access/refresh tokens directly from secure HttpOnly cookies with Bearer header fallback)
-- **Document Engine**: ReportLab (automated PDF Campaign Completion generation)
-- **Database**: SQLite (default local) / PostgreSQL production-ready
-- **Filtering & Search**: `django-filter` and DRF Search/Ordering backends
+- **Database**: SQLite (local development) / PostgreSQL (production-ready)
+- **Document Engine**: ReportLab (automated PDF report generation)
 
 ---
 
@@ -77,258 +109,167 @@ Traditional university sponsorship and campus recruitment are fragmented, slow, 
 
 ```mermaid
 flowchart TD
-    subgraph "Admin (High Council)"
-        A1[Admin Dashboard] --> A2[Verification Queue]
-        A1 --> A3[Entity Management & User Blocking]
-        A1 --> A4[Live Security/Financial Audit Logs]
+    subgraph "1. Corporate Client"
+        C1[Post Job Order: Dev or Marketing] --> C2[Specify Milestones & Upload Assets]
+        C2 --> C3[Track Project & Squad Progress]
+        C3 --> C4[Review Deliverables & Rate Performance]
     end
 
-    subgraph "Company (Patron)"
-        C1[Post Quest / Bounty] --> C2[Inspect Applicants]
-        C2 -->|Free Tier: Pay RM 100 Finder Fee| C3[Award Contract]
-        C2 -->|Pro Tier: Finder Fee Waived| C3
-        C3 --> C4[Review Deliverables & Evaluate Club S-D]
-        C4 --> C5[Download ReportLab PDF Summary]
+    subgraph "2. UniPact Admin"
+        A1[Review Client Job Orders] --> A2[Curate & Match Verified Students]
+        A2 --> A3[Lock & Finalize Assignment]
+        A4[Verify Student & Company Credentials]
     end
 
-    subgraph "Student Club (Guild)"
-        S1[Browse Quest Board] --> S2[Apply with Pitch]
-        C3 -.->|Awarded| S3[Execute & Submit Deliverables]
-        S3 -.-> C4
-        S4[Roster Management] --> S5[Invite Shadow Members]
-        S4 --> S6[Transfer Presidency to Successor]
+    subgraph "3. Student Talent & Squads"
+        S1[Register & Verify Student Profile] --> S2[Matched to Project Workspace]
+        S2 --> S3{Need More Hands?}
+        S3 -->|Yes| S4[Send Peer Squad Invite: Role & Payout %]
+        S3 -->|No| S5[Execute Milestones]
+        S4 --> S6[Peer Accepts & Joins Squad]
+        S6 --> S5
+        S5 --> S7[Submit Code/Assets Deliverables]
+        S7 --> S8[Automated Public Portfolio Entry]
     end
+
+    C1 --> A1
+    A3 --> S2
+    S7 --> C4
 ```
 
 ---
 
-## 🧩 Subsystem Breakdown
+## 🧩 Core Subsystems
 
-### 1. Quest & Application Pipeline
-- **Quest Creation**: Patrons define type (`TALENT_BOUNTY` or `BRAND_AMBASSADOR`), budget in MYR, deadline, and a dynamic checklist of deliverable clear conditions.
-- **Application Flow**: Clubs submit competitive pitches. 
-- **Contract Awarding**: Selecting an applicant automatically marks them `AWARDED`, sets the campaign to `IN_PROGRESS`, and dismisses competing applicants as `NOT_SELECTED`.
-- **Deliverable Upload**: Awarded clubs upload final artifacts (`PDF`, `ZIP`, etc.) to move application state to `SUBMITTED`.
-- **Completion & PDF Generation**: Company rates performance and closes quest. Backend triggers [generate_campaign_report](file:///c:/Users/User/Documents/GitHub/unipact-mvp/unipact-backend/campaigns/utils.py) using ReportLab to build an official PDF certificate.
+### 1. Client Job Order Pipeline & Milestones
+- **Specialized Domains**: Companies choose between **Software Development** (Full-Stack, Mobile, DevOps, AI/ML) and **Digital Marketing** (Content Creation, SEO, Social Media Campaigns).
+- **Structured Milestones**: Multi-stage delivery (e.g., Milestone 1: Wireframes/Draft, Milestone 2: Core Build/Assets, Milestone 3: Final Launch & Handoff).
+- **Revision Safeguards**: Digital marketing workflows include up to two structured revisions with central storage for raw brand assets.
 
-### 2. Reputation & Rank Decay Engine
-- Implemented in [ClubProfile.calculate_rank()](file:///c:/Users/User/Documents/GitHub/unipact-mvp/unipact-backend/users/models.py):
-  - Queries all reviews received within a **365-day rolling window** (`created_at >= now - 365 days`).
-  - Rating $\ge 4.5 \implies$ **S-Class**
-  - Rating $\ge 4.0 \implies$ **A-Class**
-  - Rating $\ge 3.0 \implies$ **B-Class**
-  - Rating $< 3.0$ or No Reviews in 365 Days $\implies$ **C-Class (Decayed/Default)**
-- Mitigates "ghost clubs" keeping high ranks after legacy executive teams graduate.
+### 2. Admin Curation & Talent Matching
+- Eliminates spam and competitive bidding races.
+- UniPact Admin reviews incoming client job orders and matches verified students (`assigned_students`) based on domain focus, university credentials, and performance ratings.
+- Match notes provide students with immediate onboarding context.
 
-### 3. Shadow Users & Leadership Succession
-- **Shadow Invites**: Presidents invite prospective executive members via email. An unassigned [ShadowUser](file:///c:/Users/User/Documents/GitHub/unipact-mvp/unipact-backend/users/models.py) record is created with a cryptographic token.
-- **Profile Claiming**: Invitees use the token to set their password and convert the shadow seat into an active authenticated member.
-- **Presidency Transfer**: Club Presidents can transfer primary `ClubProfile` ownership to any existing roster member atomically.
+### 3. Student Squad Collaboration & P2P Invitations
+- Modeled via [`ProjectTeamInvitation`](unipact-backend/campaigns/models.py).
+- An assigned student can invite any verified student to their project squad.
+- **Invitation Parameters**:
+  - `role_in_project`: e.g. "Frontend Architect", "Video Editor", "Copywriter".
+  - `payout_share_percentage`: Proposed cut from milestone funds.
+  - `notes`: Specific task assignment instructions.
+- Upon acceptance, the peer is automatically enrolled into `assigned_students` and receives workspace access.
 
-### 4. Freemium Monetization & Treasury
-- **Tier Structure**:
-  - **Free Tier**: Companies pay a **RM 100 Finder's Fee** per contract award.
-  - **Pro Tier (RM 499/mo)**: All matching/finder fees are waived.
-- **Mock Stripe Engine**: [MockStripeService](file:///c:/Users/User/Documents/GitHub/unipact-mvp/unipact-backend/payments/services.py) generates payment intents and confirms mock card charges.
-- **Treasury Ledger**: Real-time overview of tier status, auto-renewal dates, stored payment card masks, and downloadable transaction history.
+### 4. Deliverables, Milestone Reviews & Portfolios
+- Students submit repository URLs, staging links, or packaged assets along with individual contribution statements.
+- Verified client ratings directly feed into the student's rating score and public portfolio.
 
-### 5. High Council Admin Terminal
-- **Public Domain Risk Detection**: Registrations with free public mail providers (`gmail.com`, `yahoo.com`, `hotmail.com`, etc.) are automatically assigned `HIGH_RISK` status, restricting quest creation until manual clearance.
-- **Document Queue**: Inspect uploaded SSM (Company Commission of Malaysia) documents or university club authorization letters.
-- **Live System Log Feed**: Streamed audit feed categorized into `FINANCIAL`, `SECURITY`, `MARKETPLACE`, and `GROWTH`.
-- **Entity Management**: Paginated table to search, filter by role/rank/tier, and instantly block/unblock suspicious users.
+### 5. Postponed V2.2.1 Club & Guild Sponsorship Engine
+- University club sponsorships, hackathon bounties, and guild leadership transfers remain intact for future university administration rollouts.
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Directory Structure
 
 ```
 unipact-mvp/
-├── acc                               # Test login accounts reference
-├── UniPact wireframe V1.docx         # Wireframe specifications
-├── UniPact_ SRS v2.2.1 (2).docx      # Software Requirements Specification document
+├── .agents/skills/                   # Architecture & style enforcement skills
+├── AGENTS.md                         # Global agent rules and style locks
+├── STYLE_GUIDE.md                    # Official UniPact Enterprise design system
+├── UniPact_wireframe_V3_0.md         # V3.0 UI/UX wireframe specifications
+├── README.md                         # Main documentation
 │
-├── unipact-backend/                  # Django REST API
+├── unipact-backend/                  # Django REST Framework API
 │   ├── manage.py
 │   ├── requirements.txt
-│   ├── unipact_backend/              # Project configuration, URLs, Cookie JWT Auth
-│   │   ├── authentication.py         # Custom Cookie + Bearer JWT authenticator
-│   │   ├── settings.py
-│   │   └── urls.py
-│   ├── users/                        # Auth, Profiles, Shadow Users, System Logs
-│   │   ├── models.py
-│   │   ├── serializers.py
-│   │   ├── views.py
-│   │   └── utils.py                  # Public domain checks & system logging helper
-│   ├── campaigns/                    # Quests, Applications, Deliverables, PDF Reports
-│   │   ├── models.py
-│   │   ├── serializers.py
-│   │   ├── views.py
-│   │   └── utils.py                  # ReportLab PDF generator
-│   ├── payments/                     # Subscriptions, Transactions, Mock Stripe
-│   │   ├── models.py
-│   │   ├── serializers.py
-│   │   ├── services.py               # Mock Stripe payment service
-│   │   └── views.py
-│   ├── reviews/                      # Reviews & Evaluation scores
-│   │   └── models.py
-│   └── verify_*.py                   # Automated verification & audit test scripts
+│   ├── unipact_backend/              # Core settings, JWT cookie auth, URLs
+│   ├── users/                        # Auth, StudentProfile, CompanyProfile, ShadowUser
+│   ├── campaigns/                    # Campaigns, Milestones, Team Invitations, Deliverables
+│   │   ├── migrations/               # Database migrations (0007-0009 V3.0)
+│   │   ├── test_v3.py                # Comprehensive V3.0 unit tests
+│   ├── payments/                     # Subscriptions, Mock Stripe, Treasury
+│   └── reviews/                      # Performance evaluations & rank decay
 │
-└── unipact-frontend/                 # React 19 + Vite 7 SPA
+└── unipact-frontend/                 # React 19 + Vite 7 Single Page Application
     ├── package.json
-    ├── tailwind.config.js
-    ├── vite.config.js
+    ├── tailwind.config.js            # Navy & Cyan tokens from STYLE_GUIDE.md
     └── src/
-        ├── App.jsx                   # React Router route registry & route guards
-        ├── api/                      # Axios client with baseURL logic & credentials
-        ├── context/                  # AuthContext and ToastContext
-        ├── components/               # ProtectedRoute, PaymentModal, ConfirmationModal, Toast
-        └── pages/
-            ├── LandingPage.jsx       # Public cyberpunk hero landing page
-            ├── LoginPage.jsx         # Universal terminal login
-            ├── CompanyRegister.jsx   # Patron registration + SSM upload
-            ├── StudentRegister.jsx   # Guild registration + verification upload
-            ├── CompanyDashboard.jsx  # Patron command center (Recruiting/Active/Completed)
-            ├── StudentDashboard.jsx  # Guild hunter terminal (Missions/Bounties/Roster)
-            ├── CreateCampaign.jsx    # Quest definition interface
-            ├── ManageCampaign.jsx    # Candidate inspection, contract award, review modal
-            ├── QuestBoard.jsx        # Public bounty search & filter
-            ├── QuestDetails.jsx      # Quest briefing & pitch application
-            ├── SubmitDeliverable.jsx # Deliverable file upload portal
-            ├── Treasury.jsx          # Billing, subscription upgrade & transaction history
-            ├── ClubProfile.jsx       # Public guild profile & committee roster
-            ├── StudentProfile.jsx    # Hunter profile view
-            └── AdminDashboard.jsx    # High council queue, logs & entity management
+        ├── api/client.js             # Axios client with credentials
+        ├── components/               # Navbar, ProtectedRoute, Modals
+        └── pages/                    # StudentDashboard, AdminDashboard, CreateCampaign, etc.
 ```
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## ⚡ Quickstart & Local Setup
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+ & npm
-- Git
+- **Python 3.12+**
+- **Node.js 20+** & **npm**
 
 ### 1. Backend Setup
 ```bash
-# Navigate to backend directory
 cd unipact-backend
-
-# Create and activate virtual environment
 python -m venv venv
-# On Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# On macOS/Linux:
+
+# Windows
+venv\Scripts\activate
+# macOS/Linux
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Run migrations
 python manage.py migrate
-
-# (Optional) Seed mock users & transactions
-python create_seed_users.py
-
-# Start Django development server
-python manage.py runserver 8000
+python manage.py runserver
 ```
-Backend API will be accessible at: `http://localhost:8000/api/`
-
----
+Backend API will be available at `http://127.0.0.1:8000/`.
 
 ### 2. Frontend Setup
 ```bash
-# Navigate to frontend directory
 cd unipact-frontend
-
-# Install node dependencies
 npm install
-
-# Start Vite development server
 npm run dev
 ```
-Frontend web application will run at: `http://localhost:5173/`
+Frontend application will be accessible at `http://localhost:5173/`.
 
 ---
 
 ## 📡 API Endpoint Reference
 
-### Authentication & Users (`/api/users/`)
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/register/company/` | Register corporate patron profile | Public |
-| `POST` | `/register/club/` | Register student guild profile | Public |
-| `POST` | `/login/` | Universal login (sets HttpOnly cookies) | Public |
-| `POST` | `/logout/` | Terminate session & clear cookies | Authenticated |
-| `GET` | `/me/` | Current user profile & metadata | Authenticated |
-| `POST` | `/club/invite/` | Send shadow invitation to committee member | Club Only |
-| `POST` | `/users/claim/` | Claim shadow invitation token | Public |
-| `POST` | `/club/transfer-ownership/` | Transfer club presidency to successor | Club President |
-| `GET` | `/club/<id>/profile/` | Public club profile & history | Authenticated |
-| `GET` | `/club/<id>/roster/` | Club roster & committee member list | Authenticated |
-| `GET` | `/admin/stats/` | Admin KPI metrics & revenue | Admin Only |
-| `GET` | `/admin/queue/` | Pending entity verification queue | Admin Only |
-| `POST` | `/admin/verify/<type>/<id>/` | Approve, reject, or flag entity | Admin Only |
-| `GET` | `/admin/logs/` | Real-time system audit logs (50 latest) | Admin Only |
-| `GET` | `/admin/entities/` | Filterable & paginated user entity table | Admin Only |
-| `POST` | `/admin/users/<id>/block/` | Toggle user active/blocked status | Admin Only |
+### V3.0 Student Talent & Squad Collaboration
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/users/students/` | `GET` | List verified student talent profiles |
+| `/api/users/students/<id>/` | `GET` | Retrieve student profile and public portfolio |
+| `/api/campaigns/student/assigned/` | `GET` | List projects assigned to the authenticated student |
+| `/api/campaigns/<id>/team/invite/` | `POST` | Send squad invitation to peer student |
+| `/api/campaigns/<id>/team/` | `GET` | List active squad members and invitations |
+| `/api/campaigns/team/invitations/me/` | `GET` | List pending invitations received by current student |
+| `/api/campaigns/team/invitation/<id>/respond/` | `POST` | Accept or decline squad invitation |
+| `/api/campaigns/<id>/student-deliverable/` | `POST` | Submit milestone deliverable & contribution note |
 
-### Campaigns & Quests (`/api/campaigns/`)
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :--- |
-| `GET` / `POST` | `/` | List open quests (or patron's own) / Create quest | Authenticated |
-| `GET` / `PUT` | `/<id>/` | Retrieve quest details with applicants | Authenticated |
-| `POST` | `/<id>/apply/` | Submit pitch application for a quest | Club Only |
-| `GET` | `/applications/me/` | List all applications submitted by club | Club Only |
-| `POST` | `/application/<id>/award/` | Award contract to applicant (enforces fee) | Company Only |
-| `POST` | `/application/<id>/deliverable/`| Upload completed deliverable file | Club Only |
-| `POST` | `/<id>/complete/` | Submit review, close contract, generate PDF | Company Only |
-
-### Payments & Treasury (`/api/payments/`)
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/create-intent/` | Create Mock Stripe payment intent | Company Only |
-| `POST` | `/confirm/<id>/` | Confirm successful payment & upgrade tier | Company Only |
-| `GET` | `/history/` | Company transaction invoice ledger | Company Only |
-| `GET` | `/treasury/` | Treasury overview (tier, balance, charter) | Company Only |
+### Admin Curation & Management
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/campaigns/curate/unassigned/` | `GET` | List campaigns awaiting talent assignment |
+| `/api/campaigns/<id>/curate/match/` | `POST` | Match and assign verified students to campaign |
+| `/api/campaigns/<id>/curate/finalize/` | `POST` | Lock match and transition project to `IN_PROGRESS` |
 
 ---
 
-## 🧪 Test & Verification Scripts
+## 🧪 Test & Verification Protocol
 
-The backend includes standalone verification scripts to validate core business logic:
+The repository enforces mandatory verification gates:
 
+### 1. Backend Test Suite
 ```bash
 cd unipact-backend
-
-# 1. Verify Shadow User Invitation, Token Claiming & Presidency Transfer
-python verify_vectors.py
-
-# 2. Verify 365-Day Rolling Reputation Engine & Inactivity Rank Decay
-python verify_reputation_decay.py
-
-# 3. Verify Revenue Aggregation & Pro Tier Backfill Calculations
-python verify_revenue.py
-
-# 4. Verify Admin Entity Search, Filter & DRF Pagination
-python verify_pagination.py
+python manage.py test
 ```
+*Current Status*: **25/25 tests passing (100% OK)** including V3.0 student profiles, admin matching, milestone deliverables, peer invitations, and postponed V2.2.1 club audits.
 
----
-
-## 🔑 Pre-Seeded Test Credentials
-
-For quick local evaluation, use the following pre-configured credentials:
-
-| Role | Email | Password | Details |
-| :--- | :--- | :--- | :--- |
-| **Patron (Company)** | `cybercorp@test.com` | `password123` | Free Tier / Verified Company |
-| **Guild (Club)** | `netrunners@test.com` | `password123` | Verified Student Club |
-| **Administrator** | `admin@unipact.com` (or create via `createsuperuser`) | `password123` | High Council Access |
-
----
-
-## 📄 License & Attribution
-UniPact Systems © 2025 • Designed & Developed for High-Velocity B2B University Partnerships.
+### 2. Frontend Production Build
+```bash
+cd unipact-frontend
+npm run build
+```
+*Current Status*: **0 errors**, compiles clean production bundle via Vite.
