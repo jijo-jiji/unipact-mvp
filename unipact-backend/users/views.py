@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, logout
 from django.db import transaction
 from rest_framework import exceptions
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, CompanyProfile, ClubProfile, ShadowUser, SystemLog
+from .models import User, CompanyProfile, ClubProfile, StudentProfile, ShadowUser, SystemLog
 from django.shortcuts import get_object_or_404
 
 from .utils import is_public_domain
@@ -15,6 +15,8 @@ from rest_framework.pagination import PageNumberPagination
 from .serializers import (
     CompanyProfileSerializer, 
     ClubProfileSerializer, 
+    StudentProfileSerializer,
+    StudentRegistrationSerializer,
     UserSerializer, 
     ShadowUserSerializer, 
     AdminEntityListSerializer,
@@ -56,6 +58,7 @@ class UserView(views.APIView):
         
         company_profile_data = None
         club_profile_data = None
+        student_profile_data = None
 
         if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
             ver_status = user.company_profile.verification_status
@@ -68,6 +71,10 @@ class UserView(views.APIView):
             ver_status = user.club_profile.verification_status
             name = user.club_profile.club_name
             club_profile_data = ClubProfileSerializer(user.club_profile).data
+        elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
+            ver_status = user.student_profile.verification_status
+            name = user.student_profile.full_name
+            student_profile_data = StudentProfileSerializer(user.student_profile).data
         else:
             name = user.username
 
@@ -81,7 +88,8 @@ class UserView(views.APIView):
             "card_last_4": card_last_4,
             "card_brand": card_brand,
             "company_profile": company_profile_data,
-            "club_profile": club_profile_data
+            "club_profile": club_profile_data,
+            "student_profile": student_profile_data
         })
 
 class LoginView(views.APIView):
@@ -99,6 +107,7 @@ class LoginView(views.APIView):
             ver_status = None
             company_profile_data = None
             club_profile_data = None
+            student_profile_data = None
             name = user.username
 
             if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
@@ -109,9 +118,15 @@ class LoginView(views.APIView):
                 ver_status = user.club_profile.verification_status
                 name = user.club_profile.club_name
                 club_profile_data = ClubProfileSerializer(user.club_profile).data
+            elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
+                ver_status = user.student_profile.verification_status
+                name = user.student_profile.full_name
+                student_profile_data = StudentProfileSerializer(user.student_profile).data
 
             response = Response({
                 "message": "Login successful",
+                "role": user.role,
+                "verification_status": ver_status,
                 "user": {
                     "id": user.id,
                     "email": user.email,
@@ -119,7 +134,8 @@ class LoginView(views.APIView):
                     "name": name,
                     "verification_status": ver_status,
                     "company_profile": company_profile_data,
-                    "club_profile": club_profile_data
+                    "club_profile": club_profile_data,
+                    "student_profile": student_profile_data
                 }
             }, status=status.HTTP_200_OK)
 
@@ -172,20 +188,11 @@ class InviteMemberView(generics.CreateAPIView):
         existing_user = User.objects.filter(email=email).first()
 
         if existing_user:
-            # Directly add them to the roster as a claimed member
-            # Prevent adding irrelevant roles? For now allow any user to be added.
-            serializer.save(
-                invited_by=self.request.user.club_profile, 
-                token=token,
-                user=existing_user,
-                is_claimed=True
-            )
-            print(f"Added existing user {email} to roster of {self.request.user.club_profile.club_name}")
-        else:
-            # Standard Invite for new user
-            serializer.save(invited_by=self.request.user.club_profile, token=token)
-            # Mock Email Sending
-            print(f"Sending invitation to {email} with token {token}")
+            raise exceptions.ValidationError("User with this email is already registered.")
+
+        # Standard Invite for new user
+        serializer.save(invited_by=self.request.user.club_profile, token=token)
+        print(f"Sending invitation to {email} with token {token}")
 
 class ClaimProfileView(views.APIView):
     permission_classes = [AllowAny]
@@ -455,6 +462,73 @@ class RegisterClubView(generics.CreateAPIView):
         set_auth_cookies(response, tokens)
         return response
 
+class RegisterStudentView(generics.CreateAPIView):
+    serializer_class = StudentRegistrationSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        full_name = serializer.validated_data['full_name']
+        university = serializer.validated_data['university']
+        major = serializer.validated_data.get('major', '')
+        domain_focus = serializer.validated_data.get('domain_focus', 'SOFTWARE_DEV')
+        secondary_email = serializer.validated_data.get('secondary_email')
+        club_name = serializer.validated_data.get('club_affiliation_name')
+        club_role = serializer.validated_data.get('club_affiliation_role')
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "A user with that email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password,
+                role=User.Role.STUDENT,
+                first_name=full_name
+            )
+
+            profile = StudentProfile.objects.create(
+                user=user,
+                full_name=full_name,
+                university=university,
+                major=major,
+                domain_focus=domain_focus,
+                secondary_email=secondary_email,
+                club_affiliation_name=club_name,
+                club_affiliation_role=club_role,
+                verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION
+            )
+
+            if 'verification_doc' in request.FILES:
+                profile.verification_document = request.FILES['verification_doc']
+                profile.save()
+
+        tokens = get_tokens_for_user(user)
+
+        from .models import SystemLog
+        from .utils import log_event
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Student Talent Joined: {full_name} ({university})")
+
+        response = Response({
+            "message": "Student talent registered successfully. Account pending Admin verification.",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "role": user.role,
+                "name": full_name,
+                "verification_status": profile.verification_status,
+                "student_profile": StudentProfileSerializer(profile).data
+            }
+        }, status=status.HTTP_201_CREATED)
+
+        set_auth_cookies(response, tokens)
+        return response
+
 class AdminDashboardStatsView(views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -463,7 +537,8 @@ class AdminDashboardStatsView(views.APIView):
             raise exceptions.PermissionDenied("Admin access required.")
         
         pending_reviews = CompanyProfile.objects.filter(verification_status=CompanyProfile.VerificationStatus.PENDING_REVIEW).count() + \
-                          ClubProfile.objects.filter(verification_status=ClubProfile.VerificationStatus.PENDING_VERIFICATION).count()
+                          ClubProfile.objects.filter(verification_status=ClubProfile.VerificationStatus.PENDING_VERIFICATION).count() + \
+                          StudentProfile.objects.filter(verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION).count()
         system_flags = CompanyProfile.objects.filter(verification_status=CompanyProfile.VerificationStatus.HIGH_RISK).count()
         total_users = User.objects.count()
         
@@ -472,13 +547,12 @@ class AdminDashboardStatsView(views.APIView):
         from django.db.models import Sum
         
         total_rev = Transaction.objects.filter(status=Transaction.Status.SUCCESS).aggregate(Sum('amount'))['amount__sum'] or 0
-        revenue = f"RM {total_rev:,.2f}" 
-
+        
         return Response({
             "pending_reviews": pending_reviews,
             "system_flags": system_flags,
             "total_users": total_users,
-            "revenue": revenue
+            "total_revenue": total_rev
         })
 
 class AdminVerificationQueueView(views.APIView):
@@ -486,7 +560,7 @@ class AdminVerificationQueueView(views.APIView):
 
     def get(self, request):
         if request.user.role != User.Role.ADMIN:
-            raise exceptions.PermissionDenied("Admin access required.")
+             raise exceptions.PermissionDenied("Admin access required.")
 
         pending_companies = CompanyProfile.objects.filter(verification_status__in=[
             CompanyProfile.VerificationStatus.PENDING_REVIEW,
@@ -494,11 +568,13 @@ class AdminVerificationQueueView(views.APIView):
         ])
         
         pending_clubs = ClubProfile.objects.filter(verification_status=ClubProfile.VerificationStatus.PENDING_VERIFICATION)
+        pending_students = StudentProfile.objects.filter(verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION)
 
         from .serializers import AdminCompanyVerificationSerializer, AdminClubVerificationSerializer
         
         company_data = AdminCompanyVerificationSerializer(pending_companies, many=True).data
         club_data = AdminClubVerificationSerializer(pending_clubs, many=True).data
+        student_data = StudentProfileSerializer(pending_students, many=True).data
         
         # Combine and structure for frontend
         results = []
@@ -509,6 +585,10 @@ class AdminVerificationQueueView(views.APIView):
         for c in club_data:
             c['type'] = 'CLUB'
             results.append(c)
+
+        for s in student_data:
+            s['type'] = 'STUDENT'
+            results.append(s)
             
         return Response(results)
 
@@ -544,6 +624,19 @@ class AdminVerifyEntityView(views.APIView):
                 profile.save()
             except ClubProfile.DoesNotExist:
                 return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        elif entity_type == 'STUDENT':
+            try:
+                profile = StudentProfile.objects.get(id=entity_id)
+                if action == 'approve':
+                    profile.verification_status = StudentProfile.VerificationStatus.VERIFIED
+                    profile.user.is_verified = True
+                    profile.user.save()
+                elif action == 'reject':
+                    profile.verification_status = StudentProfile.VerificationStatus.REJECTED
+                profile.save()
+            except StudentProfile.DoesNotExist:
+                return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
         
         else:
              return Response({"error": "Invalid entity type"}, status=status.HTTP_400_BAD_REQUEST)
@@ -580,12 +673,12 @@ class AdminEntityListView(generics.ListAPIView):
     pagination_class.page_size = 10 # Explicitly set page size
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['role', 'company_profile__tier', 'club_profile__rank']
-    search_fields = ['email', 'company_profile__company_name', 'club_profile__club_name']
+    search_fields = ['email', 'company_profile__company_name', 'club_profile__club_name', 'student_profile__full_name']
 
     def get_queryset(self):
         if self.request.user.role != User.Role.ADMIN:
              raise exceptions.PermissionDenied("Admin access required.")
-        return User.objects.filter(role__in=[User.Role.CLUB, User.Role.COMPANY]).order_by('-date_joined')
+        return User.objects.filter(role__in=[User.Role.CLUB, User.Role.COMPANY, User.Role.STUDENT]).order_by('-date_joined')
 
 class AdminBlockUserView(views.APIView):
     permission_classes = [IsAuthenticated]

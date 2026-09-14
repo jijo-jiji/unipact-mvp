@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models import Campaign, Application
 from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer
-from users.models import User, CompanyProfile
+from users.models import User, CompanyProfile, StudentProfile
 from payments.models import Transaction, Subscription
 from .utils import generate_campaign_report
 
@@ -26,6 +26,13 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         if mode == 'my_campaigns' and self.request.user.role == User.Role.COMPANY:
             return Campaign.objects.filter(company=self.request.user.company_profile).select_related('company')
         
+        # Admin access: can view all or filter by status
+        if self.request.user.role == User.Role.ADMIN:
+            status_param = self.request.query_params.get('status')
+            if status_param:
+                return Campaign.objects.filter(status=status_param).select_related('company')
+            return Campaign.objects.all().select_related('company')
+
         # Default: Only show OPEN campaigns (Public Board)
         return Campaign.objects.filter(status=Campaign.Status.OPEN).select_related('company')
 
@@ -155,17 +162,21 @@ class DeliverableCreateView(generics.CreateAPIView):
         log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Deliverable Submitted: {application.club.club_name} -> {application.campaign.title}")
 
 class MarkCampaignCompletedView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCompany]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, campaign_id):
         campaign = get_object_or_404(Campaign, pk=campaign_id)
         
-        # Verify ownership
-        if campaign.company != request.user.company_profile:
-             return Response({"error": "You do not own this campaign."}, status=status.HTTP_403_FORBIDDEN)
+        # Verify permissions: company owner, awarded club, assigned student, or admin
+        is_owner = (request.user.role == User.Role.COMPANY and hasattr(request.user, 'company_profile') and campaign.company == request.user.company_profile)
+        is_club = (request.user.role == User.Role.CLUB and hasattr(request.user, 'club_profile') and campaign.applications.filter(club=request.user.club_profile, status__in=[Application.Status.AWARDED, Application.Status.SUBMITTED]).exists())
+        is_student = (request.user.role == User.Role.STUDENT and hasattr(request.user, 'student_profile') and campaign.assigned_students.filter(id=request.user.student_profile.id).exists())
+
+        if not (is_owner or is_club or is_student or request.user.role == User.Role.ADMIN):
+            return Response({"error": "You do not have permission to complete this campaign."}, status=status.HTTP_403_FORBIDDEN)
 
         # Verify status
-        if campaign.status != Campaign.Status.IN_PROGRESS:
+        if campaign.status not in [Campaign.Status.IN_PROGRESS, Campaign.Status.OPEN]:
             return Response({"error": "Campaign must be in progress to complete."}, status=status.HTTP_400_BAD_REQUEST)
 
         # 1. HANDLE REVIEW CREATION
@@ -179,7 +190,7 @@ class MarkCampaignCompletedView(APIView):
             ).first()
 
             if accepted_app:
-                if rating:
+                if rating and hasattr(request.user, 'company_profile'):
                     club = accepted_app.club
                     from reviews.models import Review
                     Review.objects.create(
@@ -196,12 +207,14 @@ class MarkCampaignCompletedView(APIView):
                 accepted_app.status = Application.Status.COMPLETED
                 accepted_app.save()
 
-            else:
-                 print("No awarded/submitted application found for this campaign.")
+            # Handle V3.0 assigned students rating
+            if campaign.assigned_students.exists() and rating:
+                for student in campaign.assigned_students.all():
+                    student.rating = rating
+                    student.save()
 
         except Exception as e:
             print(f"Error processing review/completion: {e}")
-            # We don't fail the completion if review fails, but we log it.
 
         # 2. MARK AS COMPLETED
         campaign.status = Campaign.Status.COMPLETED
@@ -219,3 +232,329 @@ class MarkCampaignCompletedView(APIView):
             "message": "Mission Accomplished. Campaign marked as completed.",
             "report_url": report_url
         }, status=status.HTTP_200_OK)
+
+
+# ==========================================
+# V3.0 TALENT MARKETPLACE VIEWS
+# ==========================================
+
+class AdminMatchmakingAssignView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        student_ids = request.data.get('student_ids', [])
+        match_notes = request.data.get('match_notes', '')
+
+        if not student_ids:
+            return Response({"error": "At least one student ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from users.models import StudentProfile
+        students = StudentProfile.objects.filter(id__in=student_ids)
+        if not students.exists():
+            return Response({"error": "No students found with the provided IDs."}, status=status.HTTP_400_BAD_REQUEST)
+
+        campaign.assigned_students.set(students)
+        campaign.status = Campaign.Status.MATCHED
+        campaign.match_notes = match_notes
+        campaign.save()
+
+        from users.models import SystemLog
+        from users.utils import log_event
+        student_names = ", ".join([s.full_name for s in students])
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Admin matched '{student_names}' to job #{campaign.id}: '{campaign.title}'")
+
+        return Response({
+            "message": "Talent successfully assigned and job status updated to MATCHED.",
+            "campaign": CampaignSerializer(campaign).data
+        }, status=status.HTTP_200_OK)
+
+
+class FinalizeMatchView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCompany]
+
+    def post(self, request, campaign_id):
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+
+        if campaign.company != request.user.company_profile:
+            return Response({"error": "You do not own this campaign."}, status=status.HTTP_403_FORBIDDEN)
+
+        if campaign.status != Campaign.Status.MATCHED:
+            return Response({"error": "Campaign must be in MATCHED status to finalize."}, status=status.HTTP_400_BAD_REQUEST)
+
+        company_profile = request.user.company_profile
+
+        # Monetization Gate: Free tier requires Finder's Fee payment
+        if company_profile.tier == CompanyProfile.Tier.FREE:
+            has_paid = Transaction.objects.filter(
+                company=company_profile,
+                related_campaign=campaign,
+                status=Transaction.Status.SUCCESS,
+                transaction_type=Transaction.Type.FINDERS_FEE
+            ).exists()
+
+            if not has_paid:
+                mock_pay = request.data.get('mock_pay', True)
+                if mock_pay:
+                    Transaction.objects.create(
+                        company=company_profile,
+                        related_campaign=campaign,
+                        amount=150.00,
+                        transaction_type=Transaction.Type.FINDERS_FEE,
+                        status=Transaction.Status.SUCCESS
+                    )
+                else:
+                    return Response({
+                        "status": "payment_required",
+                        "finder_fee": 150.00,
+                        "message": "Finder's Fee payment required to finalize match."
+                    }, status=status.HTTP_402_PAYMENT_REQUIRED)
+
+        campaign.is_match_finalized = True
+        campaign.status = Campaign.Status.IN_PROGRESS
+        campaign.save()
+
+        from users.models import SystemLog
+        from users.utils import log_event
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS, f"Match Finalized for '{campaign.title}' by {company_profile.company_name}")
+
+        return Response({
+            "message": "Match finalized successfully. Project is now IN_PROGRESS.",
+            "campaign": CampaignSerializer(campaign).data
+        }, status=status.HTTP_200_OK)
+
+
+class StudentAssignedJobsView(generics.ListAPIView):
+    serializer_class = CampaignSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role != User.Role.STUDENT or not hasattr(self.request.user, 'student_profile'):
+            return Campaign.objects.none()
+        return Campaign.objects.filter(assigned_students=self.request.user.student_profile).distinct()
+
+
+class StudentSubmitDeliverableView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        if self.request.user.role != User.Role.STUDENT or not hasattr(self.request.user, 'student_profile'):
+            raise exceptions.PermissionDenied("Only assigned students can submit deliverables.")
+
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        if not campaign.assigned_students.filter(id=request.user.student_profile.id).exists():
+            raise exceptions.PermissionDenied("You are not assigned to this project.")
+
+        from .models import StudentDeliverable
+        from .serializers import StudentDeliverableSerializer
+
+        title = request.data.get('title', 'Project Deliverable')
+        external_url = request.data.get('external_url', '')
+        contribution_role = request.data.get('contribution_role', '')
+        contribution_summary = request.data.get('contribution_summary', '')
+        file_obj = request.FILES.get('file', None)
+
+        deliverable = StudentDeliverable.objects.create(
+            campaign=campaign,
+            student=request.user.student_profile,
+            title=title,
+            external_url=external_url,
+            file=file_obj,
+            contribution_role=contribution_role,
+            contribution_summary=contribution_summary
+        )
+
+        return Response({
+            "message": "Deliverable submitted successfully.",
+            "deliverable": StudentDeliverableSerializer(deliverable).data
+        }, status=status.HTTP_201_CREATED)
+
+
+class ClientAssetView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, campaign_id):
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        from .models import ClientAsset
+        from .serializers import ClientAssetSerializer
+
+        is_company = (request.user.role == User.Role.COMPANY and campaign.company == getattr(request.user, 'company_profile', None))
+        is_assigned = (request.user.role == User.Role.STUDENT and hasattr(request.user, 'student_profile') and campaign.assigned_students.filter(id=request.user.student_profile.id).exists())
+        is_admin = (request.user.role == User.Role.ADMIN)
+
+        if not (is_company or is_assigned or is_admin):
+            raise exceptions.PermissionDenied("Access to raw client assets is restricted.")
+
+        assets = campaign.client_assets.all()
+        return Response(ClientAssetSerializer(assets, many=True).data)
+
+    def post(self, request, campaign_id):
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        if request.user.role != User.Role.COMPANY or campaign.company != request.user.company_profile:
+            raise exceptions.PermissionDenied("Only the project owner can upload client assets.")
+
+        from .models import ClientAsset
+        from .serializers import ClientAssetSerializer
+
+        title = request.data.get('title', 'Asset')
+        asset_type = request.data.get('asset_type', 'DOCUMENT')
+        file_obj = request.FILES.get('file')
+
+        if not file_obj:
+            return Response({"error": "File is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        asset = ClientAsset.objects.create(
+            campaign=campaign,
+            title=title,
+            asset_type=asset_type,
+            file=file_obj
+        )
+
+        return Response(ClientAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectTeamInviteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        if request.user.role != User.Role.STUDENT or not hasattr(request.user, 'student_profile'):
+            raise exceptions.PermissionDenied("Only registered students can invite collaborators.")
+
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        current_student = request.user.student_profile
+
+        if not campaign.assigned_students.filter(id=current_student.id).exists():
+            raise exceptions.PermissionDenied("You are not an assigned team member on this project.")
+
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({"error": "Invitee email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if email == request.user.email.lower():
+            return Response({"error": "You cannot invite yourself."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import ProjectTeamInvitation
+        from .serializers import ProjectTeamInvitationSerializer
+
+        # Check if already assigned
+        if campaign.assigned_students.filter(user__email__iexact=email).exists():
+            return Response({"error": "This student is already a member of the project team."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if pending invite already exists
+        if ProjectTeamInvitation.objects.filter(campaign=campaign, invitee_email__iexact=email, status=ProjectTeamInvitation.Status.PENDING).exists():
+            return Response({"error": "A pending invitation has already been sent to this email."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find student profile if already registered
+        invitee_student = StudentProfile.objects.filter(user__email__iexact=email).first()
+
+        role_in_project = request.data.get('role_in_project', 'Collaborator')
+        payout_share = request.data.get('payout_share_percentage', 0)
+        notes = request.data.get('notes', '')
+
+        invitation = ProjectTeamInvitation.objects.create(
+            campaign=campaign,
+            invited_by=current_student,
+            invitee_email=email,
+            invitee_student=invitee_student,
+            role_in_project=role_in_project,
+            payout_share_percentage=payout_share,
+            status=ProjectTeamInvitation.Status.PENDING,
+            notes=notes
+        )
+
+        from users.models import SystemLog
+        from users.utils import log_event
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Student {current_student.full_name} invited {email} as {role_in_project} to project #{campaign.id} ('{campaign.title}')")
+
+        return Response(ProjectTeamInvitationSerializer(invitation).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectTeamListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, campaign_id):
+        campaign = get_object_or_404(Campaign, pk=campaign_id)
+        from users.serializers import StudentProfileSerializer
+        from .serializers import ProjectTeamInvitationSerializer
+
+        team_members = StudentProfileSerializer(campaign.assigned_students.all(), many=True).data
+        invitations = ProjectTeamInvitationSerializer(campaign.team_invitations.filter(status='PENDING'), many=True).data
+
+        return Response({
+            "campaign_id": campaign.id,
+            "campaign_title": campaign.title,
+            "team_members": team_members,
+            "pending_invitations": invitations
+        })
+
+
+class MyTeamInvitationsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.STUDENT or not hasattr(request.user, 'student_profile'):
+            return Response([])
+
+        from .models import ProjectTeamInvitation
+        from .serializers import ProjectTeamInvitationSerializer
+        from django.db.models import Q
+
+        invitations = ProjectTeamInvitation.objects.filter(
+            Q(invitee_student=request.user.student_profile) | Q(invitee_email__iexact=request.user.email),
+            status=ProjectTeamInvitation.Status.PENDING
+        ).select_related('campaign', 'invited_by')
+
+        return Response(ProjectTeamInvitationSerializer(invitations, many=True).data)
+
+
+class RespondTeamInvitationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, invitation_id):
+        if request.user.role != User.Role.STUDENT or not hasattr(request.user, 'student_profile'):
+            raise exceptions.PermissionDenied("Only registered students can respond to team invitations.")
+
+        from .models import ProjectTeamInvitation
+        from .serializers import ProjectTeamInvitationSerializer
+        from django.db.models import Q
+
+        invitation = get_object_or_404(
+            ProjectTeamInvitation,
+            Q(invitee_student=request.user.student_profile) | Q(invitee_email__iexact=request.user.email),
+            pk=invitation_id
+        )
+
+        if invitation.status != ProjectTeamInvitation.Status.PENDING:
+            return Response({"error": f"Invitation is already {invitation.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        action = request.data.get('action', '').lower()
+        student_profile = request.user.student_profile
+
+        if action == 'accept':
+            invitation.invitee_student = student_profile
+            invitation.status = ProjectTeamInvitation.Status.ACCEPTED
+            invitation.save()
+
+            # Add student to campaign assigned students
+            invitation.campaign.assigned_students.add(student_profile)
+
+            from users.models import SystemLog
+            from users.utils import log_event
+            log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.SUCCESS, f"Student {student_profile.full_name} accepted team invitation for '{invitation.campaign.title}' as {invitation.role_in_project}")
+
+            return Response({
+                "message": f"You have successfully joined the team for '{invitation.campaign.title}' as {invitation.role_in_project}!",
+                "invitation": ProjectTeamInvitationSerializer(invitation).data
+            }, status=status.HTTP_200_OK)
+
+        elif action == 'decline':
+            invitation.status = ProjectTeamInvitation.Status.DECLINED
+            invitation.save()
+            return Response({"message": "Invitation declined."}, status=status.HTTP_200_OK)
+
+        return Response({"error": "Invalid action. Use 'accept' or 'decline'."}, status=status.HTTP_400_BAD_REQUEST)
+
+

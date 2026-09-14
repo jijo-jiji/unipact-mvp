@@ -1,15 +1,62 @@
+# pyrefly: ignore [missing-import]
 from rest_framework import serializers
-from .models import Campaign, Application, Deliverable
+from .models import Campaign, Application, Deliverable, ClientAsset, StudentDeliverable, ProjectTeamInvitation
+from users.serializers import StudentProfileSerializer
+
+class ClientAssetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientAsset
+        fields = ['id', 'campaign', 'title', 'file', 'asset_type', 'uploaded_at']
+        read_only_fields = ['uploaded_at']
+
+class StudentDeliverableSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+    student_university = serializers.CharField(source='student.university', read_only=True)
+
+    class Meta:
+        model = StudentDeliverable
+        fields = [
+            'id', 'campaign', 'student', 'student_name', 'student_university',
+            'title', 'external_url', 'file', 'contribution_role',
+            'contribution_summary', 'submitted_at'
+        ]
+        read_only_fields = ['student', 'submitted_at']
+
+class ProjectTeamInvitationSerializer(serializers.ModelSerializer):
+    campaign_title = serializers.CharField(source='campaign.title', read_only=True)
+    invited_by_name = serializers.CharField(source='invited_by.full_name', read_only=True)
+    invitee_student_name = serializers.CharField(source='invitee_student.full_name', read_only=True)
+
+    class Meta:
+        model = ProjectTeamInvitation
+        fields = [
+            'id', 'campaign', 'campaign_title', 'invited_by', 'invited_by_name',
+            'invitee_email', 'invitee_student', 'invitee_student_name',
+            'role_in_project', 'payout_share_percentage', 'status', 'notes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['campaign', 'invited_by', 'invitee_student', 'status', 'created_at', 'updated_at']
 
 class CampaignSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.company_name', read_only=True)
     guild = serializers.SerializerMethodField()
     applicants = serializers.IntegerField(source='applications.count', read_only=True)
+    assigned_students_details = StudentProfileSerializer(source='assigned_students', many=True, read_only=True)
+    client_assets = ClientAssetSerializer(many=True, read_only=True)
+    student_deliverables = StudentDeliverableSerializer(many=True, read_only=True)
+    team_invitations = ProjectTeamInvitationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Campaign
-        fields = ['id', 'company', 'company_name', 'title', 'description', 'type', 'budget', 'requirements', 'deadline', 'status', 'created_at', 'guild', 'applicants']
-        read_only_fields = ['company', 'status', 'created_at']
+        fields = [
+            'id', 'company', 'company_name', 'title', 'description', 'type', 'budget',
+            'requirements', 'deadline', 'status', 'created_at', 'guild', 'applicants',
+            'software_sub_type', 'required_skills', 'project_outcome',
+            'campaign_objective', 'target_platforms', 'match_notes', 'is_match_finalized',
+            'assigned_students', 'assigned_students_details', 'client_assets', 'student_deliverables',
+            'team_invitations'
+        ]
+        read_only_fields = ['company', 'status', 'created_at', 'is_match_finalized']
 
     def get_guild(self, obj):
         # Find the application that is AWARDED, SUBMITTED, or COMPLETED

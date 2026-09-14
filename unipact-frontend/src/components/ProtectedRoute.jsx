@@ -29,7 +29,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
             // Redirect to their appropriate dashboard if they try to access wrong area
             if (user.role === 'COMPANY') {
                 return <Navigate to="/company/dashboard" replace />;
-            } else if (user.role === 'CLUB') {
+            } else if (user.role === 'CLUB' || user.role === 'STUDENT') {
                 return <Navigate to="/student/dashboard" replace />;
             } else if (user.role === 'ADMIN') {
                 return <Navigate to="/admin" replace />;

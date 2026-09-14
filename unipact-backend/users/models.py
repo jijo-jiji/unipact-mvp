@@ -7,8 +7,9 @@ class User(AbstractUser):
         COMPANY = 'COMPANY', _('Company')
         CLUB = 'CLUB', _('Club')
         ADMIN = 'ADMIN', _('Admin')
+        STUDENT = 'STUDENT', _('Student')
 
-    role = models.CharField(max_length=20, choices=Role.choices, default=Role.CLUB)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     email = models.EmailField(_('email address'), unique=True)
     is_verified = models.BooleanField(default=False)  # General verification flag
 
@@ -103,6 +104,45 @@ class ClubProfile(models.Model):
 
     def __str__(self):
         return self.club_name
+
+class StudentProfile(models.Model):
+    class VerificationStatus(models.TextChoices):
+        PENDING_VERIFICATION = 'PENDING_VERIFICATION', _('Pending Verification')
+        VERIFIED = 'VERIFIED', _('Verified')
+        REJECTED = 'REJECTED', _('Rejected')
+
+    class DomainFocus(models.TextChoices):
+        SOFTWARE_DEV = 'SOFTWARE_DEV', _('Software Development')
+        MARKETING = 'MARKETING', _('Digital Marketing')
+        BOTH = 'BOTH', _('Both Domains')
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
+    full_name = models.CharField(max_length=255)
+    university = models.CharField(max_length=255)
+    major = models.CharField(max_length=255, blank=True)
+    domain_focus = models.CharField(
+        max_length=20, 
+        choices=DomainFocus.choices, 
+        default=DomainFocus.SOFTWARE_DEV
+    )
+    verification_status = models.CharField(
+        max_length=25,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING_VERIFICATION
+    )
+    verification_document = models.FileField(upload_to='student_docs/', blank=True, null=True)
+    secondary_email = models.EmailField(blank=True, null=True)
+    
+    # Lightweight Club Affiliation per REQ-3.6.2 (Forward-compatible with postponed v2.2.1)
+    club_affiliation_name = models.CharField(max_length=255, blank=True, null=True)
+    club_affiliation_role = models.CharField(max_length=255, blank=True, null=True)
+    
+    skills = models.JSONField(default=list, blank=True)
+    bio = models.TextField(blank=True)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
+
+    def __str__(self):
+        return f"{self.full_name} ({self.university})"
 
 class ShadowUser(models.Model):
     """

@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 // Import ALL Pages
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import RegisterSplit from './pages/RegisterSplit';
 import CompanyDashboard from './pages/CompanyDashboard';
 import CreateCampaign from './pages/CreateCampaign';
 import ManageCampaign from './pages/ManageCampaign';
@@ -30,7 +31,9 @@ function App() {
           {/* The "/" path is the default. It MUST point to LandingPage */}
           <Route path="/" element={< LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterSplit />} />
           <Route path="/register/company" element={<CompanyRegister />} />
+          <Route path="/register/student" element={<StudentRegister />} />
           <Route path="/register/club" element={<StudentRegister />} />
 
           {/* === COMPANY ROUTES === */}
@@ -79,7 +82,7 @@ function App() {
           <Route
             path="/student/dashboard"
             element={
-              <ProtectedRoute allowedRole="CLUB">
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB']}>
                 <StudentDashboard />
               </ProtectedRoute>
             }
@@ -87,7 +90,7 @@ function App() {
           <Route
             path="/quest/deliver/:applicationId"
             element={
-              <ProtectedRoute allowedRole="CLUB">
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB']}>
                 <SubmitDeliverable />
               </ProtectedRoute>
             }
@@ -95,7 +98,7 @@ function App() {
           <Route
             path="/quests"
             element={
-              <ProtectedRoute allowedRole="CLUB">
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB']}>
                 <QuestBoard />
               </ProtectedRoute>
             }
@@ -103,7 +106,7 @@ function App() {
           <Route
             path="/quest/:id"
             element={
-              <ProtectedRoute allowedRole="CLUB">
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB']}>
                 <QuestDetails />
               </ProtectedRoute>
             }
@@ -111,7 +114,7 @@ function App() {
           <Route
             path="/club/profile/:id"
             element={
-              <ProtectedRoute allowedRole={['CLUB', 'COMPANY']}>
+              <ProtectedRoute allowedRole={['CLUB', 'COMPANY', 'STUDENT']}>
                 <ClubProfile />
               </ProtectedRoute>
             }
@@ -119,7 +122,7 @@ function App() {
           <Route
             path="/student/profile/:id"
             element={
-              <ProtectedRoute allowedRole="CLUB">
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB', 'COMPANY']}>
                 <StudentProfile />
               </ProtectedRoute>
             }

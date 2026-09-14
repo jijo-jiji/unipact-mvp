@@ -47,6 +47,13 @@ export const AuthProvider = ({ children }) => {
         return response.data;
     };
 
+    const registerStudent = async (data) => {
+        // data can be FormData for file upload
+        const response = await api.post('/users/register/student/', data);
+        setUser(response.data.user);
+        return response.data;
+    };
+
     const logout = async () => {
         try {
             await api.post('/users/logout/');
@@ -62,6 +69,7 @@ export const AuthProvider = ({ children }) => {
         login,
         registerCompany,
         registerClub,
+        registerStudent,
         logout,
         checkUserStatus
     };

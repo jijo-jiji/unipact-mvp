@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import CompanyProfile, ClubProfile, ShadowUser, SystemLog
+from .models import CompanyProfile, ClubProfile, StudentProfile, ShadowUser, SystemLog
 
 User = get_user_model()
 
@@ -22,6 +22,11 @@ class UserSerializer(serializers.ModelSerializer):
                 representation['club_profile'] = ClubProfileSerializer(instance.club_profile).data
             except ClubProfile.DoesNotExist:
                 representation['club_profile'] = None
+        elif instance.role == User.Role.STUDENT:
+            try:
+                representation['student_profile'] = StudentProfileSerializer(instance.student_profile).data
+            except StudentProfile.DoesNotExist:
+                representation['student_profile'] = None
         return representation
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -57,6 +62,32 @@ class ClubProfileSerializer(serializers.ModelSerializer):
         fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document', 'rank']
         read_only_fields = ['verification_status', 'rank']
 
+class StudentProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = StudentProfile
+        fields = [
+            'id', 'full_name', 'university', 'major', 'domain_focus',
+            'verification_status', 'verification_document', 'secondary_email',
+            'club_affiliation_name', 'club_affiliation_role', 'skills',
+            'bio', 'rating', 'email'
+        ]
+        read_only_fields = ['verification_status', 'rating']
+
+class StudentRegistrationSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    secondary_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    password = serializers.CharField(write_only=True)
+    university = serializers.CharField(max_length=255)
+    major = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    domain_focus = serializers.ChoiceField(choices=StudentProfile.DomainFocus.choices, default='SOFTWARE_DEV')
+    verification_doc = serializers.FileField(required=False, allow_null=True)
+    club_affiliation_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    club_affiliation_role = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
 class PublicClubProfileSerializer(serializers.ModelSerializer):
     campaign_history = serializers.SerializerMethodField()
 
@@ -91,6 +122,8 @@ class AdminEntityListSerializer(serializers.ModelSerializer):
             return obj.club_profile.club_name
         elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
             return obj.company_profile.company_name
+        elif obj.role == User.Role.STUDENT and hasattr(obj, 'student_profile'):
+            return obj.student_profile.full_name
         return "Unknown"
 
     def get_details(self, obj):
@@ -98,6 +131,8 @@ class AdminEntityListSerializer(serializers.ModelSerializer):
             return f"Rank: {obj.club_profile.rank}"
         elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
             return f"Tier: {obj.company_profile.tier}"
+        elif obj.role == User.Role.STUDENT and hasattr(obj, 'student_profile'):
+            return f"Uni: {obj.student_profile.university} ({obj.student_profile.domain_focus})"
         return "-"
 
     def get_status(self, obj):

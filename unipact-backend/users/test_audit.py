@@ -78,6 +78,8 @@ class AuditWorkflowTests(TestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
+        self.club.refresh_from_db()
+        new_owner_user = User.objects.get(email=new_owner_email)
         self.assertEqual(self.club.user, new_owner_user)
 
     def test_invite_member_regression(self):
