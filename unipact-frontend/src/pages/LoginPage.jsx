@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, User, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Lock, Mail, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -11,12 +10,8 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-
   const { login } = useAuth();
 
-
-
-  // Re-write handleSubmit properly
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -37,99 +32,108 @@ const LoginPage = () => {
       } else if (err.message) {
         setError(err.message);
       } else {
-        setError('Access Denied: Invalid Credentials');
+        setError('Invalid email or password. Please try again.');
       }
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-[#00AEEF] selection:text-white">
 
-      <div className="w-full max-w-md bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 relative animate-fade-in shadow-2xl">
-        {/* Decorative Corners */}
-        <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[var(--text-gold)]"></div>
-        <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[var(--text-gold)]"></div>
-        <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[var(--text-gold)]"></div>
-        <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[var(--text-gold)]"></div>
-
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full border border-[var(--text-gold)] bg-black/40 shadow-[var(--glow-gold)]">
-              <ShieldCheck className="text-[var(--text-gold)] w-8 h-8" />
-            </div>
+      {/* Brand Header */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
+        <Link to="/" className="inline-flex items-center gap-2 group mb-4">
+          <div className="w-11 h-11 rounded-lg bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center font-heading font-extrabold text-2xl shadow-sm">
+            UP
           </div>
-          <h2 className="text-2xl text-white tracking-[0.2em]">SYSTEM ACCESS</h2>
-          <p className="text-[var(--text-blue)] text-xs uppercase mt-2">Identify Yourself</p>
+          <span className="font-heading font-extrabold text-2xl text-[#0A1748] tracking-tight">
+            Uni<span className="text-[#00AEEF]">Pact</span>
+          </span>
+        </Link>
+        <h2 className="font-heading font-bold text-2xl text-[#0A1748] tracking-tight">
+          Sign In to Your Workspace
+        </h2>
+        <p className="text-xs text-[#5B6478] mt-1">
+          Access your enterprise campaigns, squad collaborations, and talent portfolio
+        </p>
+      </div>
 
+      {/* Form Card */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div className="bg-white py-8 px-6 sm:px-10 border border-[rgba(10,23,72,0.12)] rounded-xl shadow-sm">
           {error && (
-            <div className="mt-4 bg-red-900/20 border border-red-500/50 p-2 flex items-center justify-center gap-2 text-red-400 text-xs">
-              <AlertCircle size={14} /> {error}
+            <div className="mb-5 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2.5 text-xs">
+              <AlertCircle size={16} className="shrink-0 text-red-600" />
+              <span>{error}</span>
             </div>
           )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#0A1748] mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#5B6478]">
+                  <Mail size={16} />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com or student@edu.my"
+                  className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] pl-10 pr-3 py-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0A1748] mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#5B6478]">
+                  <Lock size={16} />
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] pl-10 pr-3 py-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3 px-4 rounded-md bg-[#00AEEF] hover:bg-[#0090C6] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? 'Authenticating...' : (
+                <>Sign In to UniPact <ArrowRight size={15} /></>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-xs text-[#5B6478]">
+            Don\'t have an account yet?{' '}
+            <Link to="/register" className="font-bold text-[#00AEEF] hover:underline">
+              Create an Account
+            </Link>
+          </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider ml-1">
-              User ID / Email
-            </label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User size={18} className="text-gray-500 group-focus-within:text-[var(--text-gold)] transition-colors" />
-              </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-black/30 border border-gray-700 text-white text-sm rounded-none py-3 pl-10 pr-3 focus:outline-none focus:border-[var(--text-gold)] focus:shadow-[0_0_10px_rgba(222,184,116,0.1)] transition-all placeholder-gray-600 font-mono"
-                placeholder="hunter@guild.com"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[var(--text-gold)] text-xs uppercase tracking-wider ml-1">
-              Security Key
-            </label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock size={18} className="text-gray-500 group-focus-within:text-[var(--text-gold)] transition-colors" />
-              </div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black/30 border border-gray-700 text-white text-sm rounded-none py-3 pl-10 pr-3 focus:outline-none focus:border-[var(--text-gold)] focus:shadow-[0_0_10px_rgba(222,184,116,0.1)] transition-all placeholder-gray-600 font-mono"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center text-xs text-[var(--text-blue)]">
-            <label className="flex items-center space-x-2 cursor-pointer hover:text-white">
-              <input type="checkbox" className="accent-[var(--text-gold)]" />
-              <span>Maintain Link</span>
-            </label>
-            <a href="#" className="hover:text-[var(--text-gold)] transition-colors">Lost Key?</a>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full bg-[var(--text-gold)] text-black font-bold py-3 uppercase tracking-widest hover:bg-white transition-all transform active:scale-95 flex justify-center items-center ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {loading ? 'Handshaking...' : 'Establish Link'}
-          </button>
-        </form>
-
-        <div className="mt-8 text-center text-xs text-gray-500">
-          <span>No System ID? </span>
-          <a href="#" className="text-[var(--text-gold)] hover:underline tracking-wider uppercase">
-            Apply for License
-          </a>
+        {/* Security badge */}
+        <div className="mt-6 text-center text-[11px] text-[#5B6478] flex items-center justify-center gap-1.5">
+          <ShieldCheck size={14} className="text-[#00AEEF]" />
+          Secured with HttpOnly Cookie JWT Authentication
         </div>
       </div>
+
     </div>
   );
 };
