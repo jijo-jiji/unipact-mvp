@@ -1,131 +1,97 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Briefcase, GraduationCap, ArrowRight, Sparkles, Info } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
+import { Briefcase, GraduationCap, ArrowRight, Info, CheckCircle2 } from 'lucide-react';
+import PublicNav from '../components/PublicNav';
+import { useAuth } from '../context/AuthContext';
+import { homePathForRole } from '../utils/routes';
+
+const OPTIONS = [
+  {
+    to: '/register/company',
+    icon: Briefcase,
+    eyebrow: 'For companies & SMEs',
+    title: "I'm hiring talent",
+    text: 'Post projects and get a curated team of verified students.',
+    points: [
+      'Post software and marketing projects for free',
+      'Review and confirm admin-curated student teams',
+      'Share briefs, brand assets and raw footage',
+      "Pay a finder's fee only when you confirm a match",
+    ],
+    cta: 'Create a client account',
+    iconClass: 'bg-[#0B1E63] text-[#00AEEF]',
+  },
+  {
+    to: '/register/student',
+    icon: GraduationCap,
+    eyebrow: 'For university students',
+    title: "I'm a student",
+    text: 'Work on paid client projects and build a verified portfolio.',
+    points: [
+      'Get matched to paid, real-world projects',
+      'Invite classmates to join your project team',
+      'Earn client ratings on completed work',
+      'Share a public portfolio with employers',
+    ],
+    cta: 'Create a student account',
+    iconClass: 'bg-[#00AEEF] text-white',
+  },
+];
 
 const RegisterSplit = () => {
-  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Signed-in users don't need to pick an account type again
+  if (user) return <Navigate to={homePathForRole(user.role)} replace />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="w-full max-w-4xl relative z-10 animate-fade-in">
-        {/* Header */}
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex flex-col">
+      <PublicNav />
+
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-8 py-12 sm:py-16 animate-fade-in">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full border border-yellow-500/40 bg-yellow-500/10 text-yellow-400 text-xs uppercase tracking-widest">
-            <Sparkles className="w-3.5 h-3.5" /> Malaysia Premier University Talent Marketplace
-          </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-wide mb-3">
-            Choose Your Gateway
-          </h1>
-          <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto">
-            Connecting corporate clients with individually vetted university talent in Software Development and Digital Marketing.
-          </p>
+          <p className="eyebrow mb-3 justify-center"><span className="eyebrow-dot" /> Create your free account</p>
+          <h1 className="font-heading font-extrabold tracking-tight text-[clamp(2rem,4vw,2.75rem)] mb-3">How will you use UniPact?</h1>
+          <p className="text-[#5B6478] text-base sm:text-lg max-w-xl mx-auto">Choose the account type that fits you. It only takes a couple of minutes.</p>
         </div>
 
-        {/* Bifurcated Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* For Companies */}
-          <div 
-            onClick={() => navigate('/register/company')}
-            className="group cursor-pointer bg-[var(--bg-panel)] border border-[var(--border-tech)] hover:border-yellow-400 p-8 relative transition-all duration-300 hover:shadow-[0_0_25px_rgba(250,204,21,0.15)] flex flex-col justify-between"
-          >
-            <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-yellow-400/60 group-hover:border-yellow-400"></div>
-            <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-yellow-400/60 group-hover:border-yellow-400"></div>
-
-            <div>
-              <div className="w-14 h-14 rounded-lg bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center text-yellow-400 mb-6 group-hover:scale-110 transition-transform">
-                <Briefcase className="w-7 h-7" />
-              </div>
-              <span className="text-xs font-semibold text-yellow-400 uppercase tracking-wider">For Enterprise & SMEs</span>
-              <h2 className="text-2xl font-bold text-white mt-1 mb-3 group-hover:text-yellow-400 transition-colors">
-                Company / Client
-              </h2>
-              <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
-                  Post Software Dev & Digital Marketing Projects
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
-                  Curated matching with verified university talent
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
-                  Free to join & post — pay Finder's Fee on match
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
-                  Secure Client Asset Repository & video uploads
-                </li>
-              </ul>
-            </div>
-
-            <button className="w-full py-3 px-4 rounded bg-yellow-400/10 hover:bg-yellow-400 text-yellow-400 hover:text-black font-semibold border border-yellow-400 flex items-center justify-center gap-2 transition-colors">
-              Register as Company <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* For Students */}
-          <div 
-            onClick={() => navigate('/register/student')}
-            className="group cursor-pointer bg-[var(--bg-panel)] border border-[var(--border-tech)] hover:border-cyan-400 p-8 relative transition-all duration-300 hover:shadow-[0_0_25px_rgba(56,189,248,0.15)] flex flex-col justify-between"
-          >
-            <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-cyan-400/60 group-hover:border-cyan-400"></div>
-            <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-cyan-400/60 group-hover:border-cyan-400"></div>
-
-            <div>
-              <div className="w-14 h-14 rounded-lg bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 transition-transform">
-                <GraduationCap className="w-7 h-7" />
-              </div>
-              <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">For University Students</span>
-              <h2 className="text-2xl font-bold text-white mt-1 mb-3 group-hover:text-cyan-400 transition-colors">
-                Student Talent
-              </h2>
-              <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                  Work on paid real-world company contracts
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                  Build an immutable public verifiable portfolio
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                  Direct individual verification via academic ID/email
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                  Keep your account active post-graduation
-                </li>
-              </ul>
-            </div>
-
-            <button className="w-full py-3 px-4 rounded bg-cyan-400/10 hover:bg-cyan-400 text-cyan-400 hover:text-black font-semibold border border-cyan-400 flex items-center justify-center gap-2 transition-colors">
-              Register as Student <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Institutional club note & Login option */}
-        <div className="space-y-4 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded bg-slate-900/60 border border-slate-700/60 text-xs text-slate-400 max-w-xl mx-auto text-left">
-            <Info className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>
-              <strong>Note on Student Clubs:</strong> Full institutional guild sponsorship is currently undergoing university administrative review. Direct individual student registration is active.
-            </span>
-          </div>
-
-          <div className="text-sm text-slate-400">
-            Already have an account?{' '}
-            <button 
-              onClick={() => navigate('/login')}
-              className="text-yellow-400 hover:underline font-semibold"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {OPTIONS.map(({ to, icon, eyebrow, title, text, points, cta, iconClass }) => (
+            <Link
+              key={to}
+              to={to}
+              className="group card p-7 sm:p-8 flex flex-col hover:border-[#00AEEF] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00AEEF]"
             >
-              Log In Here
-            </button>
-          </div>
+              <span className={`w-14 h-14 rounded-xl flex items-center justify-center mb-5 shadow-sm ${iconClass}`}>
+                {React.createElement(icon, { size: 28 })}
+              </span>
+              <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#0090C6]">{eyebrow}</span>
+              <h2 className="font-heading font-bold text-2xl mt-1 mb-2 group-hover:text-[#0090C6] transition-colors">{title}</h2>
+              <p className="text-[#5B6478] mb-5">{text}</p>
+              <ul className="space-y-2.5 text-sm mb-8">
+                {points.map((point) => (
+                  <li key={point} className="flex items-start gap-2">
+                    <CheckCircle2 size={16} className="text-[#00AEEF] shrink-0 mt-0.5" /> {point}
+                  </li>
+                ))}
+              </ul>
+              <span className="btn-primary w-full mt-auto py-3">
+                {cta} <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+              </span>
+            </Link>
+          ))}
         </div>
-      </div>
+
+        <div className="flex items-start gap-2.5 p-4 rounded-lg bg-white border border-[rgba(10,23,72,0.12)] text-sm text-[#5B6478] max-w-2xl mx-auto">
+          <Info size={16} className="text-[#00AEEF] shrink-0 mt-0.5" />
+          <span><strong className="text-[#0A1748]">Student clubs:</strong> club sponsorships are being rolled out gradually. Club members can register individually as students and add their club to their profile.</span>
+        </div>
+
+        <p className="text-center text-sm text-[#5B6478] mt-8">
+          Already have an account?{' '}
+          <Link to="/login" className="inline-block py-2 font-semibold text-[#0090C6] hover:underline">Sign in</Link>
+        </p>
+      </main>
     </div>
   );
 };

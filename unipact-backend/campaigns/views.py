@@ -3,10 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models import Campaign, Application
-from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer
+from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer, can_view_workspace
 from users.models import User, CompanyProfile, StudentProfile
 from payments.models import Transaction, Subscription
 from .utils import generate_campaign_report
+from unipact_backend.validators import validate_project_file_upload
 
 class IsCompany(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -59,11 +60,16 @@ class CampaignDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Companies can only edit their own
-        # Companies can only edit their own
+        # Companies can only view and edit their own
         if self.request.user.role == User.Role.COMPANY:
             return Campaign.objects.filter(company=self.request.user.company_profile).prefetch_related('applications__club__user')
-        return Campaign.objects.all().select_related('company').prefetch_related('applications__club__user') # Clubs can view all (read-only logic needed in serializer or permission)
+        return Campaign.objects.all().select_related('company').prefetch_related('applications__club__user')
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        # Everyone else is read-only: only the owning company or an admin may edit or delete
+        if request.method not in permissions.SAFE_METHODS and request.user.role not in (User.Role.COMPANY, User.Role.ADMIN):
+            raise exceptions.PermissionDenied("You do not have permission to modify this campaign.")
 
 class ApplicationCreateView(generics.CreateAPIView):
     serializer_class = ApplicationSerializer
@@ -180,8 +186,16 @@ class MarkCampaignCompletedView(APIView):
             return Response({"error": "Campaign must be in progress to complete."}, status=status.HTTP_400_BAD_REQUEST)
 
         # 1. HANDLE REVIEW CREATION
-        rating = request.data.get('rating')
+        # Only the client who owns the campaign may rate the talent; ignore ratings from anyone else
+        rating = request.data.get('rating') if is_owner else None
         feedback = request.data.get('feedback')
+        if rating is not None:
+            try:
+                rating = int(rating)
+            except (TypeError, ValueError):
+                return Response({"error": "Rating must be a whole number from 1 to 5."}, status=status.HTTP_400_BAD_REQUEST)
+            if not 1 <= rating <= 5:
+                return Response({"error": "Rating must be a whole number from 1 to 5."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Find the accepted application (could be AWARDED or SUBMITTED)
@@ -190,7 +204,7 @@ class MarkCampaignCompletedView(APIView):
             ).first()
 
             if accepted_app:
-                if rating and hasattr(request.user, 'company_profile'):
+                if rating:
                     club = accepted_app.club
                     from reviews.models import Review
                     Review.objects.create(
@@ -223,7 +237,7 @@ class MarkCampaignCompletedView(APIView):
         # Generate Report
         try:
             report = generate_campaign_report(campaign)
-            report_url = report.generated_pdf.url
+            report_url = request.build_absolute_uri(report.generated_pdf.url)
         except Exception as e:
             print(f"Report generation failed: {e}")
             report_url = None
@@ -249,7 +263,10 @@ class AdminMatchmakingAssignView(APIView):
         student_ids = request.data.get('student_ids', [])
         match_notes = request.data.get('match_notes', '')
 
-        if not student_ids:
+        if campaign.status not in (Campaign.Status.OPEN, Campaign.Status.MATCHED):
+            return Response({"error": "Only open or matched projects can be (re)assigned."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(student_ids, list) or not student_ids:
             return Response({"error": "At least one student ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         from users.models import StudentProfile
@@ -274,18 +291,21 @@ class AdminMatchmakingAssignView(APIView):
 
 
 class FinalizeMatchView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCompany]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, campaign_id):
         campaign = get_object_or_404(Campaign, pk=campaign_id)
 
-        if campaign.company != request.user.company_profile:
+        # The owning company finalizes; admins may also lock a match from the Matchmaking Hub
+        is_admin = request.user.role == User.Role.ADMIN
+        is_owner = request.user.role == User.Role.COMPANY and campaign.company == getattr(request.user, 'company_profile', None)
+        if not (is_owner or is_admin):
             return Response({"error": "You do not own this campaign."}, status=status.HTTP_403_FORBIDDEN)
 
         if campaign.status != Campaign.Status.MATCHED:
             return Response({"error": "Campaign must be in MATCHED status to finalize."}, status=status.HTTP_400_BAD_REQUEST)
 
-        company_profile = request.user.company_profile
+        company_profile = campaign.company
 
         # Monetization Gate: Free tier requires Finder's Fee payment
         if company_profile.tier == CompanyProfile.Tier.FREE:
@@ -351,11 +371,31 @@ class StudentSubmitDeliverableView(APIView):
         from .models import StudentDeliverable
         from .serializers import StudentDeliverableSerializer
 
-        title = request.data.get('title', 'Project Deliverable')
-        external_url = request.data.get('external_url', '')
+        if campaign.status == Campaign.Status.COMPLETED:
+            return Response({"error": "This project is already completed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        title = request.data.get('title') or 'Project Deliverable'
+        external_url = (request.data.get('external_url') or '').strip()
         contribution_role = request.data.get('contribution_role', '')
         contribution_summary = request.data.get('contribution_summary', '')
         file_obj = request.FILES.get('file', None)
+
+        if not external_url and not file_obj:
+            return Response({"error": "Please attach a file or provide a link to your work."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if file_obj:
+            try:
+                validate_project_file_upload(file_obj, 'Deliverable')
+            except exceptions.ValidationError as exc:
+                return Response({"error": exc.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        if external_url:
+            from django.core.validators import URLValidator
+            from django.core.exceptions import ValidationError
+            try:
+                URLValidator()(external_url)
+            except ValidationError:
+                return Response({"error": "Please enter a valid link starting with http:// or https://."}, status=status.HTTP_400_BAD_REQUEST)
 
         deliverable = StudentDeliverable.objects.create(
             campaign=campaign,
@@ -389,7 +429,7 @@ class ClientAssetView(APIView):
             raise exceptions.PermissionDenied("Access to raw client assets is restricted.")
 
         assets = campaign.client_assets.all()
-        return Response(ClientAssetSerializer(assets, many=True).data)
+        return Response(ClientAssetSerializer(assets, many=True, context={'request': request}).data)
 
     def post(self, request, campaign_id):
         campaign = get_object_or_404(Campaign, pk=campaign_id)
@@ -399,12 +439,18 @@ class ClientAssetView(APIView):
         from .models import ClientAsset
         from .serializers import ClientAssetSerializer
 
-        title = request.data.get('title', 'Asset')
-        asset_type = request.data.get('asset_type', 'DOCUMENT')
         file_obj = request.FILES.get('file')
-
         if not file_obj:
             return Response({"error": "File is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_project_file_upload(file_obj, 'Project file')
+        except exceptions.ValidationError as exc:
+            return Response({"error": exc.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        title = request.data.get('title') or file_obj.name
+        asset_type = request.data.get('asset_type') or ClientAsset.AssetType.DOCUMENT
+        if asset_type not in ClientAsset.AssetType.values:
+            return Response({"error": "Invalid asset type."}, status=status.HTTP_400_BAD_REQUEST)
 
         asset = ClientAsset.objects.create(
             campaign=campaign,
@@ -429,7 +475,10 @@ class ProjectTeamInviteView(APIView):
         if not campaign.assigned_students.filter(id=current_student.id).exists():
             raise exceptions.PermissionDenied("You are not an assigned team member on this project.")
 
-        email = request.data.get('email', '').strip().lower()
+        if campaign.status == Campaign.Status.COMPLETED:
+            return Response({"error": "You cannot invite teammates to a completed project."}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = (request.data.get('email') or request.data.get('invitee_email') or '').strip().lower()
         if not email:
             return Response({"error": "Invitee email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -450,9 +499,14 @@ class ProjectTeamInviteView(APIView):
         # Find student profile if already registered
         invitee_student = StudentProfile.objects.filter(user__email__iexact=email).first()
 
-        role_in_project = request.data.get('role_in_project', 'Collaborator')
-        payout_share = request.data.get('payout_share_percentage', 0)
+        role_in_project = request.data.get('role_in_project') or 'Collaborator'
         notes = request.data.get('notes', '')
+        try:
+            payout_share = int(float(request.data.get('payout_share_percentage', 0) or 0))
+        except (TypeError, ValueError):
+            payout_share = -1
+        if not 0 <= payout_share <= 100:
+            return Response({"error": "Payout share must be between 0 and 100%."}, status=status.HTTP_400_BAD_REQUEST)
 
         invitation = ProjectTeamInvitation.objects.create(
             campaign=campaign,
@@ -477,6 +531,9 @@ class ProjectTeamListView(APIView):
 
     def get(self, request, campaign_id):
         campaign = get_object_or_404(Campaign, pk=campaign_id)
+        if not can_view_workspace(request.user, campaign):
+            raise exceptions.PermissionDenied("You are not part of this project team.")
+
         from users.serializers import StudentProfileSerializer
         from .serializers import ProjectTeamInvitationSerializer
 

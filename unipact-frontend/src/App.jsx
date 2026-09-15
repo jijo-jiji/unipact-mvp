@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
 
 // Import ALL Pages
@@ -16,15 +16,16 @@ import SubmitDeliverable from './pages/SubmitDeliverable';
 import AdminDashboard from './pages/AdminDashboard';
 import CompanyRegister from './pages/CompanyRegister';
 import StudentRegister from './pages/StudentRegister';
-import CampaignManager from './pages/CampaignManager';
 import Treasury from './pages/Treasury';
 import StudentProfile from './pages/StudentProfile';
 import ClubProfile from './pages/ClubProfile';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <ToastProvider>
         <Routes>
           {/* === PUBLIC ROUTES === */}
@@ -65,7 +66,7 @@ function App() {
             path="/company/campaign/:id/manage"
             element={
               <ProtectedRoute allowedRole="COMPANY">
-                <CampaignManager />
+                <ManageCampaign />
               </ProtectedRoute>
             }
           />
@@ -122,7 +123,7 @@ function App() {
           <Route
             path="/student/profile/:id"
             element={
-              <ProtectedRoute allowedRole={['STUDENT', 'CLUB', 'COMPANY']}>
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB', 'COMPANY', 'ADMIN']}>
                 <StudentProfile />
               </ProtectedRoute>
             }
@@ -137,6 +138,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Unknown URLs go back to the landing page instead of a blank screen */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ToastProvider>
     </BrowserRouter>

@@ -1,5 +1,7 @@
+from django.conf import settings
 from rest_framework import status, generics, views, permissions
 from rest_framework.response import Response
+from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, logout
 from django.db import transaction
@@ -30,21 +32,35 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+def _cookie_options():
+    # Secure/SameSite/domain come from settings so production cookies are HTTPS-only
+    return {
+        'httponly': True,
+        'secure': settings.AUTH_COOKIE_SECURE,
+        'samesite': settings.AUTH_COOKIE_SAMESITE,
+        'domain': settings.AUTH_COOKIE_DOMAIN,
+        'path': '/',
+    }
+
 def set_auth_cookies(response, tokens):
+    jwt = settings.SIMPLE_JWT
     response.set_cookie(
         key='access_token',
         value=tokens['access'],
-        httponly=True,
-        samesite='Lax',
-        secure=False, # Set to True in production
+        max_age=int(jwt['ACCESS_TOKEN_LIFETIME'].total_seconds()),
+        **_cookie_options(),
     )
     response.set_cookie(
         key='refresh_token',
         value=tokens['refresh'],
-        httponly=True,
-        samesite='Lax',
-        secure=False, # Set to True in production
+        max_age=int(jwt['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+        **_cookie_options(),
     )
+
+def clear_auth_cookies(response):
+    options = _cookie_options()
+    for name in ('access_token', 'refresh_token'):
+        response.delete_cookie(name, path=options['path'], domain=options['domain'], samesite=options['samesite'])
 
 class UserView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -94,6 +110,7 @@ class UserView(views.APIView):
 
 class LoginView(views.APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
 
     def post(self, request):
         email = request.data.get('email')
@@ -156,13 +173,43 @@ class LoginView(views.APIView):
         
         return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
+class CookieTokenRefreshView(views.APIView):
+    """Issues a fresh access token from the HttpOnly refresh cookie so sessions survive the 60-minute access lifetime."""
+    permission_classes = [AllowAny]
+    throttle_classes = [TokenRefreshThrottle]
+    authentication_classes = []
+
+    def post(self, request):
+        from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+        from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+        raw_refresh = request.COOKIES.get('refresh_token')
+        if not raw_refresh:
+            return Response({"error": "No active session."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = TokenRefreshSerializer(data={'refresh': raw_refresh})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except (TokenError, InvalidToken, exceptions.ValidationError):
+            response = Response({"error": "Session expired. Please sign in again."}, status=status.HTTP_401_UNAUTHORIZED)
+            clear_auth_cookies(response)
+            return response
+
+        tokens = {
+            'access': serializer.validated_data['access'],
+            # ROTATE_REFRESH_TOKENS issues a new refresh token; fall back to the current one otherwise
+            'refresh': serializer.validated_data.get('refresh', raw_refresh),
+        }
+        response = Response({"message": "Session refreshed"}, status=status.HTTP_200_OK)
+        set_auth_cookies(response, tokens)
+        return response
+
 class LogoutView(views.APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         response = Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
-        response.delete_cookie('access_token')
-        response.delete_cookie('refresh_token')
+        clear_auth_cookies(response)
         return response
 
 class InviteMemberView(generics.CreateAPIView):
@@ -196,6 +243,7 @@ class InviteMemberView(generics.CreateAPIView):
 
 class ClaimProfileView(views.APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
     def post(self, request):
         serializer = ClaimProfileSerializer(data=request.data)
@@ -301,9 +349,12 @@ class StudentPublicProfileView(views.APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, user_id):
-        from users.models import StudentProfile
-        from django.db.models import Q
-        profile = StudentProfile.objects.filter(Q(user_id=user_id) | Q(id=user_id)).first()
+        # Portfolio links use the user id; fall back to the profile id for older links.
+        # Matching both in one OR query could return a different student whose ids collide.
+        profile = (
+            StudentProfile.objects.filter(user_id=user_id).first()
+            or StudentProfile.objects.filter(id=user_id).first()
+        )
         if not profile:
             return Response({"error": "Student profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -384,6 +435,7 @@ class RegisterCompanyView(generics.CreateAPIView):
     queryset = CompanyProfile.objects.all()
     serializer_class = CompanyProfileSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -393,6 +445,9 @@ class RegisterCompanyView(generics.CreateAPIView):
         password = serializer.validated_data['password']
         company_name = serializer.validated_data['company_name']
         company_details = serializer.validated_data.get('company_details', '')
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"error": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             # Create User
@@ -446,6 +501,7 @@ class RegisterClubView(generics.CreateAPIView):
     queryset = ClubProfile.objects.all()
     serializer_class = ClubProfileSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -456,6 +512,9 @@ class RegisterClubView(generics.CreateAPIView):
         club_name = serializer.validated_data['club_name']
         university = serializer.validated_data['university']
         # File handling would happen here if passed in request.FILES
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"error": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             # Create User
@@ -503,6 +562,7 @@ class RegisterClubView(generics.CreateAPIView):
 class RegisterStudentView(generics.CreateAPIView):
     serializer_class = StudentRegistrationSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -517,9 +577,11 @@ class RegisterStudentView(generics.CreateAPIView):
         secondary_email = serializer.validated_data.get('secondary_email')
         club_name = serializer.validated_data.get('club_affiliation_name')
         club_role = serializer.validated_data.get('club_affiliation_role')
+        skills = serializer.validated_data.get('skills') or []
+        bio = serializer.validated_data.get('bio', '')
 
-        if User.objects.filter(email=email).exists():
-            return Response({"error": "A user with that email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"error": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             user = User.objects.create_user(
@@ -539,11 +601,14 @@ class RegisterStudentView(generics.CreateAPIView):
                 secondary_email=secondary_email,
                 club_affiliation_name=club_name,
                 club_affiliation_role=club_role,
+                skills=skills,
+                bio=bio,
                 verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION
             )
 
-            if 'verification_doc' in request.FILES:
-                profile.verification_document = request.FILES['verification_doc']
+            doc = request.FILES.get('verification_doc') or request.FILES.get('verification_document')
+            if doc:
+                profile.verification_document = doc
                 profile.save()
 
         tokens = get_tokens_for_user(user)
@@ -610,9 +675,11 @@ class AdminVerificationQueueView(views.APIView):
 
         from .serializers import AdminCompanyVerificationSerializer, AdminClubVerificationSerializer
         
-        company_data = AdminCompanyVerificationSerializer(pending_companies, many=True).data
-        club_data = AdminClubVerificationSerializer(pending_clubs, many=True).data
-        student_data = StudentProfileSerializer(pending_students, many=True).data
+        # Request context makes document URLs absolute, so admins can open them from the frontend
+        context = {'request': request}
+        company_data = AdminCompanyVerificationSerializer(pending_companies, many=True, context=context).data
+        club_data = AdminClubVerificationSerializer(pending_clubs, many=True, context=context).data
+        student_data = StudentProfileSerializer(pending_students, many=True, context=context).data
         
         # Combine and structure for frontend
         results = []
@@ -638,7 +705,10 @@ class AdminVerifyEntityView(views.APIView):
              raise exceptions.PermissionDenied("Admin access required.")
         
         action = request.data.get('action') # 'approve', 'reject', 'high_risk'
-        
+        allowed_actions = ('approve', 'reject', 'high_risk') if entity_type == 'COMPANY' else ('approve', 'reject')
+        if action not in allowed_actions:
+            return Response({"error": f"Invalid action. Use one of: {', '.join(allowed_actions)}."}, status=status.HTTP_400_BAD_REQUEST)
+
         if entity_type == 'COMPANY':
             try:
                 profile = CompanyProfile.objects.get(id=entity_id)
@@ -704,6 +774,17 @@ class AdminSystemLogsView(views.APIView):
         serializer = SystemLogSerializer(logs, many=True)
         return Response(serializer.data)
         
+class AdminStudentPoolView(views.APIView):
+    """Student profiles for the Matchmaking Hub. The match endpoint expects StudentProfile ids, not User ids."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+
+        students = StudentProfile.objects.filter(user__is_active=True).select_related('user').order_by('-verification_status', 'full_name')
+        return Response(StudentProfileSerializer(students, many=True).data)
+
 class AdminEntityListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = AdminEntityListSerializer
@@ -725,6 +806,9 @@ class AdminBlockUserView(views.APIView):
         if request.user.role != User.Role.ADMIN:
              raise exceptions.PermissionDenied("Admin access required.")
         
+        if user_id == request.user.id:
+            return Response({"error": "You cannot block your own account."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(id=user_id)
             # Toggle status

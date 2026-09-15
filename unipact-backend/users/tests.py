@@ -111,7 +111,8 @@ class RegistrationTests(APITestCase):
         url = reverse('register_club')
         data = {
             'email': 'club@uni.edu',
-            'password': 'password123',
+            # Sign-up now enforces Django's password validators, which reject "password123"
+            'password': 'Robotics-Club-2026',
             'club_name': 'Robotics Club',
             'university': 'Tech University'
         }

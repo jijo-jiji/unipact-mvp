@@ -19,8 +19,8 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await api.get('/users/me/');
             setUser(response.data);
-        } catch (error) {
-            console.log("Not logged in", error);
+        } catch {
+            // Not signed in (or session expired)
             setUser(null);
         } finally {
             setLoading(false);
@@ -40,16 +40,19 @@ export const AuthProvider = ({ children }) => {
         return response.data;
     };
 
+    // With the instance's JSON default header, axios would serialise FormData to JSON and drop files
+    const uploadConfig = (data) => (data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+
     const registerClub = async (data) => {
         // data can be FormData for file upload
-        const response = await api.post('/users/register/club/', data);
+        const response = await api.post('/users/register/club/', data, uploadConfig(data));
         setUser(response.data.user);
         return response.data;
     };
 
     const registerStudent = async (data) => {
         // data can be FormData for file upload
-        const response = await api.post('/users/register/student/', data);
+        const response = await api.post('/users/register/student/', data, uploadConfig(data));
         setUser(response.data.user);
         return response.data;
     };
@@ -57,9 +60,11 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await api.post('/users/logout/');
-            setUser(null);
         } catch (error) {
-            console.error("Logout failed", error);
+            console.error("Logout request failed", error);
+        } finally {
+            // Always clear local state so the user is never stuck "signed in"
+            setUser(null);
         }
     };
 
@@ -74,9 +79,11 @@ export const AuthProvider = ({ children }) => {
         checkUserStatus
     };
 
+    // Render immediately: public pages shouldn't wait on the session check (a slow or offline
+    // backend used to leave the whole site blank). ProtectedRoute shows a loader while `loading`.
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };

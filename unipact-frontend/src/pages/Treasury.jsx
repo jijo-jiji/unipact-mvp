@@ -1,196 +1,146 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Clock, FileText, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ShieldCheck, FileText, CheckCircle2, CreditCard, Sparkles } from 'lucide-react';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import WorkspaceNav from '../components/WorkspaceNav';
 import PaymentModal from '../components/PaymentModal';
+import PageLoader from '../components/PageLoader';
+import StatusBadge from '../components/StatusBadge';
+import { formatDate, formatMoney, getErrorMessage, transactionTypeLabel } from '../utils/format';
+
+const PRO_PRICE = 499;
 
 const Treasury = () => {
-  const navigate = useNavigate();
+  const { checkUserStatus } = useAuth();
+  const { showToast } = useToast();
   const [history, setHistory] = useState([]);
+  const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [payment, setPayment] = useState(null);
 
-  // Payment State
-  const [paymentAmount, setPaymentAmount] = useState(499);
-  const [paymentDesc, setPaymentDesc] = useState('Pro Tier Upgrade');
-  const [paymentType, setPaymentType] = useState('SUBSCRIPTION');
-
-  const [user, setUser] = useState(null);
-
-  // FETCH DATA
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [historyRes, userRes] = await Promise.all([
-        api.get('/payments/history/'),
-        api.get('/users/me/')
-      ]);
+      const [historyRes, userRes] = await Promise.all([api.get('/payments/history/'), api.get('/users/me/')]);
       setHistory(historyRes.data);
-      setUser(userRes.data);
+      setAccount(userRes.data);
     } catch (error) {
-      console.error("Failed to fetch data", error);
+      showToast(getErrorMessage(error, 'Could not load billing details.'), 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-white font-display uppercase tracking-widest animate-pulse">
-        Calculating Ledger...
-      </div>
-    );
-  }
-
-  const openPayment = (amount, desc, type = 'SUBSCRIPTION') => {
-    setPaymentAmount(amount);
-    setPaymentDesc(desc);
-    setPaymentType(type);
-    setPaymentModalOpen(true);
+  const handlePaid = async () => {
+    showToast('Payment received. Thank you!', 'success');
+    await fetchData();
+    checkUserStatus(); // refresh tier shown elsewhere in the app
   };
 
+  if (loading) return <PageLoader message="Loading billing…" />;
+
+  const isPro = account?.tier === 'PRO';
+
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] p-6 flex justify-center text-white">
-      <div className="w-full max-w-4xl animate-fade-in">
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
+      <WorkspaceNav />
+      <main className="max-w-[1160px] mx-auto px-4 sm:px-8 py-8 space-y-6 animate-fade-in">
+        <Link to="/company/dashboard" className="back-link">
+          <ArrowLeft size={15} /> Back to projects
+        </Link>
 
-        {/* Header */}
-        <button
-          onClick={() => navigate('/company/dashboard')}
-          className="flex items-center gap-2 text-[var(--text-blue)] hover:text-[var(--text-gold)] mb-6 transition-colors uppercase text-xs tracking-widest"
-        >
-          <ArrowLeft size={14} /> Return to Command Center
-        </button>
+        <div>
+          <h1 className="font-heading font-extrabold text-2xl sm:text-3xl">Billing</h1>
+          <p className="text-sm text-[#5B6478] mt-1">Manage your plan, payment method and past payments.</p>
+        </div>
 
-        <h1 className="text-3xl font-display uppercase tracking-widest mb-2 text-[var(--text-gold)]">
-          Guild Ledger (Billing)
-        </h1>
-        <p className="text-[var(--text-blue)] text-sm mb-8">Manage subscriptions and scouting fees.</p>
-
-        {/* 1. SUBSCRIPTION CARD */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-
-          {/* Current Plan */}
-          <div className="md:col-span-2 bg-gradient-to-r from-[var(--text-gold)]/10 to-transparent border border-[var(--text-gold)] p-8 relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 text-[var(--text-blue)] text-xs uppercase tracking-widest mb-2">
-                <Shield size={14} /> Current Charter
-              </div>
-              <div className="text-4xl font-display font-bold text-white mb-2">
-                {user?.tier || 'Free Tier'}
-              </div>
-              <p className="text-sm text-gray-400 mb-6 max-w-md">
-                {user?.tier === 'PRO'
-                  ? "You are a Pro Member. Scouting fees are waived."
-                  : <><span className="text-[var(--text-gold)]">RM 100</span> per successful match. Upgrade to PRO to waive all scouting fees.</>
-                }
-              </p>
-
-              {user?.tier !== 'PRO' && (
-                <button
-                  onClick={() => openPayment(499, 'Pro Tier Subscription (1 Month)', 'SUBSCRIPTION')}
-                  className="bg-[var(--text-gold)] text-black px-6 py-3 uppercase font-bold text-sm hover:bg-white transition-colors shadow-[0_0_20px_rgba(222,184,116,0.3)]"
-                >
-                  Upgrade to PRO (RM 499/mo)
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <section className={`md:col-span-2 card p-6 sm:p-8 ${isPro ? '' : 'border-2 border-[#00AEEF]/40'}`}>
+            <p className="eyebrow mb-2"><span className="eyebrow-dot" /> Current plan</p>
+            <div className="flex items-center gap-3 mb-2">
+              <ShieldCheck size={28} className="text-[#00AEEF]" />
+              <h2 className="font-heading font-extrabold text-3xl">{isPro ? 'Pro' : 'Free'}</h2>
+            </div>
+            <p className="text-sm text-[#5B6478] max-w-lg mb-6">
+              {isPro
+                ? "You're on Pro. Finder's fees are waived on every student match."
+                : "Posting projects is free. A finder's fee applies each time you confirm a student match. Upgrade to Pro to waive all finder's fees."}
+            </p>
+            {!isPro && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <button onClick={() => setPayment({ amount: PRO_PRICE, description: 'Pro plan (1 month)', type: 'SUBSCRIPTION' })} className="btn-primary px-6 py-3">
+                  <Sparkles size={16} /> Upgrade to Pro · {formatMoney(PRO_PRICE)}/month
                 </button>
-              )}
-            </div>
-            {/* Background Decor */}
-            <div className="absolute right-0 top-0 h-full w-32 bg-gradient-to-l from-[var(--text-gold)]/20 to-transparent"></div>
-          </div>
+                <span className="text-xs text-[#5B6478]">Cancel anytime.</span>
+              </div>
+            )}
+          </section>
 
-          {/* Payment Method */}
-          <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 flex flex-col justify-between">
+          <section className="card p-6 flex flex-col justify-between gap-6">
             <div>
-              <div className="text-[var(--text-blue)] text-xs uppercase tracking-widest mb-4">Payment Method</div>
-
-              {/* No saved card state for MVP */}
-              {user?.card_last_4 ? (
-                <div className="flex items-center gap-3 text-white mb-2">
-                  <div className="w-10 h-6 bg-gray-700 rounded flex items-center justify-center text-[8px] font-bold">
-                    {user.card_brand || 'CARD'}
-                  </div>
-                  <span className="font-mono">**** {user.card_last_4}</span>
-                  <div className="text-xs text-green-400 flex items-center gap-1 ml-auto">
-                    <CheckCircle size={10} /> Active
-                  </div>
+              <h2 className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] mb-4">Payment method</h2>
+              {account?.card_last_4 ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-7 bg-[#0B1E63] text-white rounded flex items-center justify-center text-[9px] font-bold">{account.card_brand || 'CARD'}</div>
+                  <span className="font-mono text-sm">•••• {account.card_last_4}</span>
+                  <span className="ml-auto text-xs text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Active</span>
                 </div>
               ) : (
-                <div className="text-gray-500 text-sm italic mb-4">
-                  No payment method saved.
-                </div>
+                <p className="text-sm text-[#5B6478]">No card saved yet.</p>
               )}
-
             </div>
-            <button
-              onClick={() => openPayment(1, 'Update Payment Method (Verification)', 'SUBSCRIPTION')}
-              className="text-[var(--text-blue)] text-xs border border-[var(--text-blue)] py-2 hover:bg-[var(--text-blue)] hover:text-black transition-colors uppercase"
-            >
-              Add / Update Card
+            <button onClick={() => setPayment({ amount: 1, description: 'Card verification (refundable)', type: 'SUBSCRIPTION' })} className="btn-secondary w-full">
+              <CreditCard size={15} /> {account?.card_last_4 ? 'Update card' : 'Add card'}
             </button>
-          </div>
+          </section>
         </div>
 
-        {/* 2. TRANSACTION HISTORY (Finder's Fees) */}
-        <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6">
-          <h3 className="text-white font-bold uppercase tracking-wider text-sm mb-6 flex items-center gap-2">
-            <FileText size={16} /> Transaction History
-          </h3>
-
-          <table className="w-full text-sm text-left">
-            <thead className="text-[var(--text-blue)] text-xs uppercase border-b border-gray-800">
-              <tr>
-                <th className="pb-3 font-normal">Date</th>
-                <th className="pb-3 font-normal">Type</th>
-                <th className="pb-3 font-normal">Status</th>
-                <th className="pb-3 font-normal text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-300">
-              {history.length > 0 ? (
-                history.map((tx) => (
-                  <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-white/5 transition-colors">
-                    <td className="py-4 text-gray-500 font-mono text-xs">{new Date(tx.created_at).toLocaleDateString()}</td>
-                    <td className="py-4">
-                      <div className="font-bold text-white uppercase text-xs tracking-wider">{tx.transaction_type}</div>
-                      <div className="text-xs text-[var(--text-blue)]">ID: TX-{tx.id}</div>
-                    </td>
-                    <td className="py-4 font-mono text-xs">
-                      <span className={`px-2 py-1 rounded ${tx.status === 'SUCCESS' ? 'text-green-400 bg-green-500/10' : 'text-yellow-400 bg-yellow-500/10'}`}>
-                        {tx.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right text-[var(--text-gold)] font-bold">
-                      RM {tx.amount}
-                    </td>
+        <section className="card p-6 sm:p-8">
+          <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2"><FileText size={18} className="text-[#00AEEF]" /> Payment history</h2>
+          {history.length === 0 ? (
+            <p className="text-sm text-[#5B6478] py-6 text-center">No payments yet.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-sm text-left min-w-[520px]">
+                <thead className="text-xs uppercase tracking-wider text-[#5B6478] border-b border-[rgba(10,23,72,0.12)]">
+                  <tr>
+                    <th className="py-3 px-2 font-semibold">Date</th>
+                    <th className="py-3 px-2 font-semibold">Description</th>
+                    <th className="py-3 px-2 font-semibold">Status</th>
+                    <th className="py-3 px-2 font-semibold text-right">Amount</th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="text-center py-8 text-gray-500 italic">No transactions found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          <div className="mt-4 text-center">
-            <button className="text-[var(--text-blue)] text-xs hover:text-white flex items-center justify-center gap-1 w-full">
-              <Clock size={12} /> View Older Invoices
-            </button>
-          </div>
-        </div>
-
-      </div>
+                </thead>
+                <tbody className="divide-y divide-[rgba(10,23,72,0.08)]">
+                  {history.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-[#F5F7FC]">
+                      <td className="py-3 px-2 text-[#5B6478] whitespace-nowrap">{formatDate(tx.created_at)}</td>
+                      <td className="py-3 px-2">
+                        <div className="font-medium">{transactionTypeLabel(tx.transaction_type)}</div>
+                        <div className="text-xs text-[#5B6478]">Ref TX-{tx.id}</div>
+                      </td>
+                      <td className="py-3 px-2"><StatusBadge status={tx.status} /></td>
+                      <td className="py-3 px-2 text-right font-semibold text-[#0B1E63] whitespace-nowrap">{formatMoney(tx.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
 
       <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        amount={paymentAmount}
-        description={paymentDesc}
-        onSuccess={fetchData}
-        type={paymentType}
+        isOpen={!!payment}
+        onClose={() => setPayment(null)}
+        amount={payment?.amount}
+        description={payment?.description}
+        type={payment?.type}
+        onSuccess={handlePaid}
       />
     </div>
   );

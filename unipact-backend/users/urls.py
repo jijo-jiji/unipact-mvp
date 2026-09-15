@@ -1,10 +1,10 @@
 from django.urls import path
-from django.urls import path
 from .views import (
-    RegisterCompanyView, RegisterClubView, RegisterStudentView, LoginView, LogoutView, InviteMemberView, UserView,
+    RegisterCompanyView, RegisterClubView, RegisterStudentView, LoginView, LogoutView, CookieTokenRefreshView,
+    InviteMemberView, UserView,
     AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView,
     ClubPublicProfileView, ClubRosterView, StudentPublicProfileView,
-    AdminEntityListView, AdminBlockUserView,
+    AdminEntityListView, AdminBlockUserView, AdminStudentPoolView,
     ClaimProfileView, TransferOwnershipView
 )
 
@@ -14,6 +14,7 @@ urlpatterns = [
     path('register/student/', RegisterStudentView.as_view(), name='register_student'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
     path('me/', UserView.as_view(), name='me'),
     
     # Student Specific
@@ -32,6 +33,8 @@ urlpatterns = [
     
     # Checkpoint 2 Additions
     path('admin/entities/', AdminEntityListView.as_view(), name='admin_entities'),
+    path('admin/users/<int:user_id>/block/', AdminBlockUserView.as_view(), name='admin_block_user'),
+    path('admin/students/', AdminStudentPoolView.as_view(), name='admin_student_pool'),
     path('club/transfer-ownership/', TransferOwnershipView.as_view(), name='club_transfer_ownership'),
     path('users/claim/', ClaimProfileView.as_view(), name='user_claim_profile'),
 ]

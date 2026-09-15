@@ -2,6 +2,20 @@
 from rest_framework import serializers
 from .models import Campaign, Application, Deliverable, ClientAsset, StudentDeliverable, ProjectTeamInvitation
 from users.serializers import StudentProfileSerializer
+from unipact_backend.validators import validate_project_file_upload
+
+
+def can_view_workspace(user, campaign):
+    """Owner company, assigned students and admins can see a campaign's private workspace."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.role == 'ADMIN':
+        return True
+    if user.role == 'COMPANY':
+        return campaign.company.user_id == user.id
+    if user.role == 'STUDENT' and hasattr(user, 'student_profile'):
+        return campaign.assigned_students.filter(id=user.student_profile.id).exists()
+    return False
 
 class ClientAssetSerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,13 +38,14 @@ class StudentDeliverableSerializer(serializers.ModelSerializer):
 
 class ProjectTeamInvitationSerializer(serializers.ModelSerializer):
     campaign_title = serializers.CharField(source='campaign.title', read_only=True)
+    campaign_company_name = serializers.CharField(source='campaign.company.company_name', read_only=True)
     invited_by_name = serializers.CharField(source='invited_by.full_name', read_only=True)
     invitee_student_name = serializers.CharField(source='invitee_student.full_name', read_only=True)
 
     class Meta:
         model = ProjectTeamInvitation
         fields = [
-            'id', 'campaign', 'campaign_title', 'invited_by', 'invited_by_name',
+            'id', 'campaign', 'campaign_title', 'campaign_company_name', 'invited_by', 'invited_by_name',
             'invitee_email', 'invitee_student', 'invitee_student_name',
             'role_in_project', 'payout_share_percentage', 'status', 'notes',
             'created_at', 'updated_at'
@@ -56,7 +71,20 @@ class CampaignSerializer(serializers.ModelSerializer):
             'assigned_students', 'assigned_students_details', 'client_assets', 'student_deliverables',
             'team_invitations'
         ]
-        read_only_fields = ['company', 'status', 'created_at', 'is_match_finalized']
+        # Talent assignment is admin-only (via /match/), never writable by the posting company
+        read_only_fields = ['company', 'status', 'created_at', 'is_match_finalized', 'assigned_students', 'match_notes']
+
+    # Workspace data that only the owner, assigned talent and admins may see
+    PRIVATE_FIELDS = ('client_assets', 'student_deliverables', 'team_invitations')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if request is None or can_view_workspace(request.user, instance):
+            return data
+        for field in self.PRIVATE_FIELDS:
+            data.pop(field, None)
+        return data
 
     def get_guild(self, obj):
         # Find the application that is AWARDED, SUBMITTED, or COMPLETED
@@ -66,10 +94,18 @@ class CampaignSerializer(serializers.ModelSerializer):
 class CampaignDetailSerializer(CampaignSerializer):
     applications = serializers.SerializerMethodField()
     my_application = serializers.SerializerMethodField()
+    report_url = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
-        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application']
-    
+        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url']
+
+    def get_report_url(self, obj):
+        request = self.context.get('request')
+        report = getattr(obj, 'report', None) if obj.status == 'COMPLETED' else None
+        if not report or not report.generated_pdf or not (request and can_view_workspace(request.user, obj)):
+            return None
+        return request.build_absolute_uri(report.generated_pdf.url)
+
     def get_applications(self, obj):
         # Only show applications to the owner (Company)
         request = self.context.get('request')
@@ -92,6 +128,9 @@ class DeliverableSerializer(serializers.ModelSerializer):
         model = Deliverable
         fields = ['id', 'application', 'file', 'uploaded_at']
         read_only_fields = ['application', 'uploaded_at']
+
+    def validate_file(self, value):
+        return validate_project_file_upload(value, 'Deliverable')
 
 class ApplicationSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source='club.club_name', read_only=True)

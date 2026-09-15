@@ -1,156 +1,124 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, MapPin, Users, Trophy, AlertCircle } from 'lucide-react';
 import api from '../api/client';
-import {
-  ArrowLeft, MapPin, Shield, Users, Trophy
-} from 'lucide-react';
+import WorkspaceNav from '../components/WorkspaceNav';
+import PageLoader from '../components/PageLoader';
+import StatusBadge from '../components/StatusBadge';
+import { formatDate } from '../utils/format';
 
 const ClubProfile = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-
-  // STATE: Club & Roster
   const [club, setClub] = useState(null);
   const [roster, setRoster] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        // 1. Fetch Club Details
-        const clubRes = await api.get(`/users/club/${id}/profile/`);
+        const [clubRes, rosterRes] = await Promise.all([
+          api.get(`/users/club/${id}/profile/`),
+          api.get(`/users/club/${id}/roster/`),
+        ]);
         setClub(clubRes.data);
-
-        // 2. Fetch Roster
-        const rosterRes = await api.get(`/users/club/${id}/roster/`);
         setRoster(rosterRes.data);
-
-      } catch (error) {
-        console.error("Failed to fetch club data", error);
+      } catch {
+        setClub(null);
       } finally {
         setLoading(false);
       }
     };
-
-    if (id) {
-      fetchData();
-    }
+    fetchData();
   }, [id]);
 
-  if (loading) {
-    return <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-[var(--text-gold)] animate-pulse">Initializing Terminal...</div>;
-  }
+  if (loading) return <PageLoader message="Loading club…" />;
 
   if (!club) {
     return (
-      <div className="min-h-screen bg-[var(--bg-void)] text-white p-6">
-        <button onClick={() => navigate(-1)} className="mb-4 text-[var(--text-blue)]">&larr; Back</button>
-        <div className="text-red-500">Error: Guild Not Found.</div>
+      <div className="min-h-screen bg-[#F5F7FC] font-body">
+        <WorkspaceNav />
+        <div className="max-w-md mx-auto text-center py-24 px-4">
+          <AlertCircle size={40} className="mx-auto text-[#5B6478]/50 mb-3" />
+          <h1 className="font-heading font-bold text-xl mb-2">Club not found</h1>
+          <button onClick={() => navigate(-1)} className="btn-primary mt-4">Go back</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] p-6 flex justify-center text-white">
-      <div className="w-full max-w-5xl animate-fade-in">
-
-        {/* 1. HEADER */}
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-[var(--text-blue)] hover:text-white mb-6 transition-colors uppercase text-xs tracking-widest">
-          <ArrowLeft size={14} /> Back to Dashboard
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
+      <WorkspaceNav />
+      <main className="max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-6 animate-fade-in">
+        <button onClick={() => navigate(-1)} className="back-link">
+          <ArrowLeft size={15} /> Back
         </button>
 
-        {/* 2. CLUB HERO */}
-        <div className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 flex flex-col md:flex-row gap-8 items-start mb-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#a020f0] to-transparent"></div>
-
-          <div className="w-24 h-24 bg-black border-2 border-[#a020f0] rounded-full flex items-center justify-center font-display text-3xl text-[#a020f0] shrink-0">
+        <section className="card p-6 sm:p-8 flex flex-col md:flex-row gap-6 items-start">
+          <div className="w-20 h-20 bg-[#0B1E63] rounded-2xl flex items-center justify-center font-heading font-extrabold text-3xl text-[#00AEEF] shrink-0">
             {club.club_name.charAt(0)}
           </div>
-
-          <div className="flex-1">
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-3xl font-display font-bold uppercase tracking-wide text-white">{club.club_name}</h1>
-                <div className="flex items-center gap-4 text-sm text-gray-400 mt-2">
-                  <span className="flex items-center gap-1"><MapPin size={14} /> {club.university}</span>
-                  <span className="flex items-center gap-1 text-[#a020f0]"><Shield size={14} /> {club.verification_status}</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-[10px] text-[var(--text-blue)] uppercase tracking-widest mb-1">Rank</div>
-                <div className="text-4xl font-display font-bold text-yellow-500">{club.rank || 'C'}</div>
+          <div className="flex-1 flex flex-col sm:flex-row justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-2xl sm:text-3xl font-extrabold">{club.club_name}</h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-[#5B6478] mt-2">
+                <span className="inline-flex items-center gap-1"><MapPin size={14} /> {club.university}</span>
+                <StatusBadge status={club.verification_status} />
               </div>
             </div>
-
-            <p className="mt-4 text-gray-300 text-sm leading-relaxed max-w-2xl">
-              Premier student entrepreneurship body. We organize the largest campus hackathons in KL. (Mock Bio)
-            </p>
+            <div className="text-center bg-[#F5F7FC] rounded-lg px-5 py-3 self-start">
+              <div className="text-xs uppercase font-semibold tracking-wider text-[#5B6478]">Rank</div>
+              <div className="font-heading text-3xl font-extrabold text-amber-500">{club.rank || 'C'}</div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* 3. HIGH COMMITTEE (Roster) */}
-        <div className="mb-8">
-          <div className="flex justify-between items-end mb-4 border-b border-[var(--border-tech)] pb-2">
-            <h3 className="text-white font-bold uppercase tracking-wider text-sm flex items-center gap-2">
-              <Users size={16} className="text-[var(--text-gold)]" /> Committee Roster
-            </h3>
-            <div className="text-[var(--text-blue)] text-xs">Total Members: {roster.length}</div>
+        <section className="card p-6 sm:p-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-heading font-bold text-lg flex items-center gap-2"><Users size={18} className="text-[#00AEEF]" /> Committee</h2>
+            <span className="text-sm text-[#5B6478]">{roster.length} member{roster.length === 1 ? '' : 's'}</span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {roster.length > 0 ? (
-              roster.map((member, idx) => (
-                <div
-                  key={idx}
-                  className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-4 flex items-center gap-4 hover:border-[#a020f0] hover:bg-[#a020f0]/10 transition-all cursor-not-allowed group opacity-80"
-                  title="Profile viewing coming soon (User is pending registration)"
-                >
-                  <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-xs font-bold border border-gray-600 group-hover:border-[#a020f0]">
-                    {member.email.charAt(0).toUpperCase()}
+          {roster.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {roster.map((member, idx) => (
+                <div key={member.email || idx} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white border border-[rgba(10,23,72,0.12)] rounded-full flex items-center justify-center text-sm font-bold text-[#0B1E63] shrink-0">
+                    {(member.name || member.email).charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="text-white font-bold text-sm group-hover:text-[#a020f0]">
-                      {member.email}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider text-[var(--text-gold)]">{member.role}</div>
-                    <div className="text-[10px] text-gray-500">Invited: {new Date(member.created_at).toLocaleDateString()}</div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm truncate">{member.name && member.name.trim() !== '' ? member.name : member.email}</div>
+                    <div className="text-xs text-[#0090C6]">{member.role}</div>
+                    <div className="text-xs text-[#5B6478]">{member.status}{member.created_at && ` · invited ${formatDate(member.created_at)}`}</div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8 text-gray-500 text-xs uppercase tracking-widest border border-dashed border-gray-800">
-                No active members found on roster.
-              </div>
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#5B6478] text-center py-6">No members listed yet.</p>
+          )}
+        </section>
 
-        {/* 4. PAST RAIDS (Static for now) */}
-        <div>
-          <h3 className="text-white font-bold uppercase tracking-wider text-sm mb-4 flex items-center gap-2">
-            <Trophy size={16} className="text-[#a020f0]" /> Campaign History
-          </h3>
-          <div className="space-y-4">
-            {club.campaign_history && club.campaign_history.length > 0 ? (
-              club.campaign_history.map((campaign, idx) => (
-                <div key={idx} className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 flex justify-between items-center">
+        <section className="card p-6 sm:p-8">
+          <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2"><Trophy size={18} className="text-[#00AEEF]" /> Campaign history</h2>
+          {club.campaign_history?.length > 0 ? (
+            <div className="space-y-3">
+              {club.campaign_history.map((campaign, idx) => (
+                <div key={idx} className="bg-[#F5F7FC] rounded-lg p-4 flex justify-between items-center gap-4">
                   <div>
-                    <div className="text-[10px] text-green-400 uppercase font-bold mb-1">{campaign.status}</div>
-                    <h4 className="text-lg font-bold text-white">{campaign.title}</h4>
+                    <div className="font-semibold">{campaign.title}</div>
+                    <div className="text-xs text-emerald-700">{campaign.status}</div>
                   </div>
-                  <div className="text-right text-sm text-gray-500">{campaign.date}</div>
+                  <div className="text-sm text-[#5B6478] whitespace-nowrap">{campaign.date}</div>
                 </div>
-              ))
-            ) : (
-              <div className="text-gray-500 text-xs uppercase tracking-widest border border-dashed border-gray-800 p-6 text-center">
-                No campaigns completed yet.
-              </div>
-            )}
-          </div>
-        </div>
-
-      </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#5B6478] text-center py-6">No campaigns completed yet.</p>
+          )}
+        </section>
+      </main>
     </div>
   );
 };
