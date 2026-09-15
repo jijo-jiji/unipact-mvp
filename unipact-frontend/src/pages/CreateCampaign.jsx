@@ -5,6 +5,7 @@ import { Code2, Video, Plus, Trash2, ArrowLeft, Upload, CheckCircle2, Loader2, A
 import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
 import { getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const DEFAULT_DELIVERABLES = {
   SOFTWARE_DEVELOPMENT: [
@@ -34,6 +35,7 @@ const StepHeading = ({ number, title, description }) => (
 const today = () => new Date().toISOString().split('T')[0];
 
 const CreateCampaign = () => {
+  usePageTitle('Post a project');
   const navigate = useNavigate();
   const { showToast } = useToast();
 

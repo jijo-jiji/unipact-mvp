@@ -223,6 +223,12 @@ python manage.py runserver
 ```
 Backend API will be available at `http://127.0.0.1:8000/`.
 
+No `.env` file is needed locally: you get DEBUG mode, SQLite, local file storage, and **emails printed to the backend terminal** instead of being sent (handy for testing password resets and notifications). See `unipact-backend/.env.example` for every setting.
+
+**Demo data (local only):** `python create_seed_users.py` creates demo accounts for every role (see the script for their passwords). The seed scripts refuse to run when `DJANGO_ENV=production`.
+
+**Real admin account:** `python manage.py create_admin --email you@example.com` (asks for a strong password).
+
 ### 2. Frontend Setup
 ```bash
 cd unipact-frontend
@@ -231,28 +237,58 @@ npm run dev
 ```
 Frontend application will be accessible at `http://localhost:5173/`.
 
+For production builds, see `unipact-frontend/.env.example` (API address, public site URL for link previews, legal page details, optional Sentry) and [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ---
 
 ## 📡 API Endpoint Reference
 
-### V3.0 Student Talent & Squad Collaboration
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/users/students/` | `GET` | List verified student talent profiles |
-| `/api/users/students/<id>/` | `GET` | Retrieve student profile and public portfolio |
-| `/api/campaigns/student/assigned/` | `GET` | List projects assigned to the authenticated student |
-| `/api/campaigns/<id>/team/invite/` | `POST` | Send squad invitation to peer student |
-| `/api/campaigns/<id>/team/` | `GET` | List active squad members and invitations |
-| `/api/campaigns/team/invitations/me/` | `GET` | List pending invitations received by current student |
-| `/api/campaigns/team/invitation/<id>/respond/` | `POST` | Accept or decline squad invitation |
-| `/api/campaigns/<id>/student-deliverable/` | `POST` | Submit milestone deliverable & contribution note |
+All endpoints use HttpOnly cookie authentication. Sign-in, sign-up, password reset and token refresh are rate limited per IP.
 
-### Admin Curation & Management
+### Accounts
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/api/campaigns/curate/unassigned/` | `GET` | List campaigns awaiting talent assignment |
-| `/api/campaigns/<id>/curate/match/` | `POST` | Match and assign verified students to campaign |
-| `/api/campaigns/<id>/curate/finalize/` | `POST` | Lock match and transition project to `IN_PROGRESS` |
+| `/api/users/register/student/` · `/company/` · `/club/` | `POST` | Create an account (requires `accept_terms: true`) |
+| `/api/users/login/` · `/logout/` · `/token/refresh/` | `POST` | Sign in, sign out, refresh the session cookie |
+| `/api/users/me/` | `GET` | The signed-in account |
+| `/api/users/me/settings/` | `GET` `PATCH` | View or update your own profile and verification document |
+| `/api/users/password/change/` | `POST` | Change password (`current_password`, `new_password`) |
+| `/api/users/password/forgot/` | `POST` | Email a password reset link (same response whether or not the email exists) |
+| `/api/users/password/reset/` | `POST` | Set a new password with `uid` + `token` from the email |
+| `/api/users/student/<user_id>/profile/` | `GET` | Public student portfolio |
+
+### V3.0 Projects & Team Collaboration
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/campaigns/?mode=my_campaigns` | `GET` | A company's own projects (`POST /api/campaigns/` creates one) |
+| `/api/campaigns/<id>/` | `GET` | Project detail (workspace files only for owner, team and admins) |
+| `/api/campaigns/<id>/finalize/` | `POST` | Company confirms the proposed match (finder's fee on Free plan) |
+| `/api/campaigns/<id>/assets/` | `GET` `POST` | Project files vault |
+| `/api/campaigns/student/assigned/` | `GET` | Projects assigned to the signed-in student |
+| `/api/campaigns/<id>/student-deliverable/` | `POST` | Submit a link and/or file with a contribution note |
+| `/api/campaigns/<id>/team/invite/` | `POST` | Invite another student (`email`, `role_in_project`, `payout_share_percentage`) |
+| `/api/campaigns/<id>/team/` | `GET` | Team members and pending invitations |
+| `/api/campaigns/team/invitations/me/` | `GET` | Invitations received by the signed-in student |
+| `/api/campaigns/team/invitations/<id>/respond/` | `POST` | Accept or decline (`action`) |
+| `/api/campaigns/<id>/complete/` | `POST` | Approve work, rate (1–5) and complete the project |
+
+### Admin
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/users/admin/queue/` · `/stats/` · `/logs/` | `GET` | Verification queue, dashboard stats, activity log |
+| `/api/users/admin/verify/<TYPE>/<id>/` | `POST` | Approve, reject or flag an account (emails the user) |
+| `/api/users/admin/entities/` · `/users/<id>/block/` | `GET` `POST` | User directory, block or unblock |
+| `/api/users/admin/students/` | `GET` | Student pool for matchmaking |
+| `/api/campaigns/<id>/match/` | `POST` | Propose students for a project (`student_ids`, `match_notes`) |
+
+### Billing
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/payments/create-intent/` → `mock-checkout/<id>/` → `confirm/<id>/` | `POST` | Demo checkout flow (no real charge) |
+| `/api/payments/history/` · `/treasury/` | `GET` | Payment history and plan summary |
+
+### Transactional emails
+Sent automatically (see `unipact_backend/notifications.py`): welcome, account verified/rejected, password reset and changed, match proposed (company and students), match confirmed, team invitation and reply, work submitted, project completed, club proposal received and contract awarded, payment receipt.
 
 ---
 
@@ -265,11 +301,12 @@ The repository enforces mandatory verification gates:
 cd unipact-backend
 python manage.py test
 ```
-*Current Status*: **25/25 tests passing (100% OK)** including V3.0 student profiles, admin matching, milestone deliverables, peer invitations, and postponed V2.2.1 club audits.
+*Current Status*: **83/83 tests passing** covering V3.0 matching and team collaboration, access control, uploads, rate limits, production settings, password reset, account settings, emails, sign-up consent, admin commands and the postponed V2.2.1 club track.
 
-### 2. Frontend Production Build
+### 2. Frontend Lint & Production Build
 ```bash
 cd unipact-frontend
+npx eslint src
 npm run build
 ```
-*Current Status*: **0 errors**, compiles clean production bundle via Vite.
+*Current Status*: **0 lint errors, 0 build errors**.

@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, permissions, status, exceptions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,6 +10,10 @@ from users.models import User, CompanyProfile, StudentProfile
 from payments.models import Transaction, Subscription
 from .utils import generate_campaign_report
 from unipact_backend.validators import validate_project_file_upload
+from unipact_backend import notifications
+
+logger = logging.getLogger(__name__)
+
 
 class IsCompany(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -86,7 +92,8 @@ class ApplicationCreateView(generics.CreateAPIView):
         if Application.objects.filter(campaign=campaign, club=self.request.user.club_profile).exists():
             raise exceptions.PermissionDenied("You have already applied to this campaign.")
 
-        serializer.save(club=self.request.user.club_profile, campaign=campaign)
+        application = serializer.save(club=self.request.user.club_profile, campaign=campaign)
+        notifications.club_application_received(application)
 
 class MyApplicationsView(generics.ListAPIView):
     serializer_class = ApplicationSerializer
@@ -137,6 +144,7 @@ class AwardApplicationView(APIView):
         from users.models import SystemLog
         from users.utils import log_event
         log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.SUCCESS, f"Contract Awarded: {application.club.club_name} -> {company_profile.company_name}")
+        notifications.club_contract_awarded(application)
 
         return Response({"message": "Application awarded successfully."}, status=status.HTTP_200_OK)
 
@@ -166,6 +174,7 @@ class DeliverableCreateView(generics.CreateAPIView):
         from users.models import SystemLog
         from users.utils import log_event
         log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Deliverable Submitted: {application.club.club_name} -> {application.campaign.title}")
+        notifications.work_submitted(application.campaign, application.club.club_name, 'Club deliverable')
 
 class MarkCampaignCompletedView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -227,19 +236,20 @@ class MarkCampaignCompletedView(APIView):
                     student.rating = rating
                     student.save()
 
-        except Exception as e:
-            print(f"Error processing review/completion: {e}")
+        except Exception:
+            logger.exception('Error processing review/completion for campaign %s', campaign.id)
 
         # 2. MARK AS COMPLETED
         campaign.status = Campaign.Status.COMPLETED
         campaign.save()
+        notifications.project_completed(campaign, rating)
 
         # Generate Report
         try:
             report = generate_campaign_report(campaign)
             report_url = request.build_absolute_uri(report.generated_pdf.url)
-        except Exception as e:
-            print(f"Report generation failed: {e}")
+        except Exception:
+            logger.exception('Report generation failed for campaign %s', campaign.id)
             report_url = None
         
         return Response({
@@ -283,6 +293,7 @@ class AdminMatchmakingAssignView(APIView):
         from users.utils import log_event
         student_names = ", ".join([s.full_name for s in students])
         log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Admin matched '{student_names}' to job #{campaign.id}: '{campaign.title}'")
+        notifications.match_proposed(campaign)
 
         return Response({
             "message": "Talent successfully assigned and job status updated to MATCHED.",
@@ -340,6 +351,7 @@ class FinalizeMatchView(APIView):
         from users.models import SystemLog
         from users.utils import log_event
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS, f"Match Finalized for '{campaign.title}' by {company_profile.company_name}")
+        notifications.match_confirmed(campaign)
 
         return Response({
             "message": "Match finalized successfully. Project is now IN_PROGRESS.",
@@ -406,6 +418,7 @@ class StudentSubmitDeliverableView(APIView):
             contribution_role=contribution_role,
             contribution_summary=contribution_summary
         )
+        notifications.work_submitted(campaign, request.user.student_profile.full_name, title)
 
         return Response({
             "message": "Deliverable submitted successfully.",
@@ -522,6 +535,7 @@ class ProjectTeamInviteView(APIView):
         from users.models import SystemLog
         from users.utils import log_event
         log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Student {current_student.full_name} invited {email} as {role_in_project} to project #{campaign.id} ('{campaign.title}')")
+        notifications.team_invitation(invitation)
 
         return Response(ProjectTeamInvitationSerializer(invitation).data, status=status.HTTP_201_CREATED)
 
@@ -601,6 +615,7 @@ class RespondTeamInvitationView(APIView):
             from users.models import SystemLog
             from users.utils import log_event
             log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.SUCCESS, f"Student {student_profile.full_name} accepted team invitation for '{invitation.campaign.title}' as {invitation.role_in_project}")
+            notifications.team_invitation_answered(invitation, accepted=True)
 
             return Response({
                 "message": f"You have successfully joined the team for '{invitation.campaign.title}' as {invitation.role_in_project}!",
@@ -610,6 +625,7 @@ class RespondTeamInvitationView(APIView):
         elif action == 'decline':
             invitation.status = ProjectTeamInvitation.Status.DECLINED
             invitation.save()
+            notifications.team_invitation_answered(invitation, accepted=False)
             return Response({"message": "Invitation declined."}, status=status.HTTP_200_OK)
 
         return Response({"error": "Invalid action. Use 'accept' or 'decline'."}, status=status.HTTP_400_BAD_REQUEST)

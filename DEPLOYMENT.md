@@ -33,8 +33,13 @@ cd unipact-backend && gunicorn unipact_backend.wsgi:application --bind 0.0.0.0:$
 | `AUTH_COOKIE_DOMAIN` | `.unipact.my` | Shares the login cookie between site and API |
 | `DATABASE_URL` | `postgres://…` | From your PostgreSQL provider |
 | `USE_S3` + `AWS_*` | see `.env.example` | Cloudflare R2 / S3 bucket for uploads (keep the bucket **private**; links are signed) |
+| `FRONTEND_URL` | `https://unipact.my` | Used to build links in emails (password reset, notifications) |
+| `EMAIL_HOST` + `EMAIL_*` | see `.env.example` | Any SMTP provider (Resend, Brevo, SendGrid, Amazon SES…) |
+| `DEFAULT_FROM_EMAIL` | `UniPact <no-reply@unipact.my>` | Verify this domain with your email provider (SPF/DKIM) or emails land in spam |
+| `SUPPORT_EMAIL` | `support@unipact.my` | Reply-to address shown in emails |
+| `SENTRY_DSN` | from sentry.io | Optional error monitoring; no personal data is sent |
 
-The app **refuses to start** in production if the secret key, allowed hosts, database, CORS origins or file storage are missing, so misconfiguration fails loudly instead of running insecurely.
+The app **refuses to start** in production if the secret key, allowed hosts, database, CORS origins, file storage, website address or email settings are missing, so misconfiguration fails loudly instead of running insecurely.
 
 **Verify before going live:**
 ```
@@ -44,17 +49,34 @@ python manage.py check --deploy
 
 **First deploy:**
 1. `python manage.py migrate` runs automatically in `build.sh`.
-2. Create a real admin: `python manage.py createsuperuser` and enter `ADMIN` when asked for the role. Use a strong, unique password.
-3. **Do not** run the seed scripts (`create_seed_users.py`, `seed_demo_data.py`) against production; they create accounts with known passwords.
+2. Create a real admin from the host's shell:
+   ```
+   python manage.py create_admin --email you@unipact.my --name "Your Name"
+   ```
+   It asks for a password (at least 12 characters, not common). On hosts without an interactive shell, set `ADMIN_PASSWORD` as a one-off environment variable, run the command, then delete the variable.
+3. The seed scripts (`create_seed_users.py`, `manage.py seed_data`) **refuse to run in production** because their accounts have publicly known passwords. If you copied a local database, list and remove demo accounts:
+   ```
+   python manage.py remove_demo_accounts        # lists them
+   python manage.py remove_demo_accounts --yes  # deletes them
+   ```
+4. Send yourself a password reset from the live site to confirm email delivery works.
 
 ## 2. Frontend (React)
 
 On Vercel, set the project root to `unipact-frontend`:
 - Build command: `npm run build`
 - Output directory: `dist`
-- Environment variable: `VITE_API_BASE_URL=https://api.unipact.my/api`
+- Environment variables (see `unipact-frontend/.env.example`):
+  - `VITE_API_BASE_URL=https://api.unipact.my/api`
+  - `VITE_SITE_URL=https://unipact.my`: makes WhatsApp/LinkedIn link previews, `sitemap.xml` and `robots.txt` use your real address
+  - `VITE_LEGAL_ENTITY_NAME`, `VITE_LEGAL_REGISTRATION_NO`, `VITE_LEGAL_ADDRESS`, `VITE_CONTACT_EMAIL`: shown on the Privacy Policy and Terms pages (bracketed placeholders appear until set)
+  - `VITE_SENTRY_DSN` (optional): frontend error monitoring; use a separate Sentry project from the backend
+
+Vite bakes these in at build time, so **redeploy after changing them**.
 
 `vercel.json` makes deep links such as `/student/dashboard` work and adds security headers. `public/_redirects` does the same on Netlify.
+
+After deploying, paste your site link into the [LinkedIn Post Inspector](https://www.linkedin.com/post-inspector/) or a WhatsApp chat to check the preview image.
 
 ## 3. What is protected now
 
@@ -64,10 +86,28 @@ On Vercel, set the project root to `unipact-frontend`:
 - **Cookies:** HttpOnly, `Secure` and a controlled `SameSite`/domain in production.
 - **Headers:** HTTPS redirect, HSTS (1 year), no-sniff, clickjacking protection, strict referrer policy. The browsable API is disabled in production.
 
-## 4. Still to do before real users
+- **Accounts:** forgot/reset password (links work once and expire after 1 hour, 5 requests per hour per IP), change password, and a confirmation email whenever a password changes.
+- **Consent:** sign-up requires agreeing to the Terms and Privacy Policy; the time of agreement is stored on the user (`terms_accepted_at`).
+- **Errors:** a friendly error screen instead of a blank page; with `SENTRY_DSN` / `VITE_SENTRY_DSN` set, crashes are reported to Sentry without personal data.
+
+## 4. Legal pages: review before launch
+
+`/privacy` and `/terms` are a **plain-language draft**, written for a Malaysian marketplace under the PDPA 2010. They are not legal advice. Before launch, have a lawyer review them and confirm these business decisions, which the draft assumes:
+
+- **Ownership of deliverables** passes to the client once the project is completed and paid for, unless agreed otherwise in writing.
+- **Fees** (RM 150 finder's fee, RM 499/month Pro) are non-refundable once the service is provided.
+- **Minimum age** is 18, or younger with parent/guardian permission.
+- **Liability** is capped at the fees paid to UniPact in the previous 12 months.
+- **Student payouts:** how and when teams are paid is left to the project details. This must match whatever payment provider you choose.
+- **Data outside Malaysia:** hosting, email and Sentry providers may store data abroad.
+- **Language:** PDPA notices are expected in both Bahasa Malaysia and English; a Malay version is not included yet.
+
+Set the business details with the `VITE_LEGAL_*` variables so the pages show your registered name, SSM number and address.
+
+## 5. Still to do before real users
 
 These need decisions or third-party accounts, so they are not built yet:
 - Real payment provider and student payouts (the checkout is a demo).
-- Transactional email (verification, invites, receipts) and "forgot password".
-- Privacy Policy / Terms of Service and sign-up consent (PDPA).
-- Database backups and error monitoring (e.g. Sentry).
+- Database backups: turn on automatic daily backups in your PostgreSQL provider's dashboard.
+- Accounts on an email provider (with your domain verified) and, optionally, Sentry.
+- Legal review of the Privacy Policy and Terms (see above).

@@ -5,7 +5,7 @@ import {
   FolderOpen, BadgeCheck, Wallet, Sparkles, Star, ChevronDown, LayoutDashboard,
 } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
-import BrandLogo from '../components/BrandLogo';
+import SiteFooter from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
 
@@ -307,23 +307,7 @@ const LandingPage = () => {
         </section>
       </main>
 
-      <footer className="border-t border-[rgba(10,23,72,0.08)] bg-white">
-        <div className="max-w-[1160px] mx-auto px-4 sm:px-8 py-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 text-sm text-[#5B6478]">
-          <div className="text-center md:text-left">
-            <BrandLogo />
-            <p className="mt-2">Connecting companies with verified university talent.</p>
-          </div>
-          <nav aria-label="Footer" className="flex flex-wrap justify-center gap-x-6 [&>a]:py-2.5 md:[&>a]:py-0">
-
-            <a href="#how-it-works" className="hover:text-[#0A1748]">How it works</a>
-            <a href="#faq" className="hover:text-[#0A1748]">FAQ</a>
-            <Link to="/register/company" className="hover:text-[#0A1748]">For companies</Link>
-            <Link to="/register/student" className="hover:text-[#0A1748]">For students</Link>
-            <Link to="/login" className="hover:text-[#0A1748]">Sign in</Link>
-          </nav>
-          <p className="text-xs">© {new Date().getFullYear()} UniPact. All rights reserved.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

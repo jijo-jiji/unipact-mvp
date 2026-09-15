@@ -5,8 +5,10 @@ import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import { getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const SubmitDeliverable = () => {
+  usePageTitle('Upload deliverable');
   const { applicationId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();

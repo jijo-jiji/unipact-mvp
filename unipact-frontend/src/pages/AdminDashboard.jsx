@@ -10,6 +10,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import StatusBadge from '../components/StatusBadge';
 import PageLoader from '../components/PageLoader';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const TABS = [
   { key: 'dashboard', label: 'Overview', icon: <Activity size={16} /> },
@@ -40,6 +41,7 @@ const useDebounced = (value, delay = 400) => {
 };
 
 const AdminDashboard = () => {
+  usePageTitle('Admin hub');
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [confirmState, setConfirmState] = useState({ isOpen: false });

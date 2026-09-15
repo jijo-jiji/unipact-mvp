@@ -1,7 +1,11 @@
+import logging
+
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status, generics, views, permissions
 from rest_framework.response import Response
-from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle
+from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle, PasswordResetThrottle, PasswordChangeThrottle
+from unipact_backend import notifications
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, logout
 from django.db import transaction
@@ -62,51 +66,193 @@ def clear_auth_cookies(response):
     for name in ('access_token', 'refresh_token'):
         response.delete_cookie(name, path=options['path'], domain=options['domain'], samesite=options['samesite'])
 
+def account_payload(user):
+    """The signed-in user's account as the frontend expects it (used by /me/ and the settings endpoint)."""
+    ver_status = None
+    tier = None
+    card_last_4 = None
+    card_brand = None
+
+    company_profile_data = None
+    club_profile_data = None
+    student_profile_data = None
+
+    if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
+        ver_status = user.company_profile.verification_status
+        tier = user.company_profile.tier
+        name = user.company_profile.company_name
+        card_last_4 = user.company_profile.card_last_4
+        card_brand = user.company_profile.card_brand
+        company_profile_data = CompanyProfileSerializer(user.company_profile).data
+    elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
+        ver_status = user.club_profile.verification_status
+        name = user.club_profile.club_name
+        club_profile_data = ClubProfileSerializer(user.club_profile).data
+    elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
+        ver_status = user.student_profile.verification_status
+        name = user.student_profile.full_name
+        student_profile_data = StudentProfileSerializer(user.student_profile).data
+    else:
+        name = user.get_full_name() or user.username
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": user.role,
+        "name": name,
+        "verification_status": ver_status,
+        "tier": tier,
+        "card_last_4": card_last_4,
+        "card_brand": card_brand,
+        "company_profile": company_profile_data,
+        "club_profile": club_profile_data,
+        "student_profile": student_profile_data,
+        "has_verification_document": bool(
+            getattr(getattr(user, 'student_profile', None), 'verification_document', None)
+            or getattr(getattr(user, 'company_profile', None), 'ssm_document', None)
+            or getattr(getattr(user, 'club_profile', None), 'verification_document', None)
+        ) if user.role != User.Role.ADMIN else None,
+    }
+
+
 class UserView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        return Response(account_payload(request.user))
+
+
+class AccountSettingsView(views.APIView):
+    """GET or PATCH the signed-in user's own profile. Email, role, verification and ratings are not editable here."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(account_payload(request.user))
+
+    def patch(self, request):
+        from .serializers import StudentSettingsSerializer, CompanySettingsSerializer, ClubSettingsSerializer
+        from .utils import log_event
+
         user = request.user
-        ver_status = None
-        tier = None
-        card_last_4 = None
-        card_brand = None
-        
-        company_profile_data = None
-        club_profile_data = None
-        student_profile_data = None
+        config = {
+            User.Role.STUDENT: ('student_profile', StudentSettingsSerializer, 'verification_document', StudentProfile.VerificationStatus.PENDING_VERIFICATION),
+            User.Role.COMPANY: ('company_profile', CompanySettingsSerializer, 'ssm_document', CompanyProfile.VerificationStatus.PENDING_REVIEW),
+            User.Role.CLUB: ('club_profile', ClubSettingsSerializer, 'verification_document', ClubProfile.VerificationStatus.PENDING_VERIFICATION),
+        }.get(user.role)
+        if not config or not hasattr(user, config[0]):
+            return Response({"error": "There is no editable profile for this account."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
-            ver_status = user.company_profile.verification_status
-            tier = user.company_profile.tier
-            name = user.company_profile.company_name
-            card_last_4 = user.company_profile.card_last_4
-            card_brand = user.company_profile.card_brand
-            company_profile_data = CompanyProfileSerializer(user.company_profile).data
-        elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
-            ver_status = user.club_profile.verification_status
-            name = user.club_profile.club_name
-            club_profile_data = ClubProfileSerializer(user.club_profile).data
-        elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
-            ver_status = user.student_profile.verification_status
-            name = user.student_profile.full_name
-            student_profile_data = StudentProfileSerializer(user.student_profile).data
-        else:
-            name = user.username
+        profile_attr, serializer_class, document_field, pending_status = config
+        profile = getattr(user, profile_attr)
+        serializer = serializer_class(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        changed = sorted(serializer.validated_data.keys())
 
-        return Response({
-            "id": user.id,
-            "email": user.email,
-            "role": user.role,
-            "name": name,
-            "verification_status": ver_status,
-            "tier": tier,
-            "card_last_4": card_last_4,
-            "card_brand": card_brand,
-            "company_profile": company_profile_data,
-            "club_profile": club_profile_data,
-            "student_profile": student_profile_data
-        })
+        with transaction.atomic():
+            profile = serializer.save()
+            # A rejected account that uploads a new document goes back into the review queue
+            if document_field in serializer.validated_data and profile.verification_status == 'REJECTED':
+                profile.verification_status = pending_status
+                profile.save(update_fields=['verification_status'])
+            if user.role == User.Role.STUDENT and 'full_name' in serializer.validated_data:
+                user.first_name = profile.full_name[:150]
+                user.save(update_fields=['first_name'])
+
+        if changed:
+            log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"Profile updated by {user.email}: {', '.join(changed)}")
+        user.refresh_from_db()
+        return Response(account_payload(user))
+
+
+class PasswordChangeView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [PasswordChangeThrottle]
+
+    def post(self, request):
+        from .serializers import PasswordChangeSerializer
+        from .utils import log_event
+
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save(update_fields=['password'])
+
+        log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Password changed: {user.email}")
+        notifications.password_changed(user)
+
+        response = Response({"message": "Your password has been updated."})
+        set_auth_cookies(response, get_tokens_for_user(user))  # keep this device signed in
+        return response
+
+
+class PasswordResetRequestView(views.APIView):
+    """Always answers the same way so the form can't be used to discover which emails have accounts."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [PasswordResetThrottle]
+
+    def post(self, request):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+        from urllib.parse import urlencode
+        from .serializers import PasswordResetRequestSerializer
+        from .utils import log_event
+
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user and user.has_usable_password():
+            query = urlencode({'uid': urlsafe_base64_encode(force_bytes(user.pk)), 'token': default_token_generator.make_token(user)})
+            notifications.password_reset(user, f'/reset-password?{query}')
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Password reset requested: {user.email}")
+
+        return Response({"message": "If an account exists for that email, we've sent a link to reset the password."})
+
+
+class PasswordResetConfirmView(views.APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [PasswordResetThrottle]
+
+    def post(self, request):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_str
+        from django.utils.http import urlsafe_base64_decode
+        from .serializers import PasswordResetConfirmSerializer
+        from .utils import log_event
+
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        invalid = Response({"error": "This reset link is invalid or has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(pk=force_str(urlsafe_base64_decode(data['uid'])), is_active=True)
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return invalid
+        # Tokens are tied to the current password hash, so each link works only once
+        if not default_token_generator.check_token(user, data['token']):
+            return invalid
+
+        try:
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            validate_password(data['password'], user=user)
+        except DjangoValidationError as exc:
+            return Response({"password": list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(data['password'])
+        user.save(update_fields=['password'])
+        log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Password reset completed: {user.email}")
+        notifications.password_changed(user)
+
+        response = Response({"message": "Your password has been reset. You can now sign in."})
+        clear_auth_cookies(response)
+        return response
 
 class LoginView(views.APIView):
     permission_classes = [AllowAny]
@@ -217,7 +363,6 @@ class InviteMemberView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        print("DEBUG: InviteMemberView perform_create reached")
         # Validate that requester is a Club
         if self.request.user.role != User.Role.CLUB:
              raise exceptions.PermissionDenied("Only clubs can invite members.")
@@ -239,7 +384,8 @@ class InviteMemberView(generics.CreateAPIView):
 
         # Standard Invite for new user
         serializer.save(invited_by=self.request.user.club_profile, token=token)
-        print(f"Sending invitation to {email} with token {token}")
+        # Club roster invites (postponed V2.2.1 track): there is no claim page in the frontend yet, so no email is sent
+        logging.getLogger(__name__).info('Club invitation created for %s', email)
 
 class ClaimProfileView(views.APIView):
     permission_classes = [AllowAny]
@@ -455,7 +601,8 @@ class RegisterCompanyView(generics.CreateAPIView):
                 username=email,
                 email=email,
                 password=password,
-                role=User.Role.COMPANY
+                role=User.Role.COMPANY,
+                terms_accepted_at=timezone.now(),
             )
 
             # Determine Verification Status
@@ -482,6 +629,7 @@ class RegisterCompanyView(generics.CreateAPIView):
             log_event(SystemLog.Category.SECURITY, SystemLog.Level.CRITICAL, f"High Risk Reg: {email} (Public Domain)")
         else:
             log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Company Joined: {company_name}")
+        notifications.welcome(user)
 
         response = Response({
             "message": "Company registered successfully.",
@@ -522,7 +670,8 @@ class RegisterClubView(generics.CreateAPIView):
                 username=email,
                 email=email,
                 password=password,
-                role=User.Role.CLUB
+                role=User.Role.CLUB,
+                terms_accepted_at=timezone.now(),
             )
 
             # Create Profile
@@ -544,6 +693,7 @@ class RegisterClubView(generics.CreateAPIView):
         from .models import SystemLog
         from .utils import log_event
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Club Joined: {club_name} ({university})")
+        notifications.welcome(user)
 
         response = Response({
             "message": "Club registered successfully. Please wait for admin verification.",
@@ -589,7 +739,8 @@ class RegisterStudentView(generics.CreateAPIView):
                 email=email,
                 password=password,
                 role=User.Role.STUDENT,
-                first_name=full_name
+                first_name=full_name[:150],
+                terms_accepted_at=timezone.now(),
             )
 
             profile = StudentProfile.objects.create(
@@ -616,6 +767,7 @@ class RegisterStudentView(generics.CreateAPIView):
         from .models import SystemLog
         from .utils import log_event
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Student Talent Joined: {full_name} ({university})")
+        notifications.welcome(user)
 
         response = Response({
             "message": "Student talent registered successfully. Account pending Admin verification.",
@@ -755,8 +907,10 @@ class AdminVerifyEntityView(views.APIView):
         log_event(
             SystemLog.Category.SECURITY,
             SystemLog.Level.INFO,
-            f"Admin {action.upper()}D entity {entity_id} ({entity_type})"
+            f"Admin {action.replace('_', ' ')} for {entity_type.lower()} #{entity_id}"
         )
+        if action in ('approve', 'reject'):
+            notifications.verification_result(profile.user, approved=(action == 'approve'))
 
         return Response({"message": f"Entity {action}d successfully"})
 

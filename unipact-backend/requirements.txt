@@ -13,5 +13,7 @@ gunicorn>=23.0
 whitenoise>=6.7
 dj-database-url>=2.2
 django-storages[s3]>=1.14
+# Error monitoring: only active when SENTRY_DSN is set
+sentry-sdk[django]>=2.0
 # Optional: only needed if you set REDIS_URL (shared rate-limit counters across server processes)
 # redis>=5.0

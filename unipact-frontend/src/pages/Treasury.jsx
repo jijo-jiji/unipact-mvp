@@ -9,10 +9,12 @@ import PaymentModal from '../components/PaymentModal';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { formatDate, formatMoney, getErrorMessage, transactionTypeLabel } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const PRO_PRICE = 499;
 
 const Treasury = () => {
+  usePageTitle('Billing');
   const { checkUserStatus } = useAuth();
   const { showToast } = useToast();
   const [history, setHistory] = useState([]);

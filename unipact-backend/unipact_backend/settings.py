@@ -96,7 +96,7 @@ ROOT_URLCONF = 'unipact_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -234,6 +234,9 @@ REST_FRAMEWORK = {
         'login': os.getenv('THROTTLE_LOGIN', '10/min'),
         'register': os.getenv('THROTTLE_REGISTER', '20/hour'),
         'token_refresh': os.getenv('THROTTLE_TOKEN_REFRESH', '60/min'),
+        # Stops "forgot password" being used to spam someone's inbox
+        'password_reset': os.getenv('THROTTLE_PASSWORD_RESET', '5/hour'),
+        'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
     },
     # Don't leak the browsable API in production
     'DEFAULT_RENDERER_CLASSES': (
@@ -245,7 +248,10 @@ REST_FRAMEWORK = {
 if TESTING:
     # Tests fire many requests from one "IP"; keep limits out of the way (throttle tests override these)
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = ()
-    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({'login': '10000/min', 'register': '10000/min', 'token_refresh': '10000/min'})
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({
+        'login': '10000/min', 'register': '10000/min', 'token_refresh': '10000/min',
+        'password_reset': '10000/min', 'password_change': '10000/min',
+    })
 
 # Throttle counters: set REDIS_URL when running more than one server process so limits are shared
 REDIS_URL = os.getenv('REDIS_URL')
@@ -295,6 +301,37 @@ if AUTH_COOKIE_SAMESITE == 'None' and not AUTH_COOKIE_SECURE:
 
 
 # ------------------------------------------------------------------
+# Website address (used for links in emails) & transactional email
+# ------------------------------------------------------------------
+
+FRONTEND_URL = os.getenv('FRONTEND_URL', '' if IS_PRODUCTION else 'http://localhost:5173').rstrip('/')
+if IS_PRODUCTION and not FRONTEND_URL:
+    raise ImproperlyConfigured('Set FRONTEND_URL to the public website address, e.g. "https://unipact.my" (used in email links).')
+
+# Any SMTP provider works: Resend, Brevo, SendGrid, Mailgun, Amazon SES, Zoho, Google Workspace.
+# Without EMAIL_HOST, emails are printed to the console instead of being sent (handy locally).
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', default=False)
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', default=not EMAIL_USE_SSL)
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND') or (
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST else 'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'UniPact <no-reply@unipact.local>')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', '')  # shown in emails and used as the reply-to address
+
+if IS_PRODUCTION and not EMAIL_HOST and not env_bool('ALLOW_CONSOLE_EMAIL', default=False):
+    raise ImproperlyConfigured('Set EMAIL_HOST and the EMAIL_* settings in production so password resets and notifications are delivered.')
+
+# Password reset links expire after an hour (Django's default is 3 days)
+PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
+
+
+# ------------------------------------------------------------------
 # HTTPS & browser security headers (production)
 # ------------------------------------------------------------------
 
@@ -315,6 +352,25 @@ if IS_PRODUCTION:
         SILENCED_SYSTEM_CHECKS = ['security.W021']
     # Health checks from the hosting platform come in over plain HTTP internally
     SECURE_REDIRECT_EXEMPT = [r'^api/health/$']
+
+
+# ------------------------------------------------------------------
+# Error monitoring (Sentry): off unless SENTRY_DSN is set
+# ------------------------------------------------------------------
+
+SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+if SENTRY_DSN and not TESTING:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.getenv('SENTRY_ENVIRONMENT', ENVIRONMENT),
+        release=os.getenv('SENTRY_RELEASE') or None,
+        # Fraction of requests traced for performance monitoring (0 = errors only)
+        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0')),
+        # Never send passwords, cookies, emails or IP addresses to Sentry (PDPA)
+        send_default_pii=False,
+    )
 
 
 # ------------------------------------------------------------------

@@ -3,24 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, GraduationCap, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
-
-const MALAYSIAN_UNIVERSITIES = [
-  "Universiti Malaya (UM)",
-  "Universiti Sains Malaysia (USM)",
-  "Universiti Kebangsaan Malaysia (UKM)",
-  "Universiti Putra Malaysia (UPM)",
-  "Universiti Teknologi Malaysia (UTM)",
-  "Taylor's University",
-  "Sunway University",
-  "Monash University Malaysia",
-  "Asia Pacific University (APU)",
-  "Multimedia University (MMU)",
-  "Universiti Teknologi MARA (UiTM)",
-  "UCSI University",
-  "Other Institution"
-];
+import { MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import TermsConsent from '../components/TermsConsent';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const StudentRegister = () => {
+  usePageTitle('Join as a student');
   const navigate = useNavigate();
   const { registerStudent } = useAuth();
 
@@ -38,6 +26,7 @@ const StudentRegister = () => {
   });
 
   const [docFile, setDocFile] = useState(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -67,6 +56,7 @@ const StudentRegister = () => {
       const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
       payload.append('skills', JSON.stringify(skillsArray));
       if (docFile) payload.append('verification_doc', docFile);
+      payload.append('accept_terms', acceptTerms ? 'true' : 'false');
 
       // Registration signs the user in (HttpOnly cookies) and updates auth state
       await registerStudent(payload);
@@ -179,6 +169,8 @@ const StudentRegister = () => {
             <input id="verification_doc" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setDocFile(e.target.files?.[0] || null)} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
             <p className="field-hint">PDF, PNG or JPG.</p>
           </div>
+
+          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} />
 
           <button type="submit" disabled={loading} className="btn-primary w-full py-3">
             {loading ? <><Loader2 size={16} className="animate-spin" /> Creating your account…</> : <>Create student account <ArrowRight size={16} /></>}

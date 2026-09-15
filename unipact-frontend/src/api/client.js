@@ -29,7 +29,7 @@ const api = axios.create({
 
 // 3. Response Interceptor: access tokens expire after 60 minutes, so on a 401
 // quietly swap the refresh cookie for a new access token and retry once.
-const AUTH_PATHS = ['/users/login/', '/users/token/refresh/', '/users/logout/'];
+const AUTH_PATHS = ['/users/login/', '/users/token/refresh/', '/users/logout/', '/users/password/forgot/', '/users/password/reset/'];
 let refreshPromise = null;
 
 api.interceptors.response.use(

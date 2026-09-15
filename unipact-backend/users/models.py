@@ -12,6 +12,8 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     email = models.EmailField(_('email address'), unique=True)
     is_verified = models.BooleanField(default=False)  # General verification flag
+    # When the user agreed to the Terms of Service and Privacy Policy at sign-up (PDPA consent record)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'role']

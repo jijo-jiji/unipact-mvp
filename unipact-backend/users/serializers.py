@@ -30,6 +30,18 @@ class NewAccountSerializerMixin:
                 raise serializers.ValidationError({'password': exc.detail})
         return attrs
 
+class TermsConsentMixin:
+    """Sign-up forms must record agreement to the Terms of Service and Privacy Policy (PDPA consent)."""
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        accepted = self.initial_data.get('accept_terms')
+        if str(accepted).strip().lower() not in ('true', '1', 'on', 'yes'):
+            raise serializers.ValidationError({
+                'accept_terms': ['Please agree to the Terms of Service and Privacy Policy to create an account.'],
+            })
+        return attrs
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -70,7 +82,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
-class CompanyProfileSerializer(NewAccountSerializerMixin, serializers.ModelSerializer):
+class CompanyProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     password = serializers.CharField(write_only=True)
 
@@ -82,7 +94,7 @@ class CompanyProfileSerializer(NewAccountSerializerMixin, serializers.ModelSeria
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
 
-class ClubProfileSerializer(NewAccountSerializerMixin, serializers.ModelSerializer):
+class ClubProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     password = serializers.CharField(write_only=True)
 
@@ -108,7 +120,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['verification_status', 'rating']
 
-class StudentRegistrationSerializer(NewAccountSerializerMixin, serializers.Serializer):
+class StudentRegistrationSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     email = serializers.EmailField()
     secondary_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
@@ -131,15 +143,7 @@ class StudentRegistrationSerializer(NewAccountSerializerMixin, serializers.Seria
         return validate_document_upload(value, 'Student ID document')
 
     def validate_skills(self, value):
-        import json
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except ValueError:
-                value = value.split(',')
-        if not isinstance(value, list):
-            raise serializers.ValidationError("Skills must be a list.")
-        return [str(s).strip() for s in value if str(s).strip()]
+        return clean_skills(value)
 
 
 class PublicClubProfileSerializer(serializers.ModelSerializer):
@@ -216,6 +220,115 @@ class SystemLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemLog
         fields = ['id', 'category', 'level', 'message', 'created_at']
+
+def clean_skills(value):
+    """Skills arrive as a JSON list, a JSON-encoded string (multipart forms) or a comma-separated string."""
+    import json
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = value.split(',')
+    if not isinstance(value, list):
+        raise serializers.ValidationError("Skills must be a list.")
+    skills = []
+    for skill in value:
+        skill = str(skill).strip()[:60]
+        if skill and skill.lower() not in (s.lower() for s in skills):
+            skills.append(skill)
+    if len(skills) > 30:
+        raise serializers.ValidationError("Please list at most 30 skills.")
+    return skills
+
+
+# ------------------------------------------------------------------
+# Password reset & change
+# ------------------------------------------------------------------
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({'current_password': ['Your current password is not correct.']})
+        if attrs['current_password'] == attrs['new_password']:
+            raise serializers.ValidationError({'new_password': ['Choose a password different from your current one.']})
+        try:
+            validate_password(attrs['new_password'], user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'new_password': list(exc.messages)})
+        return attrs
+
+
+# ------------------------------------------------------------------
+# Account settings (what each role may edit about itself)
+# ------------------------------------------------------------------
+
+class StudentSettingsSerializer(serializers.ModelSerializer):
+    skills = serializers.JSONField(required=False)
+
+    class Meta:
+        model = StudentProfile
+        fields = [
+            'full_name', 'university', 'major', 'domain_focus', 'skills', 'bio',
+            'club_affiliation_name', 'club_affiliation_role', 'secondary_email', 'verification_document',
+        ]
+        extra_kwargs = {
+            'full_name': {'allow_blank': False},
+            'university': {'allow_blank': False},
+            'verification_document': {'write_only': True},
+        }
+
+    def validate_skills(self, value):
+        return clean_skills(value)
+
+    def validate_bio(self, value):
+        if len(value) > 1000:
+            raise serializers.ValidationError("Please keep your bio under 1,000 characters.")
+        return value
+
+    def validate_verification_document(self, value):
+        return validate_document_upload(value, 'Student ID document')
+
+
+class CompanySettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyProfile
+        fields = ['company_name', 'company_details', 'ssm_document']
+        extra_kwargs = {
+            'company_name': {'allow_blank': False},
+            'ssm_document': {'write_only': True},
+        }
+
+    def validate_ssm_document(self, value):
+        return validate_document_upload(value, 'SSM document')
+
+
+class ClubSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubProfile
+        fields = ['club_name', 'university', 'verification_document']
+        extra_kwargs = {
+            'club_name': {'allow_blank': False},
+            'university': {'allow_blank': False},
+            'verification_document': {'write_only': True},
+        }
+
+    def validate_verification_document(self, value):
+        return validate_document_upload(value, 'Verification document')
+
 
 class ClaimProfileSerializer(NewAccountSerializerMixin, serializers.Serializer):
     token = serializers.CharField()

@@ -5,6 +5,7 @@ import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const BUDGET_FILTERS = [
   { key: 'all', label: 'Any budget', test: () => true },
@@ -14,6 +15,7 @@ const BUDGET_FILTERS = [
 ];
 
 const QuestBoard = () => {
+  usePageTitle('Quest board');
   const { showToast } = useToast();
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -112,7 +112,7 @@ class UserAndAdminFixTests(APITestCase):
         self.admin = User.objects.create_superuser(username='admin@x.my', email='admin@x.my', password='AdminPass123!', role=User.Role.ADMIN)
 
     def test_duplicate_company_email_returns_400(self):
-        payload = {'email': 'dup@corp.com', 'password': 'Pass12345!', 'company_name': 'Dup'}
+        payload = {'accept_terms': True, 'email': 'dup@corp.com', 'password': 'Pass12345!', 'company_name': 'Dup'}
         self.assertEqual(self.client.post(reverse('register_company'), payload, format='json').status_code, status.HTTP_201_CREATED)
         self.client.cookies.clear()
         res = self.client.post(reverse('register_company'), payload, format='json')
@@ -120,7 +120,7 @@ class UserAndAdminFixTests(APITestCase):
         self.assertIn('already exists', res.data['error'])
 
     def test_student_registration_saves_skills_and_bio_from_multipart(self):
-        res = self.client.post(reverse('register_student'), {
+        res = self.client.post(reverse('register_student'), {'accept_terms': True, 
             'full_name': 'Aina', 'email': 'aina@siswa.my', 'password': 'Pass12345!', 'university': 'UM',
             'skills': '["React", " Django "]', 'bio': 'Builder'
         }, format='multipart')

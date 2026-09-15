@@ -6,6 +6,9 @@ from decimal import Decimal
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'unipact_backend.settings')
 django.setup()
 
+from unipact_backend.demo_data import refuse_in_production
+refuse_in_production('create_seed_users.py')  # demo accounts have known passwords
+
 from django.contrib.auth import get_user_model
 from users.models import CompanyProfile, ClubProfile, StudentProfile
 from campaigns.models import Campaign, ProjectTeamInvitation

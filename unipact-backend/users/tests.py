@@ -26,6 +26,7 @@ class LoginTests(APITestCase):
         Test that login returns the user's role and verification status.
         """
         data = {
+            'accept_terms': True,
             'email': 'test@example.com',
             'password': 'password123'
         }
@@ -36,6 +37,7 @@ class LoginTests(APITestCase):
 
     def test_invalid_login(self):
         data = {
+            'accept_terms': True,
             'email': 'test@example.com',
             'password': 'wrongpassword'
         }
@@ -78,6 +80,7 @@ class RegistrationTests(APITestCase):
         """
         url = reverse('register_company')
         data = {
+            'accept_terms': True,
             'email': 'jane@acme.corp',
             'password': 'securepassword123',
             'company_name': 'Acme Corp',
@@ -95,6 +98,7 @@ class RegistrationTests(APITestCase):
         """
         url = reverse('register_company')
         data = {
+            'accept_terms': True,
             'email': 'jane@gmail.com',
             'password': 'securepassword123',
             'company_name': 'Jane Startup',
@@ -110,6 +114,7 @@ class RegistrationTests(APITestCase):
         """
         url = reverse('register_club')
         data = {
+            'accept_terms': True,
             'email': 'club@uni.edu',
             # Sign-up now enforces Django's password validators, which reject "password123"
             'password': 'Robotics-Club-2026',

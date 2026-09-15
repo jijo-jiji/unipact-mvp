@@ -14,6 +14,7 @@ import Modal from '../components/Modal';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 // Fees mirror the backend: FinalizeMatchView (V3 match) and AwardApplicationView (club award)
 const MATCH_FINDERS_FEE = 150;
@@ -59,6 +60,7 @@ const Progress = ({ status }) => {
 };
 
 const ManageCampaign = () => {
+  usePageTitle('Manage project');
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();

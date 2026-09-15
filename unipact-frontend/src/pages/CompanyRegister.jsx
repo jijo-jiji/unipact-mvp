@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
+import TermsConsent from '../components/TermsConsent';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const PUBLIC_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];
 
@@ -11,8 +13,10 @@ const CompanyRegister = () => {
   const { registerCompany } = useAuth();
 
   const [formData, setFormData] = useState({ email: '', password: '', companyName: '', ssmNumber: '' });
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  usePageTitle('Create a client account');
 
   const domain = formData.email.split('@')[1]?.toLowerCase();
   const isPublicDomain = PUBLIC_DOMAINS.includes(domain);
@@ -34,6 +38,7 @@ const CompanyRegister = () => {
         password: formData.password,
         company_name: formData.companyName.trim(),
         company_details: formData.ssmNumber.trim(),
+        accept_terms: acceptTerms,
       });
       navigate('/company/dashboard', { replace: true });
     } catch (err) {
@@ -94,6 +99,8 @@ const CompanyRegister = () => {
             <label className="field-label" htmlFor="company-password">Password</label>
             <input id="company-password" type="password" required minLength={8} autoComplete="new-password" placeholder="At least 8 characters" value={formData.password} onChange={update('password')} className="input" />
           </div>
+
+          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} />
 
           <button type="submit" disabled={loading} className="btn-primary w-full py-3">
             {loading ? <><Loader2 size={16} className="animate-spin" /> Creating account…</> : <>Create client account <ArrowRight size={16} /></>}

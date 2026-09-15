@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const TABS = [
   { key: 'recruiting', label: 'Finding talent', statuses: ['OPEN', 'MATCHED'] },
@@ -14,6 +15,7 @@ const TABS = [
 ];
 
 const CompanyDashboard = () => {
+  usePageTitle('Projects');
   const navigate = useNavigate();
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);

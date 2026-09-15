@@ -68,6 +68,18 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Account settings: save profile changes and keep the signed-in user in sync everywhere
+    const updateAccount = async (data) => {
+        const response = await api.patch('/users/me/settings/', data, uploadConfig(data));
+        setUser(response.data);
+        return response.data;
+    };
+
+    const changePassword = async (currentPassword, newPassword) => {
+        const response = await api.post('/users/password/change/', { current_password: currentPassword, new_password: newPassword });
+        return response.data;
+    };
+
     const value = {
         user,
         loading,
@@ -76,7 +88,9 @@ export const AuthProvider = ({ children }) => {
         registerClub,
         registerStudent,
         logout,
-        checkUserStatus
+        checkUserStatus,
+        updateAccount,
+        changePassword,
     };
 
     // Render immediately: public pages shouldn't wait on the session check (a slow or offline

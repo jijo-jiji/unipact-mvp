@@ -41,18 +41,18 @@ class RateLimitTests(APITestCase):
     def test_registration_is_rate_limited(self):
         with rates(register='2/hour'):
             for i in range(2):
-                self.client.post(reverse('register_company'), {'email': f'r{i}@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
+                self.client.post(reverse('register_company'), {'accept_terms': True, 'email': f'r{i}@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
                 self.client.cookies.clear()
-            res = self.client.post(reverse('register_company'), {'email': 'r9@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
+            res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 'r9@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
             self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class PasswordPolicyTests(APITestCase):
     def test_weak_passwords_rejected_on_every_signup(self):
         cases = [
-            ('register_company', {'email': 'w@corp.com', 'company_name': 'W'}),
-            ('register_club', {'email': 'w@club.my', 'club_name': 'W', 'university': 'UM'}),
-            ('register_student', {'email': 'w@siswa.my', 'full_name': 'W', 'university': 'UM'}),
+            ('register_company', {'accept_terms': True, 'email': 'w@corp.com', 'company_name': 'W'}),
+            ('register_club', {'accept_terms': True, 'email': 'w@club.my', 'club_name': 'W', 'university': 'UM'}),
+            ('register_student', {'accept_terms': True, 'email': 'w@siswa.my', 'full_name': 'W', 'university': 'UM'}),
         ]
         for url_name, payload in cases:
             for weak in ('1', '12345678', 'password123'):
@@ -62,7 +62,7 @@ class PasswordPolicyTests(APITestCase):
         self.assertFalse(User.objects.filter(email__startswith='w@').exists())
 
     def test_strong_password_accepted(self):
-        res = self.client.post(reverse('register_company'), {'email': 's@corp.com', 'password': 'Blue-Kettle-Run-88', 'company_name': 'S'}, format='json')
+        res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 's@corp.com', 'password': 'Blue-Kettle-Run-88', 'company_name': 'S'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
 
@@ -96,7 +96,7 @@ class UploadValidationTests(APITestCase):
 
     def test_student_id_document_must_be_document_type(self):
         self.client.force_authenticate(None)
-        res = self.client.post(reverse('register_student'), {
+        res = self.client.post(reverse('register_student'), {'accept_terms': True, 
             'email': 'doc@siswa.my', 'password': 'Blue-Kettle-Run-88', 'full_name': 'D', 'university': 'UM',
             'verification_doc': SimpleUploadedFile('id.zip', b'PK\x03\x04'),
         }, format='multipart')
@@ -125,7 +125,7 @@ class ProductionSettingsTests(TestCase):
     """Boot Django in a subprocess with production settings to prove the safeguards work."""
 
     def run_check(self, extra_env, *args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith(('DJANGO_', 'DATABASE_', 'USE_S3', 'AWS_', 'CORS_', 'CSRF_'))}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(('DJANGO_', 'DATABASE_', 'USE_S3', 'AWS_', 'CORS_', 'CSRF_', 'EMAIL_', 'FRONTEND_', 'SENTRY_'))}
         env.update({'DJANGO_ENV': 'production', **extra_env})
         return subprocess.run([sys.executable, 'manage.py', 'check', *args], cwd=BACKEND_DIR, env=env, capture_output=True, text=True, timeout=120)
 
@@ -142,5 +142,19 @@ class ProductionSettingsTests(TestCase):
             'CORS_ALLOWED_ORIGINS': 'https://unipact.my',
             'USE_S3': 'true', 'AWS_ACCESS_KEY_ID': 'k', 'AWS_SECRET_ACCESS_KEY': 's', 'AWS_STORAGE_BUCKET_NAME': 'b',
             'DJANGO_ADMIN_URL': 'ops-secret/',
+            'FRONTEND_URL': 'https://unipact.my',
+            'EMAIL_HOST': 'smtp.example.com',
         }, '--deploy', '--fail-level', 'WARNING')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_production_requires_email_settings(self):
+        result = self.run_check({
+            'DJANGO_SECRET_KEY': 'x' * 30 + 'Q7f!kP2@zL9#mW4$vB8^nR3&cT6*hY1(',
+            'DJANGO_ALLOWED_HOSTS': 'api.unipact.my',
+            'DATABASE_URL': 'postgres://u:p@localhost:5432/unipact',
+            'CORS_ALLOWED_ORIGINS': 'https://unipact.my',
+            'USE_S3': 'true', 'AWS_ACCESS_KEY_ID': 'k', 'AWS_SECRET_ACCESS_KEY': 's', 'AWS_STORAGE_BUCKET_NAME': 'b',
+            'FRONTEND_URL': 'https://unipact.my',
+        })
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('EMAIL_HOST', result.stderr)

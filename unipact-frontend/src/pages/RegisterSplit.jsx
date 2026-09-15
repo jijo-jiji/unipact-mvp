@@ -4,6 +4,7 @@ import { Briefcase, GraduationCap, ArrowRight, Info, CheckCircle2 } from 'lucide
 import PublicNav from '../components/PublicNav';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const OPTIONS = [
   {
@@ -39,6 +40,7 @@ const OPTIONS = [
 ];
 
 const RegisterSplit = () => {
+  usePageTitle('Create an account');
   const { user } = useAuth();
 
   // Signed-in users don't need to pick an account type again

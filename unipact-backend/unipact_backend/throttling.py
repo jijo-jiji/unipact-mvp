@@ -26,3 +26,11 @@ class RegisterThrottle(ScopedIPThrottle):
 
 class TokenRefreshThrottle(ScopedIPThrottle):
     scope = 'token_refresh'
+
+
+class PasswordResetThrottle(ScopedIPThrottle):
+    scope = 'password_reset'
+
+
+class PasswordChangeThrottle(ScopedIPThrottle):
+    scope = 'password_change'

@@ -8,8 +8,10 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const QuestDetails = () => {
+  usePageTitle('Quest details');
   const { id } = useParams();
   const { user } = useAuth();
   const { showToast } = useToast();

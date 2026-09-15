@@ -7,8 +7,10 @@ import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import PageLoader from '../components/PageLoader';
 import { campaignTypeLabel, domainLabel, formatDate } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const StudentProfile = () => {
+  usePageTitle('Student portfolio');
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();

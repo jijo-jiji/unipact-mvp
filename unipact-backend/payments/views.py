@@ -9,6 +9,7 @@ from campaigns.models import Campaign
 from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
 from .models import Transaction, Subscription
 from .services import MockStripeService
+from unipact_backend import notifications
 
 class CreatePaymentIntentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -118,6 +119,7 @@ class ConfirmPaymentView(APIView):
 
         # Log Logic
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS, f"Payment Received: RM {transaction.amount} from {transaction.company.company_name}")
+        notifications.payment_receipt(transaction)
 
         return Response({"status": "SUCCESS", "message": "Payment confirmed"})
 

@@ -27,6 +27,7 @@ import {
   Loader2,
   CheckCircle2,
 } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const SectionHeading = ({ title, description, action }) => (
   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -39,6 +40,7 @@ const SectionHeading = ({ title, description, action }) => (
 );
 
 const StudentDashboard = () => {
+  usePageTitle('My workspace');
   const { user } = useAuth();
   const { showToast } = useToast();
   const isClub = user?.role === 'CLUB';

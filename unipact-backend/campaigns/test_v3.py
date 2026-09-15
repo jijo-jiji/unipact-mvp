@@ -33,6 +33,7 @@ class V3TalentMarketplaceTests(APITestCase):
         # 1. Register student
         url = reverse('register_student')
         payload = {
+            'accept_terms': True,
             'full_name': 'Sarah Tan',
             'email': 'sarah@siswa.um.edu.my',
             'password': 'StudentPassword123!',

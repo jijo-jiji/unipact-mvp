@@ -19,6 +19,10 @@ import StudentRegister from './pages/StudentRegister';
 import Treasury from './pages/Treasury';
 import StudentProfile from './pages/StudentProfile';
 import ClubProfile from './pages/ClubProfile';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import SettingsPage from './pages/SettingsPage';
+import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -36,6 +40,20 @@ function App() {
           <Route path="/register/company" element={<CompanyRegister />} />
           <Route path="/register/student" element={<StudentRegister />} />
           <Route path="/register/club" element={<StudentRegister />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+
+          {/* === ANY SIGNED-IN USER === */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* === COMPANY ROUTES === */}
           <Route

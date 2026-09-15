@@ -1,13 +1,16 @@
 import random
-from faker import Faker
-from django.core.management.base import BaseCommand
+try:
+    from faker import Faker  # development-only dependency: pip install faker
+except ImportError:
+    Faker = None
+from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.db.utils import IntegrityError
 from users.models import CompanyProfile, ClubProfile
 from campaigns.models import Campaign, Application
 
 User = get_user_model()
-fake = Faker()
+fake = Faker() if Faker else None
 
 # Constants
 MALAYSIAN_UNIVERSITIES = [
@@ -38,6 +41,11 @@ class Command(BaseCommand):
     help = 'Seeds the database with realistic mock data for UniPact'
 
     def handle(self, *args, **options):
+        from unipact_backend.demo_data import refuse_in_production
+        refuse_in_production('manage.py seed_data')
+        if Faker is None:
+            raise CommandError('seed_data needs the "faker" package for generating demo data: pip install faker')
+
         self.stdout.write("🌱 Starting User Seed Process...")
         
         self.create_companies()

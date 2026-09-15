@@ -6,8 +6,10 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { formatDate } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const ClubProfile = () => {
+  usePageTitle('Club profile');
   const navigate = useNavigate();
   const { id } = useParams();
   const [club, setClub] = useState(null);
