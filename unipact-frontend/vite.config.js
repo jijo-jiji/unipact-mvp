@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react-swc'
 
 // Public pages search engines may list. Signed-in areas are kept out via robots.txt.
 const PUBLIC_PATHS = ['/', '/register', '/register/company', '/register/student', '/login', '/privacy', '/terms']
-const PRIVATE_PATHS = ['/company/', '/campaign/', '/manage-campaign/', '/student/dashboard', '/quest', '/admin', '/settings', '/reset-password']
+const PRIVATE_PATHS = ['/company/', '/campaign/', '/manage-campaign/', '/student/dashboard', '/quest', '/admin', '/settings', '/reset-password', '/join-club']
 
 // Link previews (WhatsApp, LinkedIn, Facebook) need absolute URLs, so the public site address is
 // injected at build time from VITE_SITE_URL, and robots.txt + sitemap.xml are generated to match.

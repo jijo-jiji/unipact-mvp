@@ -5,7 +5,7 @@ from .views import (
     AdminDashboardStatsView, AdminVerificationQueueView, AdminVerifyEntityView, AdminSystemLogsView,
     ClubPublicProfileView, ClubRosterView, StudentPublicProfileView,
     AdminEntityListView, AdminBlockUserView, AdminStudentPoolView,
-    ClaimProfileView, TransferOwnershipView,
+    ClaimProfileView, ClaimInvitePreviewView, ClubInviteDetailView, TransferOwnershipView,
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
 )
 
@@ -27,6 +27,8 @@ urlpatterns = [
 
     # Club Specific
     path('club/invite/', InviteMemberView.as_view(), name='club_invite'),
+    path('club/invite/<int:pk>/', ClubInviteDetailView.as_view(), name='club_invite_detail'),
+    path('club/invite/<int:pk>/resend/', ClubInviteDetailView.as_view(), name='club_invite_resend'),
     path('club/<int:user_id>/profile/', ClubPublicProfileView.as_view(), name='club_public_profile'),
     path('club/<int:user_id>/roster/', ClubRosterView.as_view(), name='club_roster'),
 
@@ -42,4 +44,5 @@ urlpatterns = [
     path('admin/students/', AdminStudentPoolView.as_view(), name='admin_student_pool'),
     path('club/transfer-ownership/', TransferOwnershipView.as_view(), name='club_transfer_ownership'),
     path('users/claim/', ClaimProfileView.as_view(), name='user_claim_profile'),
+    path('users/claim/preview/', ClaimInvitePreviewView.as_view(), name='user_claim_preview'),
 ]

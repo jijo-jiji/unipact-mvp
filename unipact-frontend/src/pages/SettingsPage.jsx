@@ -31,8 +31,8 @@ const profileFromUser = (user) => {
     const p = user.company_profile || {};
     return { company_name: p.company_name || '', company_details: p.company_details || '' };
   }
-  if (user?.role === 'CLUB') {
-    const p = user.club_profile || {};
+  if (user?.role === 'CLUB' && user.club_profile) {
+    const p = user.club_profile;
     return { club_name: p.club_name || '', university: p.university || '' };
   }
   return null;
@@ -71,7 +71,7 @@ const SkillsInput = ({ value, onChange }) => {
         {value.map((skill) => (
           <span key={skill} className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full bg-[#00AEEF]/10 text-[#0090C6] text-sm font-medium">
             {skill}
-            <button type="button" onClick={() => onChange(value.filter((s) => s !== skill))} className="p-1 rounded-full hover:bg-[#00AEEF]/20" aria-label={`Remove ${skill}`}>
+            <button type="button" onClick={() => onChange(value.filter((s) => s !== skill))} className="p-2.5 -my-1.5 sm:p-1 sm:my-0 rounded-full hover:bg-[#00AEEF]/20" aria-label={`Remove ${skill}`}>
               <X size={12} />
             </button>
           </span>
@@ -113,7 +113,9 @@ const SettingsPage = () => {
   const [passwordError, setPasswordError] = useState('');
 
   const role = user?.role;
-  const docCopy = DOCUMENT_COPY[role];
+  // Club committee members joined by invitation: no club profile or documents of their own
+  const isClubMember = role === 'CLUB' && !user?.club_profile;
+  const docCopy = isClubMember ? null : DOCUMENT_COPY[role];
   const dirty = initial && profile && JSON.stringify(initial) !== JSON.stringify(profile);
   const set = (field) => (e) => setProfile((p) => ({ ...p, [field]: e.target.value }));
 
@@ -168,7 +170,11 @@ const SettingsPage = () => {
   };
 
   const verificationStatus = user?.verification_status;
-  const sections = SECTIONS.filter((s) => (s.id === 'profile' || s.id === 'verification' ? role !== 'ADMIN' : true));
+  const sections = SECTIONS.filter((s) => {
+    if (s.id === 'profile') return Boolean(profile) || isClubMember;
+    if (s.id === 'verification') return Boolean(docCopy);
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
@@ -181,7 +187,7 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-8 items-start">
-          <nav aria-label="Settings sections" className="lg:sticky lg:top-28 flex lg:flex-col gap-1 overflow-x-auto -mx-1 px-1">
+          <nav aria-label="Settings sections" className="lg:sticky lg:top-28 flex lg:flex-col gap-1 overflow-x-auto overflow-y-hidden -mx-1 px-1">
             {sections.map((s) => (
               <a key={s.id} href={`#${s.id}`} className="inline-flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-[#5B6478] hover:text-[#0A1748] hover:bg-white whitespace-nowrap">
                 {s.icon} {s.label}
@@ -191,6 +197,23 @@ const SettingsPage = () => {
 
           <div className="space-y-6 min-w-0">
             {/* PROFILE */}
+            {isClubMember && (
+              <Section id="profile" title="Club membership">
+                {user?.club_membership ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <dl className="text-sm space-y-1.5">
+                      <div><dt className="inline text-[#5B6478]">Name: </dt><dd className="inline font-semibold">{user.name}</dd></div>
+                      <div><dt className="inline text-[#5B6478]">Club: </dt><dd className="inline font-semibold">{user.club_membership.club_name}</dd></div>
+                      <div><dt className="inline text-[#5B6478]">Role: </dt><dd className="inline font-semibold">{user.club_membership.role}</dd></div>
+                    </dl>
+                    <Link to={`/club/profile/${user.club_membership.club_id}`} className="btn-secondary self-start">View club roster</Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#5B6478]">You&apos;re no longer linked to a club.</p>
+                )}
+                <p className="text-xs text-[#5B6478] mt-4">To change your name or committee role, ask your club president or contact the UniPact team.</p>
+              </Section>
+            )}
             {profile && (
               <Section id="profile" title="Profile" description={role === 'STUDENT' ? 'This appears on your public portfolio and helps admins match you to projects.' : 'Shown to students and UniPact admins.'}>
                 {profileError && <div className="alert-error mb-5" role="alert"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{profileError}</span></div>}
@@ -345,7 +368,7 @@ const SettingsPage = () => {
                   <button type="submit" disabled={savingPassword || !passwords.current || !passwords.next} className="btn-primary">
                     {savingPassword ? <><Loader2 size={15} className="animate-spin" /> Updating…</> : 'Update password'}
                   </button>
-                  <Link to="/forgot-password" state={{ email: user?.email }} className="text-sm font-medium text-[#0090C6] hover:underline">Forgot your current password?</Link>
+                  <Link to="/forgot-password" state={{ email: user?.email }} className="inline-block py-2 text-sm font-medium text-[#0090C6] hover:underline">Forgot your current password?</Link>
                 </div>
               </form>
             </Section>

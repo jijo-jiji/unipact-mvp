@@ -186,21 +186,47 @@ class AdminEntityListSerializer(serializers.ModelSerializer):
 
     def get_details(self, obj):
         if obj.role == User.Role.CLUB and hasattr(obj, 'club_profile'):
-            return f"Rank: {obj.club_profile.rank}"
+            return f"{obj.club_profile.university} · Rank {obj.club_profile.rank}"
         elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
-            return f"Tier: {obj.company_profile.tier}"
+            return f"{str(obj.company_profile.tier).title()} plan"
         elif obj.role == User.Role.STUDENT and hasattr(obj, 'student_profile'):
-            return f"Uni: {obj.student_profile.university} ({obj.student_profile.domain_focus})"
-        return "-"
+            profile = obj.student_profile
+            return f"{profile.university} · {profile.get_domain_focus_display()}"
+        # Club committee members joined by invitation
+        membership = obj.shadow_membership.select_related('invited_by').first() if obj.role == User.Role.CLUB else None
+        return f"{membership.role}, {membership.invited_by.club_name}" if membership else "-"
 
     def get_status(self, obj):
         return "Active" if obj.is_active else "Blocked"
 
 class ShadowUserSerializer(serializers.ModelSerializer):
+    """A club committee invitation. The claim token is never returned: it only travels in the invite email."""
+    status = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+
     class Meta:
         model = ShadowUser
-        fields = ['email', 'role', 'invited_by', 'created_at']
-        read_only_fields = ['invited_by', 'created_at']
+        fields = ['id', 'email', 'role', 'invited_by', 'created_at', 'is_claimed', 'status', 'name']
+        read_only_fields = ['invited_by', 'created_at', 'is_claimed']
+        # Uniqueness is checked in the view so the error message can be friendlier
+        extra_kwargs = {'email': {'validators': []}}
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate_role(self, value):
+        value = ' '.join(value.split())
+        if not value:
+            raise serializers.ValidationError('Give this member a committee role, e.g. "Treasurer".')
+        return value
+
+    def get_status(self, obj):
+        if obj.is_claimed:
+            return 'ACTIVE'
+        return 'EXPIRED' if obj.is_expired else 'PENDING'
+
+    def get_name(self, obj):
+        return obj.user.get_full_name() if obj.is_claimed and obj.user else None
 
 class AdminCompanyVerificationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
@@ -330,9 +356,9 @@ class ClubSettingsSerializer(serializers.ModelSerializer):
         return validate_document_upload(value, 'Verification document')
 
 
-class ClaimProfileSerializer(NewAccountSerializerMixin, serializers.Serializer):
-    token = serializers.CharField()
+class ClaimProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):
+    token = serializers.CharField(max_length=64)
     password = serializers.CharField(write_only=True)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
 

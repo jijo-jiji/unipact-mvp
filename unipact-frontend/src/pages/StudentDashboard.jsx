@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
+import ClubCommittee from '../components/ClubCommittee';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
 import {
   GraduationCap,
@@ -44,6 +45,9 @@ const StudentDashboard = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const isClub = user?.role === 'CLUB';
+  // Committee members joined through a club invitation: they belong to a club but don't run one
+  const membership = isClub && !user?.club_profile ? user?.club_membership : null;
+  const isClubMember = isClub && !user?.club_profile;
 
   const [assignedJobs, setAssignedJobs] = useState([]);
   const [clubApplications, setClubApplications] = useState([]);
@@ -65,7 +69,9 @@ const StudentDashboard = () => {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      if (isClub) {
+      if (isClubMember) {
+        // Nothing to load: quest applications are managed by the club president
+      } else if (isClub) {
         const res = await api.get('/campaigns/applications/me/');
         setClubApplications(res.data);
       } else {
@@ -81,7 +87,7 @@ const StudentDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [isClub, showToast]);
+  }, [isClub, isClubMember, showToast]);
 
   useEffect(() => {
     fetchDashboard();
@@ -89,7 +95,7 @@ const StudentDashboard = () => {
 
   const studentProfile = user?.student_profile || {};
   const verificationStatus = isClub ? user?.club_profile?.verification_status : studentProfile.verification_status;
-  const isVerified = verificationStatus === 'VERIFIED';
+  const isVerified = isClubMember || verificationStatus === 'VERIFIED';
   const portfolioPath = `/student/profile/${user?.id}`;
 
   const handleCopyLink = async () => {
@@ -196,14 +202,16 @@ const StudentDashboard = () => {
               <p className="eyebrow mb-1"><span className="eyebrow-dot" /> Welcome back</p>
               <div className="flex flex-wrap items-center gap-2.5 mb-1">
                 <h1 className="font-heading font-extrabold text-2xl text-[#0A1748]">{displayName || 'Your workspace'}</h1>
-                {isVerified ? (
+                {isClubMember ? null : isVerified ? (
                   <span className="badge bg-emerald-50 border-emerald-200 text-emerald-700"><ShieldCheck size={13} /> Verified</span>
                 ) : (
                   <span className="badge bg-amber-50 border-amber-200 text-amber-800"><AlertCircle size={13} /> Pending review</span>
                 )}
               </div>
               <p className="text-[#5B6478] text-sm">
-                {isClub
+                {isClubMember
+                  ? membership ? `${membership.role}, ${membership.club_name}` : 'Club committee member'
+                  : isClub
                   ? user?.club_profile?.university || 'Student club'
                   : [studentProfile.university, studentProfile.major].filter(Boolean).join(' • ') || 'University student'}
                 {!isClub && studentProfile.club_affiliation_name && (
@@ -213,7 +221,13 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          {isClub ? (
+          {isClubMember ? (
+            membership && (
+              <Link to={`/club/profile/${membership.club_id}`} className="btn-primary self-start md:self-auto">
+                <Users size={16} /> View club roster
+              </Link>
+            )
+          ) : isClub ? (
             <Link to="/quests" className="btn-primary self-start md:self-auto">
               <Compass size={16} /> Browse open quests
             </Link>
@@ -245,8 +259,13 @@ const StudentDashboard = () => {
           <div className="card p-12 flex items-center justify-center gap-3 text-[#5B6478] text-sm">
             <Loader2 size={18} className="animate-spin text-[#00AEEF]" /> Loading your workspace…
           </div>
+        ) : isClubMember ? (
+          <ClubMemberHome membership={membership} />
         ) : isClub ? (
-          <ClubApplications applications={clubApplications} />
+          <>
+            <ClubCommittee clubUserId={user?.id} />
+            <ClubApplications applications={clubApplications} />
+          </>
         ) : (
           <>
             {/* Incoming team invitations */}
@@ -398,7 +417,7 @@ const StudentDashboard = () => {
           <div>
             <label className="field-label" htmlFor="invite-email">Student&apos;s email</label>
             <input id="invite-email" type="email" required value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} placeholder="classmate@university.edu.my" className="input" />
-            <p className="field-hint">Use the email they registered on UniPact with, so the invite shows up on their dashboard.</p>
+            <p className="field-hint">We&apos;ll email them the invitation. If they&apos;re not on UniPact yet, they can sign up with this email and find it on their dashboard.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -452,7 +471,7 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
           </p>
         </div>
         {isOpen && (
-          <button onClick={onSubmit} className="btn-primary self-start">
+          <button onClick={onSubmit} className="btn-primary self-start shrink-0 whitespace-nowrap">
             <Upload size={15} /> Submit work
           </button>
         )}
@@ -524,7 +543,7 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
                 </div>
                 <p className="text-xs text-[#5B6478] truncate">{member.university}</p>
               </div>
-              <Link to={`/student/profile/${member.user_id}`} title={`View ${member.full_name}'s portfolio`} className="p-1.5 rounded text-[#5B6478] hover:text-[#0090C6] hover:bg-white shrink-0">
+              <Link to={`/student/profile/${member.user_id}`} title={`View ${member.full_name}'s portfolio`} aria-label={`View ${member.full_name}'s portfolio`} className="p-3 -m-1.5 sm:p-1.5 sm:m-0 rounded text-[#5B6478] hover:text-[#0090C6] hover:bg-white shrink-0">
                 <ArrowUpRight size={15} />
               </Link>
             </div>
@@ -561,6 +580,26 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
     </article>
   );
 };
+
+// V2.2.1 club track: what a committee member sees after accepting an invitation
+const ClubMemberHome = ({ membership }) => (
+  <section className="card p-8 sm:p-10 text-center">
+    <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+      <CheckCircle2 size={26} />
+    </div>
+    <h2 className="font-heading font-bold text-xl mb-1">
+      {membership ? `You're on the ${membership.club_name} committee` : 'You\'re on your club\'s committee'}
+    </h2>
+    <p className="text-[#5B6478] text-sm max-w-md mx-auto">
+      {membership && <>Your role: <strong className="text-[#0A1748]">{membership.role}</strong>. </>}
+      Your club president manages quest applications and deliverables. You appear on the club&apos;s public roster.
+    </p>
+    <div className="flex flex-wrap justify-center gap-3 mt-6">
+      {membership && <Link to={`/club/profile/${membership.club_id}`} className="btn-primary"><Users size={15} /> View club roster</Link>}
+      <Link to="/settings" className="btn-secondary">Account settings</Link>
+    </div>
+  </section>
+);
 
 // V2.2.1 club track: applications to company quests
 const ClubApplications = ({ applications }) => (

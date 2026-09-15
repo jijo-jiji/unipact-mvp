@@ -95,6 +95,14 @@ def account_payload(user):
     else:
         name = user.get_full_name() or user.username
 
+    # Committee members who joined through a club invitation have no ClubProfile of their own
+    club_membership = None
+    if user.role == User.Role.CLUB and not hasattr(user, 'club_profile'):
+        membership = user.shadow_membership.select_related('invited_by').filter(is_claimed=True).first()
+        if membership:
+            club = membership.invited_by
+            club_membership = {"club_id": club.user_id, "club_name": club.club_name, "university": club.university, "role": membership.role}
+
     return {
         "id": user.id,
         "email": user.email,
@@ -107,6 +115,7 @@ def account_payload(user):
         "company_profile": company_profile_data,
         "club_profile": club_profile_data,
         "student_profile": student_profile_data,
+        "club_membership": club_membership,
         "has_verification_document": bool(
             getattr(getattr(user, 'student_profile', None), 'verification_document', None)
             or getattr(getattr(user, 'company_profile', None), 'ssm_document', None)
@@ -358,34 +367,96 @@ class LogoutView(views.APIView):
         clear_auth_cookies(response)
         return response
 
-class InviteMemberView(generics.CreateAPIView):
+def _new_invite_token():
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
+def _club_president_profile(user):
+    """The ClubProfile the signed-in user runs, or a 403 for anyone else (including committee members)."""
+    if user.role != User.Role.CLUB or not hasattr(user, 'club_profile'):
+        raise exceptions.PermissionDenied("Only club presidents can manage committee invitations.")
+    return user.club_profile
+
+
+INVALID_INVITE_MESSAGE = "This invitation link is invalid or has expired. Ask your club to send a new one."
+
+
+def _open_invitation(token):
+    """An unclaimed, unexpired invitation for this token, or None."""
+    shadow = ShadowUser.objects.select_related('invited_by').filter(token=token, is_claimed=False).first() if token else None
+    return shadow if shadow and not shadow.is_expired else None
+
+
+class InviteMemberView(generics.ListCreateAPIView):
+    """GET: the club's committee invitations. POST: invite someone new by email (they get an email with a join link)."""
     serializer_class = ShadowUserSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        club = _club_president_profile(self.request.user)
+        return ShadowUser.objects.filter(invited_by=club).select_related('user').order_by('-created_at')
 
     def perform_create(self, serializer):
-        # Validate that requester is a Club
-        if self.request.user.role != User.Role.CLUB:
-             raise exceptions.PermissionDenied("Only clubs can invite members.")
-        
+        from .utils import log_event
+
+        club = _club_president_profile(self.request.user)
         email = serializer.validated_data['email']
-        
-        # Check if already in roster (ShadowUser exists for this club)
-        if ShadowUser.objects.filter(email=email, invited_by=self.request.user.club_profile).exists():
-             raise exceptions.ValidationError("User is already a member or has a pending invite.")
 
-        import uuid
-        token = str(uuid.uuid4())
+        existing = ShadowUser.objects.filter(email__iexact=email).select_related('invited_by').first()
+        if existing and existing.invited_by_id == club.id:
+            raise exceptions.ValidationError({"email": ["This person is already on your committee or has a pending invitation."]})
+        if existing:
+            raise exceptions.ValidationError({"email": ["This person has already been invited by another club."]})
+        if User.objects.filter(email__iexact=email).exists():
+            raise exceptions.ValidationError({"email": ["This email already has a UniPact account, so it can't be invited as a new committee member."]})
 
-        # Check if User already exists in the system
-        existing_user = User.objects.filter(email=email).first()
+        shadow = serializer.save(invited_by=club, token=_new_invite_token())
+        notifications.club_member_invitation(shadow)
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"Club {club.club_name} invited {email} as {shadow.role}")
 
-        if existing_user:
-            raise exceptions.ValidationError("User with this email is already registered.")
 
-        # Standard Invite for new user
-        serializer.save(invited_by=self.request.user.club_profile, token=token)
-        # Club roster invites (postponed V2.2.1 track): there is no claim page in the frontend yet, so no email is sent
-        logging.getLogger(__name__).info('Club invitation created for %s', email)
+class ClubInviteDetailView(views.APIView):
+    """DELETE cancels a pending invitation; POST .../resend/ emails a fresh link."""
+    permission_classes = [IsAuthenticated]
+
+    def _pending(self, request, pk):
+        club = _club_president_profile(request.user)
+        shadow = get_object_or_404(ShadowUser, pk=pk, invited_by=club)
+        if shadow.is_claimed:
+            raise exceptions.ValidationError("This member has already joined, so the invitation can't be changed.")
+        return shadow
+
+    def delete(self, request, pk):
+        self._pending(request, pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def post(self, request, pk):
+        shadow = self._pending(request, pk)
+        # A new token invalidates the old link, and the expiry clock restarts
+        ShadowUser.objects.filter(pk=shadow.pk).update(token=_new_invite_token(), created_at=timezone.now())
+        shadow.refresh_from_db()
+        notifications.club_member_invitation(shadow)
+        return Response(ShadowUserSerializer(shadow).data)
+
+
+class ClaimInvitePreviewView(views.APIView):
+    """What the join page shows before the invitee sets a password. The token stays in the request body."""
+    permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
+
+    def post(self, request):
+        shadow = _open_invitation(str(request.data.get('token') or '')[:64])
+        if not shadow:
+            return Response({"error": INVALID_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "email": shadow.email,
+            "role": shadow.role,
+            "club_name": shadow.invited_by.club_name,
+            "university": shadow.invited_by.university,
+        })
+
 
 class ClaimProfileView(views.APIView):
     permission_classes = [AllowAny]
@@ -394,45 +465,44 @@ class ClaimProfileView(views.APIView):
     def post(self, request):
         serializer = ClaimProfileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        token = serializer.validated_data['token']
-        password = serializer.validated_data['password']
-        first_name = serializer.validated_data.get('first_name', '')
-        last_name = serializer.validated_data.get('last_name', '')
+        data = serializer.validated_data
 
+        shadow = _open_invitation(data['token'])
+        if not shadow:
+            return Response({"error": INVALID_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=shadow.email).exists():
+            return Response({"error": "An account with this email already exists. Sign in instead."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .serializers import check_new_password
         try:
-            shadow = ShadowUser.objects.get(token=token, is_claimed=False)
-        except ShadowUser.DoesNotExist:
-            return Response({"error": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+            check_new_password(data['password'], shadow.email)
+        except exceptions.ValidationError as exc:
+            return Response({"password": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            # Create User
+            # Lock the invitation so a double-submit can't create two accounts
+            shadow = ShadowUser.objects.select_for_update().select_related('invited_by__user').get(pk=shadow.pk)
+            if shadow.is_claimed:
+                return Response({"error": INVALID_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
             user = User.objects.create_user(
-                username=shadow.email, # Use email as username
+                username=shadow.email,
                 email=shadow.email,
-                password=password,
-                role=User.Role.CLUB,  # Or a new 'STUDENT' role? For now Club Member is just a user
-                first_name=first_name,
-                last_name=last_name
+                password=data['password'],
+                role=User.Role.CLUB,  # committee member of the inviting club (no ClubProfile of their own)
+                first_name=data['first_name'].strip(),
+                last_name=data.get('last_name', '').strip(),
+                terms_accepted_at=timezone.now(),
             )
-            
-            # Link & Claim
             shadow.user = user
             shadow.is_claimed = True
-            shadow.save()
+            shadow.save(update_fields=['user', 'is_claimed'])
+            notifications.club_member_joined(shadow)
 
-        # Generate tokens
-        tokens = get_tokens_for_user(user)
         response = Response({
-            "message": "Profile claimed successfully!",
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "name": f"{first_name} {last_name}"
-            }
+            "message": f"Welcome to {shadow.invited_by.club_name}!",
+            "user": account_payload(user),
         }, status=status.HTTP_201_CREATED)
-        
-        set_auth_cookies(response, tokens)
+        set_auth_cookies(response, get_tokens_for_user(user))
         return response
 
 class TransferOwnershipView(views.APIView):
@@ -541,15 +611,20 @@ class ClubRosterView(views.APIView):
         except ClubProfile.DoesNotExist:
             return Response({"error": "Club not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        shadow_users = ShadowUser.objects.filter(invited_by=club_profile)
-        
+        # Email addresses and pending invitations are private (PDPA): only the club president and admins see them.
+        # Everyone else sees names and committee roles of people who have actually joined.
+        can_see_private = request.user.role == User.Role.ADMIN or club_profile.user_id == request.user.id
+        shadow_users = ShadowUser.objects.filter(invited_by=club_profile).select_related('user')
+        if not can_see_private:
+            shadow_users = shadow_users.filter(is_claimed=True, user__isnull=False)
+
         roster_data = []
-        
+
         # Add President
         president = {
             'id': club_profile.user.id,
-            'email': club_profile.user.email,
-            'name': club_profile.user.first_name + " " + club_profile.user.last_name if club_profile.user.first_name else "President",
+            'email': club_profile.user.email if can_see_private else None,
+            'name': club_profile.user.get_full_name() or club_profile.club_name,
             'role': 'President',
             'status': 'ACTIVE',
             'joined_at': club_profile.user.date_joined
@@ -558,12 +633,12 @@ class ClubRosterView(views.APIView):
 
         for shadow in shadow_users:
             member = {
-                'email': shadow.email,
+                'email': shadow.email if can_see_private else None,
                 'role': shadow.role,
                 'invited_by': shadow.invited_by.club_name,
                 'created_at': shadow.created_at
             }
-            
+
             if shadow.is_claimed and shadow.user:
                 member['id'] = shadow.user.id
                 member['name'] = shadow.user.first_name + " " + shadow.user.last_name

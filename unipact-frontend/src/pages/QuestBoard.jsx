@@ -62,7 +62,7 @@ const QuestBoard = () => {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1" role="group" aria-label="Filter by budget">
+        <div className="flex gap-2 mb-6 overflow-x-auto overflow-y-hidden pb-1" role="group" aria-label="Filter by budget">
           {BUDGET_FILTERS.map((f) => (
             <button key={f.key} onClick={() => setBudgetFilter(f.key)} aria-pressed={budgetFilter === f.key}
               className={`px-3.5 py-1.5 rounded-full text-sm border whitespace-nowrap transition-colors ${budgetFilter === f.key ? 'bg-[#0B1E63] text-white border-[#0B1E63]' : 'bg-white text-[#5B6478] border-[rgba(10,23,72,0.15)] hover:text-[#0A1748]'}`}>

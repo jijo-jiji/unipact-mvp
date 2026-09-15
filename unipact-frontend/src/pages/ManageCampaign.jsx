@@ -39,7 +39,7 @@ const ASSET_TYPES = [
 const Progress = ({ status }) => {
   const current = STEPS.findIndex((s) => s.status === status);
   return (
-    <ol className="flex items-center gap-2 sm:gap-3 overflow-x-auto" aria-label="Project progress">
+    <ol className="flex items-center gap-2 sm:gap-3 overflow-x-auto overflow-y-hidden" aria-label="Project progress">
       {STEPS.map((step, i) => {
         const done = i < current || status === 'COMPLETED';
         const active = i === current && status !== 'COMPLETED';
@@ -273,7 +273,7 @@ const ManageCampaign = () => {
                   : 'The team is working on it. You can approve the project once they submit their work.'}
               </span>
             </div>
-            <button onClick={() => setReview({ isOpen: true, rating: 5, comment: '' })} disabled={!canComplete || busy} className="btn-primary self-start sm:self-auto">
+            <button onClick={() => setReview({ isOpen: true, rating: 5, comment: '' })} disabled={!canComplete || busy} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
               <CheckCircle2 size={15} /> Approve & complete
             </button>
           </div>

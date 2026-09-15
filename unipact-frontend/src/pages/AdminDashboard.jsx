@@ -161,6 +161,10 @@ const AdminDashboard = () => {
     setSelectedCampaignId(camp.id);
     setSelectedStudentIds(camp.assigned_students || []);
     setMatchNotes(camp.match_notes || '');
+    // Below the lg breakpoint the match panel sits under the project list, so bring it into view
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      requestAnimationFrame(() => document.getElementById('match-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
   };
 
   const toggleStudent = (studentId) =>
@@ -272,7 +276,7 @@ const AdminDashboard = () => {
           <p className="text-sm text-[#5B6478] mt-1">Verify new accounts, manage users and match students to client projects.</p>
         </div>
 
-        <div role="tablist" className="flex gap-1 sm:gap-4 mb-8 border-b border-[rgba(10,23,72,0.12)] overflow-x-auto">
+        <div role="tablist" className="flex gap-1 sm:gap-4 mb-8 border-b border-[rgba(10,23,72,0.12)] overflow-x-auto overflow-y-hidden">
           {TABS.map(({ key, label, icon }) => (
             <button
               key={key}
@@ -429,9 +433,38 @@ const AdminDashboard = () => {
             </div>
 
             <div className="card overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Phones: one card per user instead of a sideways-scrolling table */}
+              <ul className="lg:hidden divide-y divide-[rgba(10,23,72,0.08)]">
+                {entityLoading ? (
+                  <li className="p-10 text-center text-sm text-[#5B6478]"><Loader2 size={18} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading users…</li>
+                ) : entities.length === 0 ? (
+                  <li className="p-10 text-center text-sm text-[#5B6478]">No users match these filters.</li>
+                ) : (
+                  entities.map((ent) => (
+                    <li key={ent.id} className="p-4 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold break-words">{ent.entity_name}</div>
+                          <div className="text-[#5B6478] break-all">{ent.email}</div>
+                        </div>
+                        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6] shrink-0">{ent.role.toLowerCase()}</span>
+                      </div>
+                      {ent.details && ent.details !== '-' && <div className="text-xs text-[#5B6478] mt-1.5">{ent.details}</div>}
+                      <div className="flex items-center justify-between gap-3 mt-3">
+                        {ent.status === 'Active'
+                          ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>
+                          : <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>}
+                        <button onClick={() => handleBlockUser(ent)} className={ent.status === 'Active' ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>
+                          {ent.status === 'Active' ? <><Ban size={13} /> Block</> : 'Unblock'}
+                        </button>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-left text-sm min-w-[720px]">
-                  <thead className="bg-[#F5F7FC] text-[#5B6478] text-xs uppercase tracking-wider">
+                  <thead className="bg-[#F5F7FC] text-[#5B6478] text-xs uppercase tracking-wider whitespace-nowrap">
                     <tr>
                       <th className="px-4 py-3 font-semibold">Name</th>
                       <th className="px-4 py-3 font-semibold">Email</th>
@@ -524,12 +557,12 @@ const AdminDashboard = () => {
               )}
             </section>
 
-            <section className="lg:col-span-7">
+            <section id="match-panel" className="lg:col-span-7 scroll-mt-24">
               {!selectedCampaign ? (
                 <div className="card h-full min-h-[400px] p-8 flex flex-col items-center justify-center text-center">
                   <Sparkles size={32} className="mb-3 text-[#00AEEF]/60" />
                   <div className="font-semibold">Select a project</div>
-                  <p className="text-sm text-[#5B6478] mt-1 max-w-sm">Pick a client project on the left to review its requirements and choose the students to match.</p>
+                  <p className="text-sm text-[#5B6478] mt-1 max-w-sm">Pick a client project from the list to review its requirements and choose the students to match.</p>
                 </div>
               ) : (
                 <div className="card p-6 space-y-6">

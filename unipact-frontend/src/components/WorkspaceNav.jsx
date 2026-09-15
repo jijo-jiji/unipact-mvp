@@ -37,7 +37,11 @@ const WorkspaceNav = () => {
   const navigate = useNavigate();
   const { open, toggle, scrolled } = useNavMenu();
 
-  const links = (LINKS[user?.role] || []).map((l) => ({ ...l, to: l.to.replace(':me', user?.id) }));
+  // Club committee members (no ClubProfile of their own) can't apply to quests, so they only get the dashboard
+  const isClubMember = user?.role === 'CLUB' && !user?.club_profile;
+  const links = (LINKS[user?.role] || [])
+    .filter((l) => !(isClubMember && l.to === '/quests'))
+    .map((l) => ({ ...l, to: l.to.replace(':me', user?.id) }));
   const displayName = user?.company_profile?.company_name || user?.student_profile?.full_name || user?.club_profile?.club_name || user?.name || user?.email || '';
   const roleLabel = ROLE_LABEL[user?.role] || 'Account';
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U';

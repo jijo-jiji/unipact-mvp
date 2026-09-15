@@ -96,8 +96,9 @@ h1, h2, h3, h4, h5, h6 {
     @apply btn bg-white text-red-700 border border-red-200 hover:bg-red-50;
   }
 
+  /* Compact on desktop; still a ~40px tap target on phones */
   .btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-3 py-1.5 text-xs whitespace-nowrap min-h-10 sm:min-h-0;
   }
 
   /* "Back to …" links: padded so they are comfortable to tap on phones */

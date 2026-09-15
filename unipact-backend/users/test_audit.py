@@ -27,9 +27,10 @@ class AuditWorkflowTests(TestCase):
         url = reverse('user_claim_profile')
         data = {
             'token': self.token,
-            'password': 'newpassword123',
+            'password': 'Blue-Kettle-Run-88',
             'first_name': 'Ali',
-            'last_name': 'Baba'
+            'last_name': 'Baba',
+            'accept_terms': True,
         }
         
         response = self.client.post(url, data)

@@ -329,6 +329,8 @@ if IS_PRODUCTION and not EMAIL_HOST and not env_bool('ALLOW_CONSOLE_EMAIL', defa
 
 # Password reset links expire after an hour (Django's default is 3 days)
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
+# Club committee invitation links stop working after this many days (the club can resend)
+CLUB_INVITE_TTL_DAYS = int(os.getenv('CLUB_INVITE_TTL_DAYS', '14'))
 
 
 # ------------------------------------------------------------------

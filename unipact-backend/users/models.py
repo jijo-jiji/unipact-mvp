@@ -158,6 +158,13 @@ class ShadowUser(models.Model):
     is_claimed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def is_expired(self):
+        from datetime import timedelta
+        from django.conf import settings
+        from django.utils import timezone
+        return timezone.now() > self.created_at + timedelta(days=settings.CLUB_INVITE_TTL_DAYS)
+
     def __str__(self):
         return f"Shadow: {self.email}"
 

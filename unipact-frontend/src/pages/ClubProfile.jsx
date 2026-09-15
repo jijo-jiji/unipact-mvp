@@ -80,22 +80,27 @@ const ClubProfile = () => {
         <section className="card p-6 sm:p-8">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-heading font-bold text-lg flex items-center gap-2"><Users size={18} className="text-[#00AEEF]" /> Committee</h2>
-            <span className="text-sm text-[#5B6478]">{roster.length} member{roster.length === 1 ? '' : 's'}</span>
+            <span className="text-sm text-[#5B6478]">{(() => { const n = roster.filter((m) => m.status !== 'Pending').length; return `${n} member${n === 1 ? '' : 's'}`; })()}</span>
           </div>
           {roster.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {roster.map((member, idx) => (
-                <div key={member.email || idx} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white border border-[rgba(10,23,72,0.12)] rounded-full flex items-center justify-center text-sm font-bold text-[#0B1E63] shrink-0">
-                    {(member.name || member.email).charAt(0).toUpperCase()}
+              {roster.map((member, idx) => {
+                const pending = member.status === 'Pending';
+                // Emails (and pending invites) are only included for the club president and admins
+                const label = pending ? member.email : member.name?.trim() || member.email || 'Member';
+                return (
+                  <div key={member.id || member.email || idx} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white border border-[rgba(10,23,72,0.12)] rounded-full flex items-center justify-center text-sm font-bold text-[#0B1E63] shrink-0">
+                      {label.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate">{label}</div>
+                      <div className="text-xs text-[#0090C6]">{member.role}</div>
+                      {pending && <div className="text-xs text-[#5B6478]">Invitation pending · sent {formatDate(member.created_at)} · only you can see this</div>}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm truncate">{member.name && member.name.trim() !== '' ? member.name : member.email}</div>
-                    <div className="text-xs text-[#0090C6]">{member.role}</div>
-                    <div className="text-xs text-[#5B6478]">{member.status}{member.created_at && ` · invited ${formatDate(member.created_at)}`}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-[#5B6478] text-center py-6">No members listed yet.</p>

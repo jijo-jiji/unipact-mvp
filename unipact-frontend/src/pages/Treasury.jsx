@@ -13,6 +13,11 @@ import { usePageTitle } from '../hooks/usePageTitle';
 
 const PRO_PRICE = 499;
 
+// The RM 1 "Add card" check is stored as a subscription-type payment; name it for what it is
+const describe = (tx) => (tx.transaction_type === 'SUBSCRIPTION' && Number(tx.amount) < PRO_PRICE ? 'Card verification' : transactionTypeLabel(tx.transaction_type));
+// A checkout that was opened but never paid
+const historyStatus = (tx) => (tx.status === 'PENDING' ? 'NOT_COMPLETED' : tx.status);
+
 const Treasury = () => {
   usePageTitle('Billing');
   const { checkUserStatus } = useAuth();
@@ -107,7 +112,23 @@ const Treasury = () => {
           {history.length === 0 ? (
             <p className="text-sm text-[#5B6478] py-6 text-center">No payments yet.</p>
           ) : (
-            <div className="overflow-x-auto -mx-2">
+            <>
+            {/* Phones: stacked rows instead of a sideways-scrolling table */}
+            <ul className="md:hidden divide-y divide-[rgba(10,23,72,0.08)] border-y border-[rgba(10,23,72,0.08)]">
+              {history.map((tx) => (
+                <li key={tx.id} className="py-3.5 flex items-start justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <div className="font-medium">{describe(tx)}</div>
+                    <div className="text-xs text-[#5B6478] mt-0.5">{formatDate(tx.created_at)} · Ref TX-{tx.id}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-semibold text-[#0B1E63] whitespace-nowrap">{formatMoney(tx.amount)}</div>
+                    <div className="mt-1"><StatusBadge status={historyStatus(tx)} /></div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden md:block overflow-x-auto -mx-2">
               <table className="w-full text-sm text-left min-w-[520px]">
                 <thead className="text-xs uppercase tracking-wider text-[#5B6478] border-b border-[rgba(10,23,72,0.12)]">
                   <tr>
@@ -122,16 +143,17 @@ const Treasury = () => {
                     <tr key={tx.id} className="hover:bg-[#F5F7FC]">
                       <td className="py-3 px-2 text-[#5B6478] whitespace-nowrap">{formatDate(tx.created_at)}</td>
                       <td className="py-3 px-2">
-                        <div className="font-medium">{transactionTypeLabel(tx.transaction_type)}</div>
+                        <div className="font-medium">{describe(tx)}</div>
                         <div className="text-xs text-[#5B6478]">Ref TX-{tx.id}</div>
                       </td>
-                      <td className="py-3 px-2"><StatusBadge status={tx.status} /></td>
+                      <td className="py-3 px-2"><StatusBadge status={historyStatus(tx)} /></td>
                       <td className="py-3 px-2 text-right font-semibold text-[#0B1E63] whitespace-nowrap">{formatMoney(tx.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
       </main>

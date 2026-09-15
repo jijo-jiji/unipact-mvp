@@ -21,7 +21,8 @@ class IsCompany(permissions.BasePermission):
 
 class IsClub(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.role == User.Role.CLUB
+        # Committee members (joined via invitation) share the CLUB role but act through their president's ClubProfile
+        return request.user.role == User.Role.CLUB and hasattr(request.user, 'club_profile')
 
 class CampaignListCreateView(generics.ListCreateAPIView):
     serializer_class = CampaignSerializer

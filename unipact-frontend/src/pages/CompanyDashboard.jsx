@@ -111,14 +111,14 @@ const CompanyDashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <section className="lg:col-span-2 card p-5 sm:p-8 min-h-[420px]">
-            <div role="tablist" className="flex gap-1 sm:gap-6 border-b border-[rgba(10,23,72,0.08)] mb-6 overflow-x-auto">
+            <div role="tablist" className="flex gap-1 sm:gap-6 border-b border-[rgba(10,23,72,0.08)] mb-6 overflow-x-auto overflow-y-hidden">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   role="tab"
                   aria-selected={activeTab === tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`text-sm font-semibold pb-3 px-2 -mb-px border-b-2 whitespace-nowrap transition-colors ${
+                  className={`text-sm font-semibold pt-1 pb-3 px-2 -mb-px border-b-2 whitespace-nowrap transition-colors ${
                     activeTab === tab.key ? 'text-[#0090C6] border-[#00AEEF]' : 'text-[#5B6478] border-transparent hover:text-[#0A1748]'
                   }`}
                 >

@@ -15,6 +15,8 @@ const STATUS = {
   NOT_SELECTED: { label: 'Not selected', className: 'bg-slate-50 text-slate-500 border-slate-200' },
   ACCEPTED: { label: 'Accepted', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   DECLINED: { label: 'Declined', className: 'bg-slate-50 text-slate-500 border-slate-200' },
+  ACTIVE: { label: 'Joined', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  EXPIRED: { label: 'Link expired', className: 'bg-slate-50 text-slate-500 border-slate-200' },
   // Verification & payments
   VERIFIED: { label: 'Verified', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   PENDING_REVIEW: { label: 'Pending review', className: 'bg-amber-50 text-amber-800 border-amber-200' },
@@ -22,6 +24,7 @@ const STATUS = {
   HIGH_RISK: { label: 'High risk', className: 'bg-red-50 text-red-700 border-red-200' },
   SUCCESS: { label: 'Paid', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   FAILED: { label: 'Failed', className: 'bg-red-50 text-red-700 border-red-200' },
+  NOT_COMPLETED: { label: 'Not completed', className: 'bg-slate-50 text-slate-500 border-slate-200' },
 };
 
 export const statusLabel = (status) => STATUS[status]?.label || status || '—';

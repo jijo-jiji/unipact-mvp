@@ -251,7 +251,7 @@ const CreateCampaign = () => {
                   <span className="text-sm text-[#5B6478] w-5 text-right">{idx + 1}.</span>
                   <input value={item} onChange={(e) => updateDeliverable(idx, e.target.value)} placeholder="e.g. Deployed demo URL" className="input" aria-label={`Deliverable ${idx + 1}`} />
                   <button type="button" onClick={() => setDeliverables(deliverables.filter((_, i) => i !== idx))} disabled={deliverables.length === 1}
-                    className="p-2 rounded-md text-[#5B6478] hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent" aria-label={`Remove deliverable ${idx + 1}`}>
+                    className="p-3 sm:p-2 rounded-md text-[#5B6478] hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent" aria-label={`Remove deliverable ${idx + 1}`}>
                     <Trash2 size={16} />
                   </button>
                 </div>

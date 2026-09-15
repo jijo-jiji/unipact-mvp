@@ -226,6 +226,29 @@ def project_completed(campaign, rating=None):
 # V2.2.1 club track
 # ------------------------------------------------------------------
 
+def club_member_invitation(shadow):
+    club = shadow.invited_by
+    send_email(
+        shadow.email, f'{club.club_name} invited you to their committee', 'You\'re invited to join your club on UniPact',
+        [f'{club.club_name} added you to their committee on UniPact.',
+         'Accept the invitation to set up your account and appear on the club\'s roster.'],
+        details=[('Club', club.club_name), ('University', club.university), ('Your role', shadow.role)],
+        action_label='Accept invitation', action_path=f'/join-club?token={shadow.token}',
+        note=f'The link expires in {settings.CLUB_INVITE_TTL_DAYS} days. If you weren\'t expecting this, you can ignore this email.',
+    )
+
+
+def club_member_joined(shadow):
+    club = shadow.invited_by
+    name = shadow.user.get_full_name() if shadow.user else shadow.email
+    send_email(
+        club.user.email, f'{name} joined {club.club_name}', 'A committee member joined',
+        [f'{name} accepted your invitation and is now on your club\'s roster.'],
+        details=[('Member', name), ('Email', shadow.email), ('Role', shadow.role)],
+        action_label='View your committee', action_path='/student/dashboard',
+    )
+
+
 def club_application_received(application):
     campaign = application.campaign
     send_email(
@@ -252,7 +275,10 @@ def club_contract_awarded(application):
 
 def payment_receipt(transaction_obj):
     company = transaction_obj.company
-    kind = 'Pro plan subscription' if transaction_obj.transaction_type == 'SUBSCRIPTION' else "Finder's fee"
+    if transaction_obj.transaction_type == 'SUBSCRIPTION':
+        kind = 'Pro plan subscription' if transaction_obj.amount >= 499 else 'Card verification'
+    else:
+        kind = "Finder's fee"
     send_email(
         company.user.email, 'Payment receipt', 'Payment received',
         [f'Thanks, {company.company_name}. We received your payment.'],

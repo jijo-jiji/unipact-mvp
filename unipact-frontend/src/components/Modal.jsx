@@ -37,7 +37,7 @@ const Modal = ({ isOpen, onClose, title, subtitle, icon, children, maxWidth = 'm
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-4 right-4 p-1.5 rounded-md text-[#5B6478] hover:text-[#0A1748] hover:bg-[#F5F7FC] transition-colors"
+            className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 p-3 sm:p-1.5 rounded-md text-[#5B6478] hover:text-[#0A1748] hover:bg-[#F5F7FC] transition-colors"
           >
             <X size={18} />
           </button>
