@@ -1,28 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, GraduationCap, Upload, ShieldAlert, CheckCircle, ArrowRight } from 'lucide-react';
-import api from '../api/client';
+import { ArrowLeft, GraduationCap, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const MALAYSIAN_UNIVERSITIES = [
-  "Universiti Malaya (UM)",
-  "Universiti Sains Malaysia (USM)",
-  "Universiti Kebangsaan Malaysia (UKM)",
-  "Universiti Putra Malaysia (UPM)",
-  "Universiti Teknologi Malaysia (UTM)",
-  "Taylor's University",
-  "Sunway University",
-  "Monash University Malaysia",
-  "Asia Pacific University (APU)",
-  "Multimedia University (MMU)",
-  "Universiti Teknologi MARA (UiTM)",
-  "UCSI University",
-  "Other Institution"
-];
+import { getErrorMessage } from '../utils/format';
+import { MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import TermsConsent from '../components/TermsConsent';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const StudentRegister = () => {
+  usePageTitle('Join as a student');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { registerStudent } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -38,6 +26,7 @@ const StudentRegister = () => {
   });
 
   const [docFile, setDocFile] = useState(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,260 +38,149 @@ const StudentRegister = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    if (formData.password.length < 8) {
+      setError('Please choose a password with at least 8 characters.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const payload = new FormData();
-      payload.append('email', formData.email);
-      payload.append('password', formData.password);
-      payload.append('full_name', formData.full_name);
-      payload.append('university', formData.university);
-      payload.append('major', formData.major);
-      payload.append('domain_focus', formData.domain_focus);
+      ['email', 'password', 'full_name', 'university', 'major', 'domain_focus', 'bio', 'club_affiliation_name', 'club_affiliation_role']
+        .forEach((key) => {
+          const value = formData[key].trim ? formData[key].trim() : formData[key];
+          if (value || key === 'major') payload.append(key, value);
+        });
 
-      const skillsArray = formData.skills
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
+      const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
       payload.append('skills', JSON.stringify(skillsArray));
+      if (docFile) payload.append('verification_doc', docFile);
+      payload.append('accept_terms', acceptTerms ? 'true' : 'false');
 
-      if (formData.bio) payload.append('bio', formData.bio);
-      if (formData.club_affiliation_name) payload.append('club_affiliation_name', formData.club_affiliation_name);
-      if (formData.club_affiliation_role) payload.append('club_affiliation_role', formData.club_affiliation_role);
-      if (docFile) payload.append('verification_document', docFile);
-
-      await api.post('/users/register/student/', payload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      // Auto-login
-      await login(formData.email, formData.password);
-      navigate('/student/dashboard');
+      // Registration signs the user in (HttpOnly cookies) and updates auth state
+      await registerStudent(payload);
+      navigate('/student/dashboard', { replace: true });
     } catch (err) {
-      console.error(err);
-      if (err.response && err.response.data) {
-        const d = err.response.data;
-        setError(d.error || Object.values(d)[0] || 'Registration failed.');
-      } else {
-        setError('Registration failed. Please check your connection.');
-      }
+      setError(getErrorMessage(err, 'Registration failed. Please try again.'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex items-center justify-center p-6 selection:bg-[#00AEEF] selection:text-white">
-      <div className="w-full max-w-2xl bg-white border border-[rgba(10,23,72,0.12)] rounded-xl p-8 sm:p-10 shadow-sm relative animate-fade-in">
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-2xl card p-6 sm:p-10 animate-fade-in">
 
-        {/* Header */}
-        <div className="mb-6">
-          <Link to="/register" className="text-xs font-semibold text-[#5B6478] hover:text-[#0A1748] flex items-center gap-1.5 mb-6 transition-colors">
-            <ArrowLeft size={14} /> Back to Selection
-          </Link>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center shadow-sm">
-              <GraduationCap size={24} />
-            </div>
-            <div>
-              <h1 className="font-heading font-bold text-2xl text-[#0A1748] tracking-tight">
-                Join as Verified Student Talent
-              </h1>
-              <p className="text-xs text-[#5B6478] mt-0.5">
-                Get matched to real-world paid projects in Software Development & Digital Marketing.
-              </p>
-            </div>
+        <Link to="/register" className="back-link mb-6">
+          <ArrowLeft size={15} /> Back
+        </Link>
+
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center shadow-sm shrink-0">
+            <GraduationCap size={24} />
+          </div>
+          <div>
+            <h1 className="font-heading font-bold text-2xl tracking-tight">Join as student talent</h1>
+            <p className="text-sm text-[#5B6478] mt-0.5">Get matched to paid, real-world projects in software development and digital marketing.</p>
           </div>
         </div>
 
-        {/* Status notice */}
-        <div className="mb-6 bg-amber-50 border border-amber-200 p-3.5 rounded-lg text-xs text-amber-900">
-          <strong className="block font-bold mb-0.5">Verification Notice</strong>
-          Your account will default to <strong>Pending Verification</strong> until UniPact Admin validates your student status.
+        <div className="mb-6 flex items-start gap-2.5 bg-[#00AEEF]/5 border border-[#00AEEF]/20 p-3.5 rounded-lg text-sm">
+          <Info size={16} className="text-[#00AEEF] shrink-0 mt-0.5" />
+          <span>After you sign up, a UniPact admin verifies your student status. Uploading your student ID below speeds this up.</span>
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs flex items-center gap-2">
-            <ShieldAlert size={16} className="shrink-0 text-red-600" />
+          <div className="alert-error mb-6" role="alert">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name & Domain */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Full Legal Name (*)</label>
-              <input
-                type="text"
-                name="full_name"
-                required
-                value={formData.full_name}
-                onChange={handleChange}
-                placeholder="e.g. Sarah Tan Shu Min"
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              />
+              <label className="field-label" htmlFor="full_name">Full name</label>
+              <input id="full_name" name="full_name" required autoComplete="name" value={formData.full_name} onChange={handleChange} placeholder="e.g. Sarah Tan Shu Min" className="input" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Primary Domain Track (*)</label>
-              <select
-                name="domain_focus"
-                value={formData.domain_focus}
-                onChange={handleChange}
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              >
-                <option value="SOFTWARE_DEV">Software Development (Full-Stack, Mobile, DevOps)</option>
-                <option value="MARKETING">Digital Marketing (Social Media, Content, SEO)</option>
-                <option value="BOTH">Dual Specialist (Dev & Marketing)</option>
+              <label className="field-label" htmlFor="domain_focus">Main track</label>
+              <select id="domain_focus" name="domain_focus" value={formData.domain_focus} onChange={handleChange} className="input">
+                <option value="SOFTWARE_DEV">Software development</option>
+                <option value="MARKETING">Digital marketing</option>
+                <option value="BOTH">Both</option>
               </select>
             </div>
           </div>
 
-          {/* Email & Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">University / Personal Email (*)</label>
-              <input
-                type="email"
-                name="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="student@university.edu.my"
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              />
+              <label className="field-label" htmlFor="email">Email</label>
+              <input id="email" type="email" name="email" required autoComplete="email" value={formData.email} onChange={handleChange} placeholder="you@siswa.um.edu.my" className="input" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Password (*)</label>
-              <input
-                type="password"
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••••••"
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              />
+              <label className="field-label" htmlFor="password">Password</label>
+              <input id="password" type="password" name="password" required minLength={8} autoComplete="new-password" value={formData.password} onChange={handleChange} placeholder="At least 8 characters" className="input" />
             </div>
           </div>
 
-          {/* University & Major */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Institution (*)</label>
-              <select
-                name="university"
-                value={formData.university}
-                onChange={handleChange}
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              >
-                {MALAYSIAN_UNIVERSITIES.map((u, i) => (
-                  <option key={i} value={u}>{u}</option>
-                ))}
+              <label className="field-label" htmlFor="university">University</label>
+              <select id="university" name="university" value={formData.university} onChange={handleChange} className="input">
+                {MALAYSIAN_UNIVERSITIES.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-[#0A1748] block mb-1">Degree Major (*)</label>
-              <input
-                type="text"
-                name="major"
-                required
-                value={formData.major}
-                onChange={handleChange}
-                placeholder="e.g. B.Sc. Computer Science"
-                className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-              />
+              <label className="field-label" htmlFor="major">Course / major</label>
+              <input id="major" name="major" required value={formData.major} onChange={handleChange} placeholder="e.g. BSc Computer Science" className="input" />
             </div>
           </div>
 
-          {/* Club / Guild Affiliation (SRS v2.2.1 Coexistence) */}
-          <div className="p-3.5 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg">
-            <span className="text-[11px] font-bold text-[#0B1E63] uppercase tracking-wider block mb-2">
-              Club / Guild Affiliation (Optional)
-            </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="field-label" htmlFor="skills">Skills</label>
+            <input id="skills" name="skills" required value={formData.skills} onChange={handleChange} placeholder="React, Django, Figma, TikTok editing" className="input" />
+            <p className="field-hint">Separate skills with commas. These help admins match you to the right projects.</p>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="bio">Short bio (optional)</label>
+            <textarea id="bio" name="bio" rows={3} value={formData.bio} onChange={handleChange} placeholder="What kind of projects are you great at?" className="input" />
+          </div>
+
+          <fieldset className="p-4 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg">
+            <legend className="text-sm font-semibold px-1">Club or society (optional)</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
               <div>
-                <label className="text-[11px] text-[#5B6478] block mb-1">Club / Society Name</label>
-                <input
-                  type="text"
-                  name="club_affiliation_name"
-                  value={formData.club_affiliation_name}
-                  onChange={handleChange}
-                  placeholder="e.g. UM Coding Society"
-                  className="w-full bg-white border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2 text-xs rounded focus:border-[#00AEEF] focus:outline-none"
-                />
+                <label className="text-xs text-[#5B6478] block mb-1" htmlFor="club_affiliation_name">Club name</label>
+                <input id="club_affiliation_name" name="club_affiliation_name" value={formData.club_affiliation_name} onChange={handleChange} placeholder="e.g. UM Coding Society" className="input bg-white" />
               </div>
               <div>
-                <label className="text-[11px] text-[#5B6478] block mb-1">Your Role in Club</label>
-                <input
-                  type="text"
-                  name="club_affiliation_role"
-                  value={formData.club_affiliation_role}
-                  onChange={handleChange}
-                  placeholder="e.g. Tech Lead / Vice President"
-                  className="w-full bg-white border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2 text-xs rounded focus:border-[#00AEEF] focus:outline-none"
-                />
+                <label className="text-xs text-[#5B6478] block mb-1" htmlFor="club_affiliation_role">Your role</label>
+                <input id="club_affiliation_role" name="club_affiliation_role" value={formData.club_affiliation_role} onChange={handleChange} placeholder="e.g. Tech lead" className="input bg-white" />
               </div>
             </div>
-          </div>
+          </fieldset>
 
-          {/* Skills */}
           <div>
-            <label className="text-xs font-semibold text-[#0A1748] block mb-1">Key Technical / Marketing Skills (*)</label>
-            <input
-              type="text"
-              name="skills"
-              required
-              value={formData.skills}
-              onChange={handleChange}
-              placeholder="e.g. React, Django, Tailwind CSS, PostgreSQL, Figma"
-              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-            />
+            <label className="field-label" htmlFor="verification_doc">Student ID or enrolment letter (optional)</label>
+            <input id="verification_doc" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setDocFile(e.target.files?.[0] || null)} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
+            <p className="field-hint">PDF, PNG or JPG.</p>
           </div>
 
-          {/* Bio */}
-          <div>
-            <label className="text-xs font-semibold text-[#0A1748] block mb-1">Brief Bio & Strengths</label>
-            <textarea
-              name="bio"
-              rows={2}
-              value={formData.bio}
-              onChange={handleChange}
-              placeholder="Tell clients what projects you excel at..."
-              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] p-2.5 text-xs rounded-md focus:border-[#00AEEF] focus:outline-none"
-            />
-          </div>
+          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} />
 
-          {/* Student ID Proof Upload */}
-          <div>
-            <label className="text-xs font-semibold text-[#0A1748] block mb-1">
-              Student ID or Enrollment Confirmation Proof (PDF, PNG, JPG)
-            </label>
-            <input
-              type="file"
-              onChange={(e) => e.target.files && setDocFile(e.target.files[0])}
-              className="w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#5B6478] p-2 text-xs rounded-md focus:outline-none"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-4 py-3.5 px-4 rounded-md bg-[#00AEEF] hover:bg-[#0090C6] text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? 'Submitting Application...' : (
-              <>Register as Student Talent <ArrowRight size={15} /></>
-            )}
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Creating your account…</> : <>Create student account <ArrowRight size={16} /></>}
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-xs text-[#5B6478]">
+        <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-sm text-[#5B6478]">
           Already registered?{' '}
-          <Link to="/login" className="font-bold text-[#00AEEF] hover:underline">
-            Sign In to Workspace
-          </Link>
+          <Link to="/login" className="inline-block py-2 font-semibold text-[#0090C6] hover:underline">Sign in</Link>
         </div>
-
       </div>
     </div>
   );

@@ -39,13 +39,93 @@
   --font-ui: 'Inter', sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   margin: 0;
   background-color: var(--bg);
   color: var(--text-main);
   font-family: var(--font-ui);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--navy-deep);
+  line-height: 1.15;
+}
+
+::selection {
+  background: var(--cyan);
+  color: var(--white);
+}
+
+/* Shared building blocks so pages stay visually consistent */
+@layer components {
+  .card {
+    @apply bg-white border border-[rgba(10,23,72,0.12)] rounded-xl shadow-sm;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00AEEF] focus-visible:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-[#00AEEF] text-white shadow-sm hover:bg-[#0090C6];
+  }
+
+  .btn-navy {
+    @apply btn bg-[#0B1E63] text-white shadow-sm hover:bg-[#0A1748];
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-[#0A1748] border border-[rgba(10,23,72,0.15)] hover:border-[#00AEEF] hover:text-[#0090C6];
+  }
+
+  .btn-danger {
+    @apply btn bg-white text-red-700 border border-red-200 hover:bg-red-50;
+  }
+
+  /* Compact on desktop; still a ~40px tap target on phones */
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs whitespace-nowrap min-h-10 sm:min-h-0;
+  }
+
+  /* "Back to …" links: padded so they are comfortable to tap on phones */
+  .back-link {
+    @apply inline-flex items-center gap-1.5 py-2 text-sm font-medium text-[#5B6478] hover:text-[#0A1748];
+  }
+
+  .field-label {
+    @apply block text-sm font-semibold text-[#0A1748] mb-1.5;
+  }
+
+  .field-hint {
+    @apply mt-1 text-xs text-[#5B6478];
+  }
+
+  .input {
+    /* 16px on phones: iOS Safari zooms the page when focusing inputs smaller than 16px */
+    @apply w-full bg-[#F5F7FC] border border-[rgba(10,23,72,0.15)] text-[#0A1748] placeholder:text-[#5B6478]/70 px-3 py-2.5 text-base sm:text-sm rounded-md transition-colors focus:border-[#00AEEF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00AEEF]/20;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap;
+  }
+
+  .alert-error {
+    @apply flex items-start gap-2.5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm;
+  }
 }
 
 /* Base Utility Classes per STYLE_GUIDE.md */

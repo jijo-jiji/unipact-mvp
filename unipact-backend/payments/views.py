@@ -1,15 +1,15 @@
+from decimal import Decimal, InvalidOperation
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
-from .models import Transaction
 from campaigns.models import Campaign
-from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
 from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
 from .models import Transaction, Subscription
 from .services import MockStripeService
+from unipact_backend import notifications
 
 class CreatePaymentIntentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -18,16 +18,23 @@ class CreatePaymentIntentView(APIView):
         if request.user.role != User.Role.COMPANY:
             return Response({"error": "Only companies can make payments"}, status=status.HTTP_403_FORBIDDEN)
         
-        amount = request.data.get('amount')
         campaign_id = request.data.get('campaign_id')
         transaction_type = request.data.get('type', Transaction.Type.FINDERS_FEE)
-        
-        if not amount:
-            return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Amount may arrive as a number or a string; "150" * 100 would repeat the string instead of multiplying
+        try:
+            amount = Decimal(str(request.data.get('amount')))
+        except (InvalidOperation, TypeError):
+            amount = None
+        if amount is None or amount <= 0:
+            return Response({"error": "A positive amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if transaction_type not in Transaction.Type.values:
+            return Response({"error": "Invalid payment type"}, status=status.HTTP_400_BAD_REQUEST)
 
         campaign = None
         if campaign_id:
-            campaign = get_object_or_404(Campaign, pk=campaign_id)
+            campaign = get_object_or_404(Campaign, pk=campaign_id, company=request.user.company_profile)
 
         # Create Intent via Service
         intent = MockStripeService.create_payment_intent(amount=int(amount * 100)) # Stripe uses cents
@@ -48,14 +55,35 @@ class CreatePaymentIntentView(APIView):
             "amount": transaction.amount
         })
 
+class MockCheckoutView(APIView):
+    """
+    Stands in for Stripe.js charging the card in the browser. Without this step the mock intent
+    stays 'pending' and ConfirmPaymentView (correctly) rejects every payment.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, transaction_id):
+        transaction = get_object_or_404(Transaction, pk=transaction_id)
+        if transaction.company != getattr(request.user, 'company_profile', None):
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        if transaction.status != Transaction.Status.PENDING or not transaction.stripe_payment_id:
+            return Response({"error": "Invalid transaction state"}, status=status.HTTP_400_BAD_REQUEST)
+
+        intent = MockStripeService.confirm_payment_intent(transaction.stripe_payment_id)
+        if not intent:
+            return Response({"error": "Payment session expired. Please try again."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({"status": intent['status']})
+
 class ConfirmPaymentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, transaction_id):
         transaction = get_object_or_404(Transaction, pk=transaction_id)
-        
+
         # Verify ownership
-        if transaction.company != request.user.company_profile:
+        if transaction.company != getattr(request.user, 'company_profile', None):
              return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
         
         # Security Check: Verify with Stripe
@@ -91,6 +119,7 @@ class ConfirmPaymentView(APIView):
 
         # Log Logic
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS, f"Payment Received: RM {transaction.amount} from {transaction.company.company_name}")
+        notifications.payment_receipt(transaction)
 
         return Response({"status": "SUCCESS", "message": "Payment confirmed"})
 
@@ -124,6 +153,10 @@ class TreasurySummaryView(APIView):
                 'end_date': "2025-01-01T00:00:00Z"
             }
         )
+        # Keep the mock plan in sync after an upgrade
+        if subscription.plan_name != company.tier:
+            subscription.plan_name = company.tier
+            subscription.save(update_fields=['plan_name'])
 
         transactions = Transaction.objects.filter(company=company).order_by('-created_at')[:5]
         

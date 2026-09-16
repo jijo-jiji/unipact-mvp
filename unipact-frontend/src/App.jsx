@@ -1,31 +1,69 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
-
-// Import ALL Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterSplit from './pages/RegisterSplit';
-import CompanyDashboard from './pages/CompanyDashboard';
-import CreateCampaign from './pages/CreateCampaign';
-import ManageCampaign from './pages/ManageCampaign';
-import StudentDashboard from './pages/StudentDashboard';
-import QuestDetails from './pages/QuestDetails';
-import QuestBoard from './pages/QuestBoard';
-import SubmitDeliverable from './pages/SubmitDeliverable';
-import AdminDashboard from './pages/AdminDashboard';
-import CompanyRegister from './pages/CompanyRegister';
-import StudentRegister from './pages/StudentRegister';
-import CampaignManager from './pages/CampaignManager';
-import Treasury from './pages/Treasury';
-import StudentProfile from './pages/StudentProfile';
-import ClubProfile from './pages/ClubProfile';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
+import PageLoader from './components/PageLoader';
+
+// Each page is its own download, so visitors only fetch the code for the page they open.
+// After a new deploy, an open tab may ask for a file that no longer exists: reload once to get the new version.
+const RELOAD_KEY = 'unipact:chunk-reload';
+const reloadFlag = (action) => {
+  try {
+    if (action === 'check') return sessionStorage.getItem(RELOAD_KEY) === '1';
+    if (action === 'set') sessionStorage.setItem(RELOAD_KEY, '1');
+    else sessionStorage.removeItem(RELOAD_KEY);
+  } catch {
+    return true; // storage blocked: never risk a reload loop
+  }
+  return false;
+};
+
+const page = (load, pick = (m) => m.default) => lazy(() =>
+  load()
+    .then((module) => {
+      reloadFlag('clear');
+      return { default: pick(module) };
+    })
+    .catch((error) => {
+      if (!reloadFlag('check')) {
+        reloadFlag('set');
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw error;
+    })
+);
+
+const LandingPage = page(() => import('./pages/LandingPage'));
+const LoginPage = page(() => import('./pages/LoginPage'));
+const RegisterSplit = page(() => import('./pages/RegisterSplit'));
+const CompanyDashboard = page(() => import('./pages/CompanyDashboard'));
+const CreateCampaign = page(() => import('./pages/CreateCampaign'));
+const ManageCampaign = page(() => import('./pages/ManageCampaign'));
+const StudentDashboard = page(() => import('./pages/StudentDashboard'));
+const QuestDetails = page(() => import('./pages/QuestDetails'));
+const QuestBoard = page(() => import('./pages/QuestBoard'));
+const SubmitDeliverable = page(() => import('./pages/SubmitDeliverable'));
+const AdminDashboard = page(() => import('./pages/AdminDashboard'));
+const CompanyRegister = page(() => import('./pages/CompanyRegister'));
+const StudentRegister = page(() => import('./pages/StudentRegister'));
+const Treasury = page(() => import('./pages/Treasury'));
+const StudentProfile = page(() => import('./pages/StudentProfile'));
+const ClubProfile = page(() => import('./pages/ClubProfile'));
+const ForgotPasswordPage = page(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
+const SettingsPage = page(() => import('./pages/SettingsPage'));
+const JoinClubPage = page(() => import('./pages/JoinClubPage'));
+const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
+const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
 
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <ToastProvider>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* === PUBLIC ROUTES === */}
           {/* The "/" path is the default. It MUST point to LandingPage */}
@@ -35,6 +73,21 @@ function App() {
           <Route path="/register/company" element={<CompanyRegister />} />
           <Route path="/register/student" element={<StudentRegister />} />
           <Route path="/register/club" element={<StudentRegister />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/join-club" element={<JoinClubPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+
+          {/* === ANY SIGNED-IN USER === */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* === COMPANY ROUTES === */}
           <Route
@@ -65,7 +118,7 @@ function App() {
             path="/company/campaign/:id/manage"
             element={
               <ProtectedRoute allowedRole="COMPANY">
-                <CampaignManager />
+                <ManageCampaign />
               </ProtectedRoute>
             }
           />
@@ -122,7 +175,7 @@ function App() {
           <Route
             path="/student/profile/:id"
             element={
-              <ProtectedRoute allowedRole={['STUDENT', 'CLUB', 'COMPANY']}>
+              <ProtectedRoute allowedRole={['STUDENT', 'CLUB', 'COMPANY', 'ADMIN']}>
                 <StudentProfile />
               </ProtectedRoute>
             }
@@ -137,7 +190,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Unknown URLs go back to the landing page instead of a blank screen */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </ToastProvider>
     </BrowserRouter>
   );

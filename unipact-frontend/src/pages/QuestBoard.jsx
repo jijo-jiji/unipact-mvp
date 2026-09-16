@@ -1,153 +1,104 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Search, ChevronRight, Clock, Building2, Compass, Loader2 } from 'lucide-react';
 import api from '../api/client';
-import { useNavigate } from 'react-router-dom';
-import {
-  Search,
-  Filter,
-  ChevronRight,
-  Coins,
-  Clock,
-  Shield
-} from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import WorkspaceNav from '../components/WorkspaceNav';
+import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
+
+const BUDGET_FILTERS = [
+  { key: 'all', label: 'Any budget', test: () => true },
+  { key: 'large', label: 'RM 5,000+', test: (b) => b >= 5000 },
+  { key: 'medium', label: 'RM 1,000 – 4,999', test: (b) => b >= 1000 && b < 5000 },
+  { key: 'small', label: 'Under RM 1,000', test: (b) => b < 1000 },
+];
 
 const QuestBoard = () => {
-  const navigate = useNavigate();
-  const [filter, setFilter] = useState('all');
-
-  /* MOCK DATA REPLACED BY API */
+  usePageTitle('Quest board');
+  const { showToast } = useToast();
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [budgetFilter, setBudgetFilter] = useState('all');
 
   useEffect(() => {
     const fetchQuests = async () => {
       try {
         const response = await api.get('/campaigns/');
-        // Handle both paginated and non-paginated responses
-        const rawData = response.data;
-        const dataArray = Array.isArray(rawData) ? rawData : (rawData.results || []);
-
-        const openQuests = dataArray.filter(q => q.status === 'OPEN');
-        setQuests(openQuests);
+        const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+        setQuests(data.filter((q) => q.status === 'OPEN'));
       } catch (error) {
-        console.error("Failed to fetch quests", error);
+        showToast(getErrorMessage(error, 'Could not load quests.'), 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchQuests();
-  }, []);
+  }, [showToast]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-void)] flex items-center justify-center text-white font-display uppercase tracking-widest animate-pulse">
-        Loading Active Bounties...
-      </div>
+  const visibleQuests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const budgetTest = BUDGET_FILTERS.find((f) => f.key === budgetFilter).test;
+    return quests.filter((quest) =>
+      budgetTest(Number(quest.budget)) &&
+      (!q || [quest.title, quest.company_name, quest.description].join(' ').toLowerCase().includes(q))
     );
-  }
+  }, [quests, search, budgetFilter]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-void)] p-6 text-white flex justify-center">
-      <div className="w-full max-w-5xl animate-fade-in">
-
-        {/* 1. HEADER & SEARCH */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/student/dashboard')}
-            className="text-[var(--text-blue)] text-xs uppercase tracking-widest hover:text-white mb-4"
-          >
-            &lt; Return to Terminal
-          </button>
-
-          <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-            <div>
-              <h1 className="text-3xl font-display font-bold uppercase tracking-wider text-white">
-                Available Quests
-              </h1>
-              <p className="text-[var(--text-blue)] text-sm">
-                Current Active Bounties: <span className="text-[#a020f0] font-bold">{quests.length}</span>
-              </p>
-            </div>
-
-            {/* Search Bar */}
-            <div className="flex items-center gap-2 bg-black/30 border border-[var(--border-tech)] p-2 w-full md:w-96 focus-within:border-[#a020f0] transition-colors">
-              <Search className="text-gray-500" size={18} />
-              <input
-                type="text"
-                placeholder="Search by keyword or Client ID..."
-                className="bg-transparent border-none outline-none text-sm text-white w-full placeholder-gray-600"
-              />
-            </div>
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
+      <WorkspaceNav />
+      <main className="max-w-5xl mx-auto px-4 sm:px-8 py-8 animate-fade-in">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+          <div>
+            <p className="eyebrow mb-1"><span className="eyebrow-dot" /> Quest board</p>
+            <h1 className="font-heading text-2xl sm:text-3xl font-extrabold">Open company quests</h1>
+            <p className="text-sm text-[#5B6478] mt-1">{loading ? 'Loading…' : `${visibleQuests.length} of ${quests.length} quests shown`}</p>
+          </div>
+          <div className="relative w-full md:w-80">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5B6478]" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or company" className="input pl-9 bg-white" aria-label="Search quests" />
           </div>
         </div>
 
-        {/* 2. FILTERS */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {['all', 'S-Rank', 'A-Rank', 'B-Rank'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 border text-xs uppercase tracking-wider transition-all ${filter === f
-                ? 'bg-[#a020f0]/20 border-[#a020f0] text-white'
-                : 'border-[var(--border-tech)] text-gray-500 hover:text-white hover:border-white'
-                }`}
-            >
-              {f === 'all' ? 'All Ranks' : f}
+        <div className="flex gap-2 mb-6 overflow-x-auto overflow-y-hidden pb-1" role="group" aria-label="Filter by budget">
+          {BUDGET_FILTERS.map((f) => (
+            <button key={f.key} onClick={() => setBudgetFilter(f.key)} aria-pressed={budgetFilter === f.key}
+              className={`px-3.5 py-1.5 rounded-full text-sm border whitespace-nowrap transition-colors ${budgetFilter === f.key ? 'bg-[#0B1E63] text-white border-[#0B1E63]' : 'bg-white text-[#5B6478] border-[rgba(10,23,72,0.15)] hover:text-[#0A1748]'}`}>
+              {f.label}
             </button>
           ))}
-          <button className="px-4 py-2 border border-[var(--border-tech)] text-gray-500 text-xs uppercase tracking-wider hover:text-white hover:border-white flex items-center gap-2 ml-auto">
-            <Filter size={12} /> Advanced Filter
-          </button>
         </div>
 
-        {/* 3. QUEST LIST GRID */}
-        <div className="grid grid-cols-1 gap-4">
-          {quests.map((quest) => (
-            <div
-              key={quest.id}
-              onClick={() => navigate(`/quest/${quest.id}`)}
-              className="bg-[var(--bg-panel)] border border-[var(--border-tech)] p-6 flex flex-col md:flex-row items-center justify-between hover:border-[#a020f0] hover:shadow-[0_0_15px_rgba(160,32,240,0.1)] transition-all cursor-pointer group"
-            >
-              {/* Left: Info */}
-              <div className="flex items-center gap-6 w-full md:w-auto">
-                {/* Dynamic Rank Badge */}
-                <div className={`w-12 h-12 flex items-center justify-center font-display font-bold text-xl border-2 
-                  ${quest.budget >= 5000 ? 'border-yellow-400 text-yellow-400' :
-                    quest.budget >= 1000 ? 'border-purple-500 text-purple-500' :
-                      'border-gray-500 text-gray-500'}`}>
-                  {quest.budget >= 5000 ? 'S' : quest.budget >= 1000 ? 'A' : 'B'}
+        {loading ? (
+          <div className="card p-12 text-center text-sm text-[#5B6478]"><Loader2 size={18} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading quests…</div>
+        ) : visibleQuests.length === 0 ? (
+          <div className="card p-12 text-center">
+            <Compass className="w-11 h-11 text-[#5B6478]/40 mx-auto mb-3" />
+            <p className="text-sm text-[#5B6478]">{quests.length === 0 ? 'There are no open quests right now. Check back soon.' : 'No quests match your search.'}</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {visibleQuests.map((quest) => (
+              <Link key={quest.id} to={`/quest/${quest.id}`} className="card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-[#00AEEF] transition-colors group">
+                <div className="min-w-0">
+                  <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6] mb-1.5">{campaignTypeLabel(quest.type)}</span>
+                  <h2 className="font-heading font-bold text-lg group-hover:text-[#0090C6] transition-colors">{quest.title}</h2>
+                  <p className="text-sm text-[#5B6478] flex items-center gap-1.5 mt-0.5"><Building2 size={14} /> {quest.company_name}</p>
                 </div>
-
-                <div>
-                  <h3 className="text-lg font-bold text-white group-hover:text-[#a020f0] transition-colors">
-                    {quest.title}
-                  </h3>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                    <span className="flex items-center gap-1"><Shield size={12} /> {quest.company_name}</span>
-                    <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-                    <span>{quest.type}</span>
+                <div className="flex items-center gap-6 justify-between md:justify-end shrink-0">
+                  <div className="md:text-right">
+                    <div className="font-heading font-bold text-[#0B1E63]">{formatMoney(quest.budget)}</div>
+                    <div className="text-xs text-[#5B6478] flex items-center gap-1 md:justify-end mt-0.5"><Clock size={12} /> {formatDate(quest.deadline, 'No deadline')}</div>
                   </div>
+                  <ChevronRight className="text-[#5B6478] group-hover:text-[#00AEEF] group-hover:translate-x-1 transition-transform" />
                 </div>
-              </div>
-
-              {/* Right: Rewards & Action */}
-              <div className="flex items-center gap-8 w-full md:w-auto mt-4 md:mt-0 justify-between md:justify-end">
-                <div className="text-right">
-                  <div className="text-white font-bold flex items-center gap-2 justify-end">
-                    <Coins size={14} className="text-[#a020f0]" /> RM {quest.budget}
-                  </div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1 justify-end mt-1">
-                    <Clock size={12} /> {quest.deadline || 'No Deadline'}
-                  </div>
-                </div>
-
-                <ChevronRight className="text-gray-600 group-hover:text-[#a020f0] transition-transform group-hover:translate-x-1" />
-              </div>
-
-            </div>
-          ))}
-        </div>
-
-      </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 };

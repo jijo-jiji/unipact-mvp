@@ -1,43 +1,29 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PageLoader from './PageLoader';
+import { homePathForRole } from '../utils/routes';
 
 const ProtectedRoute = ({ children, allowedRole }) => {
-    const { user, loading } = useAuth();
-    const location = useLocation();
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-    if (loading) {
-        // Basic loading spinner
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center text-[var(--text-gold)]">
-                Loading Access Protocols...
-            </div>
-        );
+  if (loading) return <PageLoader message="Checking your session…" />;
+
+  // Not logged in -> login, remembering where they were going
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Wrong area for this role -> send them to their own dashboard
+  if (allowedRole) {
+    const roles = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
+    if (!roles.includes(user.role)) {
+      return <Navigate to={homePathForRole(user.role)} replace />;
     }
+  }
 
-    // 1. Not Logged In -> Redirect to Login
-    if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-
-    // 2. Role Verification
-    // 2. Role Verification
-    if (allowedRole) {
-        const roles = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
-
-        if (!roles.includes(user.role)) {
-            // Redirect to their appropriate dashboard if they try to access wrong area
-            if (user.role === 'COMPANY') {
-                return <Navigate to="/company/dashboard" replace />;
-            } else if (user.role === 'CLUB' || user.role === 'STUDENT') {
-                return <Navigate to="/student/dashboard" replace />;
-            } else if (user.role === 'ADMIN') {
-                return <Navigate to="/admin" replace />;
-            }
-        }
-    }
-
-    return children;
+  return children;
 };
 
 export default ProtectedRoute;

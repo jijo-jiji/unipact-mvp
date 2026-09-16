@@ -1,0 +1,13 @@
+{% autoescape off %}{{ heading }}
+
+{% for line in lines %}{{ line }}
+
+{% endfor %}{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}{% if details %}
+{% endif %}{% if action_url %}{{ action_label }}: {{ action_url }}
+
+{% endif %}{% if note %}{{ note }}
+
+{% endif %}--
+UniPact{% if support_email %} · {{ support_email }}{% endif %}
+{% endautoescape %}

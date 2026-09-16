@@ -12,6 +12,8 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     email = models.EmailField(_('email address'), unique=True)
     is_verified = models.BooleanField(default=False)  # General verification flag
+    # When the user agreed to the Terms of Service and Privacy Policy at sign-up (PDPA consent record)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'role']
@@ -155,6 +157,13 @@ class ShadowUser(models.Model):
     token = models.CharField(max_length=64, unique=True)
     is_claimed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_expired(self):
+        from datetime import timedelta
+        from django.conf import settings
+        from django.utils import timezone
+        return timezone.now() > self.created_at + timedelta(days=settings.CLUB_INVITE_TTL_DAYS)
 
     def __str__(self):
         return f"Shadow: {self.email}"

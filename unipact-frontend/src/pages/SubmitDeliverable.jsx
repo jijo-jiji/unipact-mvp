@@ -1,112 +1,87 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, UploadCloud, FileText, Loader2, AlertCircle } from 'lucide-react';
 import api from '../api/client';
-import { ArrowLeft, UploadCloud, FileText } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import WorkspaceNav from '../components/WorkspaceNav';
+import { getErrorMessage } from '../utils/format';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const SubmitDeliverable = () => {
-    const { applicationId } = useParams();
-    const navigate = useNavigate();
-    const [file, setFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
+  usePageTitle('Upload deliverable');
+  const { applicationId } = useParams();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
 
-    const handleFileChange = (e) => {
-        if (e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) return;
 
-    const [submitStatus, setSubmitStatus] = useState(null); // success, error
+    setUploading(true);
+    setError('');
+    const formData = new FormData();
+    formData.append('file', file);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!file) return;
+    try {
+      await api.post(`/campaigns/application/${applicationId}/deliverable/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      showToast('Deliverable uploaded. The company will review it.', 'success');
+      navigate('/student/dashboard');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Upload failed. Please try again.'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
+  return (
+    <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
+      <WorkspaceNav />
+      <main className="max-w-md mx-auto px-4 py-10">
+        <Link to="/student/dashboard" className="back-link mb-6">
+          <ArrowLeft size={15} /> Back to dashboard
+        </Link>
 
-        try {
-            await api.post(`/campaigns/application/${applicationId}/deliverable/`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-            setSubmitStatus('success');
-            setTimeout(() => {
-                navigate('/student/dashboard');
-            }, 2000);
-        } catch (error) {
-            console.error("Upload failed", error);
-            setSubmitStatus('error');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-[var(--bg-void)] p-6 flex flex-col items-center justify-center text-white">
-            <div className="w-full max-w-md bg-[var(--bg-panel)] border border-[var(--border-tech)] p-8 relative animate-fade-in">
-
-                <button
-                    onClick={() => navigate('/student/dashboard')}
-                    className="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors"
-                >
-                    <ArrowLeft size={20} />
-                </button>
-
-                <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-[#a020f0]/20 border border-[#a020f0] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <UploadCloud className="text-[#a020f0]" size={32} />
-                    </div>
-                    <h1 className="text-2xl font-display font-bold uppercase tracking-wide">Upload Deliverables</h1>
-                    <p className="text-gray-400 text-sm mt-2">Submit your proof of work to complete the mission.</p>
-                </div>
-
-                {submitStatus === 'success' ? (
-                    <div className="bg-green-500/20 text-green-400 p-6 border border-green-500/50 text-center uppercase tracking-wider text-sm font-bold animate-pulse">
-                        Mission Accomplished.
-                        <div className="text-[10px] mt-2 text-gray-400">Redirecting to Dashboard...</div>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {submitStatus === 'error' && (
-                            <div className="text-red-500 text-xs text-center border border-red-500/30 p-2">Transmission Failed. Check Signal & Try Again.</div>
-                        )}
-                        <div className="border-2 border-dashed border-gray-700 hover:border-[#a020f0] transition-colors p-8 text-center cursor-pointer relative">
-                            <input
-                                type="file"
-                                onChange={handleFileChange}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            />
-                            {file ? (
-                                <div className="flex flex-col items-center gap-2">
-                                    <FileText className="text-white" size={32} />
-                                    <span className="text-sm font-bold text-[#a020f0]">{file.name}</span>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-2 text-gray-500">
-                                    <UploadCloud size={32} />
-                                    <span className="text-xs uppercase tracking-wider">Click or Drag File Here</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={!file || uploading}
-                            className={`w-full py-3 font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${file && !uploading
-                                ? 'bg-[#a020f0] hover:bg-[#8e1cc1] text-white shadow-[0_0_15px_#a020f0]'
-                                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                }`}
-                        >
-                            {uploading ? 'Transmitting...' : 'Confirm Upload'}
-                        </button>
-                    </form>
-                )}
-
+        <div className="card p-8 animate-fade-in">
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 bg-[#00AEEF]/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <UploadCloud className="text-[#00AEEF]" size={28} />
             </div>
+            <h1 className="font-heading text-2xl font-bold">Upload your deliverable</h1>
+            <p className="text-sm text-[#5B6478] mt-1">Submit your finished work so the company can review and close the quest.</p>
+          </div>
+
+          {error && <div className="alert-error mb-4"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{error}</span></div>}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <label className="block border-2 border-dashed border-[rgba(10,23,72,0.15)] hover:border-[#00AEEF] rounded-lg p-8 text-center cursor-pointer bg-[#F5F7FC] transition-colors">
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="sr-only" />
+              {file ? (
+                <span className="flex flex-col items-center gap-2">
+                  <FileText className="text-[#00AEEF]" size={30} />
+                  <span className="text-sm font-semibold break-all">{file.name}</span>
+                  <span className="text-xs text-[#5B6478]">Click to choose a different file</span>
+                </span>
+              ) : (
+                <span className="flex flex-col items-center gap-2 text-[#5B6478]">
+                  <UploadCloud size={30} />
+                  <span className="text-sm"><span className="text-[#0090C6] font-semibold">Choose a file</span> to upload</span>
+                </span>
+              )}
+            </label>
+
+            <button type="submit" disabled={!file || uploading} className="btn-primary w-full py-3">
+              {uploading ? <><Loader2 size={16} className="animate-spin" /> Uploading…</> : 'Submit deliverable'}
+            </button>
+          </form>
         </div>
-    );
+      </main>
+    </div>
+  );
 };
 
 export default SubmitDeliverable;

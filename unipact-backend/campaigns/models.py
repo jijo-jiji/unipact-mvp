@@ -43,6 +43,40 @@ class Campaign(models.Model):
     def __str__(self):
         return self.title
 
+    def has_pending_offers(self):
+        return self.match_offers.filter(status=MatchOffer.Status.PENDING).exists()
+
+    def is_active_member(self, student_profile):
+        """On the team and not still deciding on an admin's offer. Students without an offer row
+        (teammates who joined by invitation, or matches made before offers existed) count as active."""
+        if not student_profile or not self.assigned_students.filter(id=student_profile.id).exists():
+            return False
+        return not self.match_offers.filter(student=student_profile, status=MatchOffer.Status.PENDING).exists()
+
+
+class MatchOffer(models.Model):
+    """V3.0 (wireframe §9): an admin's match is an offer the student accepts or declines
+    before the company is asked to confirm and pay."""
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        ACCEPTED = 'ACCEPTED', 'Accepted'
+        DECLINED = 'DECLINED', 'Declined'
+        WITHDRAWN = 'WITHDRAWN', 'Withdrawn by admin'
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='match_offers')
+    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='match_offers')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    decline_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['campaign', 'student'], name='unique_match_offer_per_student')]
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Offer: {self.student.full_name} for {self.campaign.title} ({self.status})"
+
 class Application(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'

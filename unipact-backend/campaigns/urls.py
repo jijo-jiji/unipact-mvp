@@ -3,7 +3,7 @@ from .views import (
     CampaignListCreateView, CampaignDetailView, ApplicationCreateView, 
     AwardApplicationView, DeliverableCreateView, MarkCampaignCompletedView, MyApplicationsView,
     AdminMatchmakingAssignView, FinalizeMatchView, StudentAssignedJobsView,
-    StudentSubmitDeliverableView, ClientAssetView,
+    StudentSubmitDeliverableView, ClientAssetView, RespondMatchOfferView,
     ProjectTeamInviteView, ProjectTeamListView, MyTeamInvitationsView, RespondTeamInvitationView
 )
 
@@ -18,6 +18,7 @@ urlpatterns = [
     
     # V3.0 Endpoints
     path('<int:campaign_id>/match/', AdminMatchmakingAssignView.as_view(), name='admin_matchmaking_assign'),
+    path('<int:campaign_id>/offer/respond/', RespondMatchOfferView.as_view(), name='respond_match_offer'),
     path('<int:campaign_id>/finalize/', FinalizeMatchView.as_view(), name='finalize_match'),
     path('student/assigned/', StudentAssignedJobsView.as_view(), name='student_assigned_jobs'),
     path('<int:campaign_id>/student-deliverable/', StudentSubmitDeliverableView.as_view(), name='student_submit_deliverable'),

@@ -1,22 +1,19 @@
 import axios from 'axios';
 
 // 1. Define the Base URL (Where Django lives)
-// In development, this is usually localhost:8000
 const getBaseUrl = () => {
-  const hostname = window.location.hostname;
-
-  // PRIORITY 1: Match the browser's hostname to avoid Cross-Site Cookie blocking
-  if (hostname === 'localhost') {
-    return 'http://localhost:8000/api';
-  }
-
-  // PRIORITY 2: Check Env Var
+  // Production builds: set VITE_API_BASE_URL, e.g. https://api.unipact.my/api
   if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
   }
 
-  // Fallback
-  return 'http://127.0.0.1:8000/api';
+  // Development: talk to the local Django server on the same hostname the page was opened with,
+  // so cookies are not treated as cross-site (localhost and 127.0.0.1 count as different sites)
+  const hostname = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
+  if (import.meta.env.PROD) {
+    console.error('VITE_API_BASE_URL is not set; API calls will go to a local server and fail.');
+  }
+  return `http://${hostname}:8000/api`;
 };
 
 const BASE_URL = getBaseUrl();
@@ -30,15 +27,31 @@ const api = axios.create({
   withCredentials: true, // IMPORTANT: Cookies
 });
 
-// 3. Response Interceptor (Optional: Handle 401s globally)
-api.interceptors.response.use((response) => {
-  return response;
-}, (error) => {
-  if (error.response && error.response.status === 401) {
-    // Optional: Redirect to login or clear state
-    // window.location.href = '/login';
+// 3. Response Interceptor: access tokens expire after 60 minutes, so on a 401
+// quietly swap the refresh cookie for a new access token and retry once.
+const AUTH_PATHS = ['/users/login/', '/users/token/refresh/', '/users/logout/', '/users/password/forgot/', '/users/password/reset/', '/users/users/claim/', '/users/users/claim/preview/'];
+let refreshPromise = null;
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    const isAuthCall = AUTH_PATHS.some((path) => original?.url?.includes(path));
+
+    if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
+      original._retried = true;
+      try {
+        refreshPromise = refreshPromise || api.post('/users/token/refresh/');
+        await refreshPromise;
+        return api(original);
+      } catch {
+        // Refresh failed: the session is really over, surface the original 401
+      } finally {
+        refreshPromise = null;
+      }
+    }
+    return Promise.reject(error);
   }
-  return Promise.reject(error);
-});
+);
 
 export default api;
