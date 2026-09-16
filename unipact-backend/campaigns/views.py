@@ -3,8 +3,10 @@ import logging
 from rest_framework import generics, permissions, status, exceptions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import transaction as db_transaction
 from django.shortcuts import get_object_or_404
-from .models import Campaign, Application
+from django.utils import timezone
+from .models import Campaign, Application, MatchOffer
 from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer, can_view_workspace
 from users.models import User, CompanyProfile, StudentProfile
 from payments.models import Transaction, Subscription
@@ -281,25 +283,102 @@ class AdminMatchmakingAssignView(APIView):
             return Response({"error": "At least one student ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         from users.models import StudentProfile
-        students = StudentProfile.objects.filter(id__in=student_ids)
-        if not students.exists():
+        students = list(StudentProfile.objects.filter(id__in=student_ids).select_related('user'))
+        if not students:
             return Response({"error": "No students found with the provided IDs."}, status=status.HTTP_400_BAD_REQUEST)
 
-        campaign.assigned_students.set(students)
-        campaign.status = Campaign.Status.MATCHED
-        campaign.match_notes = match_notes
-        campaign.save()
+        chosen_ids = {s.id for s in students}
+        newly_offered, withdrawn = [], []
+        with db_transaction.atomic():
+            offers = {o.student_id: o for o in campaign.match_offers.select_related('student__user')}
+            current_team = set(campaign.assigned_students.values_list('id', flat=True))
+            for student in students:
+                offer = offers.get(student.id)
+                if offer is None:
+                    # Already working on it without an offer (joined as a teammate): nothing to ask
+                    if student.id in current_team:
+                        continue
+                    MatchOffer.objects.create(campaign=campaign, student=student)
+                    newly_offered.append(student)
+                elif offer.status in (MatchOffer.Status.DECLINED, MatchOffer.Status.WITHDRAWN):
+                    offer.status, offer.decline_reason, offer.responded_at = MatchOffer.Status.PENDING, '', None
+                    offer.save(update_fields=['status', 'decline_reason', 'responded_at'])
+                    newly_offered.append(student)
+            for student_id, offer in offers.items():
+                if student_id not in chosen_ids and offer.status in (MatchOffer.Status.PENDING, MatchOffer.Status.ACCEPTED):
+                    offer.status, offer.responded_at = MatchOffer.Status.WITHDRAWN, timezone.now()
+                    offer.save(update_fields=['status', 'responded_at'])
+                    withdrawn.append(offer.student)
+
+            campaign.assigned_students.set(students)
+            campaign.status = Campaign.Status.MATCHED
+            campaign.match_notes = match_notes
+            campaign.save()
 
         from users.models import SystemLog
         from users.utils import log_event
         student_names = ", ".join([s.full_name for s in students])
-        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Admin matched '{student_names}' to job #{campaign.id}: '{campaign.title}'")
-        notifications.match_proposed(campaign)
+        log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Admin offered job #{campaign.id} '{campaign.title}' to {student_names}")
+        notifications.match_offered(campaign, newly_offered)
+        notifications.match_withdrawn(campaign, withdrawn)
+        if not campaign.has_pending_offers():
+            notifications.match_ready(campaign)
 
+        waiting = campaign.has_pending_offers()
         return Response({
-            "message": "Talent successfully assigned and job status updated to MATCHED.",
+            "message": "Offer sent. The client can confirm once every student accepts." if waiting else "Team updated and ready for the client to confirm.",
             "campaign": CampaignSerializer(campaign).data
         }, status=status.HTTP_200_OK)
+
+
+class RespondMatchOfferView(APIView):
+    """A matched student accepts or declines the admin's offer (wireframe §9)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        if request.user.role != User.Role.STUDENT or not hasattr(request.user, 'student_profile'):
+            raise exceptions.PermissionDenied("Only students can respond to project offers.")
+        profile = request.user.student_profile
+        action = str(request.data.get('action', '')).lower()
+        if action not in ('accept', 'decline'):
+            return Response({"error": "Choose 'accept' or 'decline'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from users.models import SystemLog
+        from users.utils import log_event
+
+        with db_transaction.atomic():
+            offer = MatchOffer.objects.select_for_update().select_related('campaign__company__user').filter(campaign_id=campaign_id, student=profile).first()
+            if not offer:
+                raise exceptions.NotFound("You don't have an offer for this project.")
+            campaign = offer.campaign
+            if offer.status != MatchOffer.Status.PENDING or campaign.status != Campaign.Status.MATCHED:
+                return Response({"error": "This offer is no longer open."}, status=status.HTTP_400_BAD_REQUEST)
+
+            offer.responded_at = timezone.now()
+            if action == 'accept':
+                offer.status = MatchOffer.Status.ACCEPTED
+                offer.save(update_fields=['status', 'responded_at'])
+            else:
+                offer.status = MatchOffer.Status.DECLINED
+                offer.decline_reason = str(request.data.get('reason') or '').strip()[:500]
+                offer.save(update_fields=['status', 'decline_reason', 'responded_at'])
+                campaign.assigned_students.remove(profile)
+                if not campaign.assigned_students.exists():
+                    # Nobody left: back to the admin's "needs match" queue
+                    campaign.status = Campaign.Status.OPEN
+                    campaign.save(update_fields=['status', 'updated_at'])
+
+        if action == 'accept':
+            log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.SUCCESS, f"{profile.full_name} accepted the offer for '{campaign.title}'")
+            if not campaign.has_pending_offers():
+                notifications.match_ready(campaign)
+            message = "You accepted the project. We'll let you know when the client confirms."
+        else:
+            log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.WARNING, f"{profile.full_name} declined the offer for '{campaign.title}'")
+            notifications.match_declined(offer)
+            message = "You declined the project. Thanks for letting us know."
+
+        return Response({"message": message, "status": offer.status, "campaign_status": campaign.status}, status=status.HTTP_200_OK)
 
 
 class FinalizeMatchView(APIView):
@@ -316,6 +395,10 @@ class FinalizeMatchView(APIView):
 
         if campaign.status != Campaign.Status.MATCHED:
             return Response({"error": "Campaign must be in MATCHED status to finalize."}, status=status.HTTP_400_BAD_REQUEST)
+        if campaign.has_pending_offers():
+            return Response({"error": "Waiting for the matched students to accept the project. You can confirm once they do."}, status=status.HTTP_400_BAD_REQUEST)
+        if not campaign.assigned_students.exists():
+            return Response({"error": "There are no students on this match yet."}, status=status.HTTP_400_BAD_REQUEST)
 
         company_profile = campaign.company
 
@@ -380,6 +463,8 @@ class StudentSubmitDeliverableView(APIView):
         campaign = get_object_or_404(Campaign, pk=campaign_id)
         if not campaign.assigned_students.filter(id=request.user.student_profile.id).exists():
             raise exceptions.PermissionDenied("You are not assigned to this project.")
+        if not campaign.is_active_member(request.user.student_profile):
+            raise exceptions.PermissionDenied("Accept the project offer before submitting work.")
 
         from .models import StudentDeliverable
         from .serializers import StudentDeliverableSerializer
@@ -436,7 +521,7 @@ class ClientAssetView(APIView):
         from .serializers import ClientAssetSerializer
 
         is_company = (request.user.role == User.Role.COMPANY and campaign.company == getattr(request.user, 'company_profile', None))
-        is_assigned = (request.user.role == User.Role.STUDENT and hasattr(request.user, 'student_profile') and campaign.assigned_students.filter(id=request.user.student_profile.id).exists())
+        is_assigned = (request.user.role == User.Role.STUDENT and hasattr(request.user, 'student_profile') and campaign.is_active_member(request.user.student_profile))
         is_admin = (request.user.role == User.Role.ADMIN)
 
         if not (is_company or is_assigned or is_admin):
@@ -488,6 +573,8 @@ class ProjectTeamInviteView(APIView):
 
         if not campaign.assigned_students.filter(id=current_student.id).exists():
             raise exceptions.PermissionDenied("You are not an assigned team member on this project.")
+        if not campaign.is_active_member(current_student):
+            raise exceptions.PermissionDenied("Accept the project offer before inviting teammates.")
 
         if campaign.status == Campaign.Status.COMPLETED:
             return Response({"error": "You cannot invite teammates to a completed project."}, status=status.HTTP_400_BAD_REQUEST)

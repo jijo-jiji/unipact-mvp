@@ -27,6 +27,8 @@ import {
   Compass,
   Loader2,
   CheckCircle2,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -66,6 +68,10 @@ const StudentDashboard = () => {
   const [invite, setInvite] = useState({ email: '', role: '', share: '30', notes: '' });
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
+
+  // Decline offer modal state
+  const [declineJob, setDeclineJob] = useState(null);
+  const [declineReason, setDeclineReason] = useState('');
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -182,8 +188,26 @@ const StudentDashboard = () => {
     }
   };
 
-  const activeCount = assignedJobs.filter((j) => ['IN_PROGRESS', 'MATCHED'].includes(j.status)).length;
-  const completedCount = assignedJobs.filter((j) => j.status === 'COMPLETED').length;
+  // Admin match offers the student hasn't answered yet are shown apart from their projects
+  const offers = assignedJobs.filter((j) => j.status === 'MATCHED' && j.my_offer?.status === 'PENDING');
+  const projects = assignedJobs.filter((j) => !offers.includes(j));
+  const activeCount = projects.filter((j) => ['IN_PROGRESS', 'MATCHED'].includes(j.status)).length;
+  const completedCount = projects.filter((j) => j.status === 'COMPLETED').length;
+
+  const respondToOffer = async (job, action, reason = '') => {
+    setActionLoading(`offer-${job.id}`);
+    try {
+      const res = await api.post(`/campaigns/${job.id}/offer/respond/`, { action, reason });
+      showToast(res.data?.message || (action === 'accept' ? 'Project accepted.' : 'Offer declined.'), 'success');
+      setDeclineJob(null);
+      await fetchDashboard();
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not update the offer.'), 'error');
+      await fetchDashboard();
+    } finally {
+      setActionLoading(null);
+    }
+  };
   const displayName = isClub ? user?.club_profile?.club_name || user?.name : studentProfile.full_name || user?.name;
 
   return (
@@ -268,6 +292,25 @@ const StudentDashboard = () => {
           </>
         ) : (
           <>
+            {/* Admin match offers waiting for an answer */}
+            {offers.length > 0 && (
+              <section className="space-y-4 animate-fade-in">
+                <SectionHeading
+                  title={`Project offers (${offers.length})`}
+                  description="A UniPact admin picked you for these client projects. Accept to join the team, or decline if the timing or scope doesn't work for you."
+                />
+                {offers.map((job) => (
+                  <OfferCard
+                    key={job.id}
+                    job={job}
+                    busy={actionLoading === `offer-${job.id}`}
+                    onAccept={() => respondToOffer(job, 'accept')}
+                    onDecline={() => { setDeclineJob(job); setDeclineReason(''); }}
+                  />
+                ))}
+              </section>
+            )}
+
             {/* Incoming team invitations */}
             {incomingInvites.length > 0 && (
               <section className="card border-2 border-[#00AEEF] p-6 animate-fade-in">
@@ -331,7 +374,7 @@ const StudentDashboard = () => {
             <section className="space-y-4">
               <SectionHeading title="Your projects" description="Projects you have been matched to or joined as a teammate." />
 
-              {assignedJobs.length === 0 ? (
+              {projects.length === 0 ? (
                 <div className="card p-12 text-center">
                   <Briefcase className="w-12 h-12 text-[#5B6478]/40 mx-auto mb-3" />
                   <h3 className="font-heading font-bold text-lg mb-1">No projects yet</h3>
@@ -343,7 +386,7 @@ const StudentDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {assignedJobs.map((job) => (
+                  {projects.map((job) => (
                     <ProjectCard
                       key={job.id}
                       job={job}
@@ -402,6 +445,29 @@ const StudentDashboard = () => {
         </form>
       </Modal>
 
+      {/* Decline offer modal */}
+      <Modal
+        isOpen={!!declineJob}
+        onClose={() => !actionLoading && setDeclineJob(null)}
+        title="Decline this project?"
+        subtitle={declineJob ? `${declineJob.title} · ${declineJob.company_name}` : ''}
+        icon={<X size={20} />}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); respondToOffer(declineJob, 'decline', declineReason.trim()); }} className="space-y-4">
+          <p className="text-sm text-[#5B6478]">The UniPact team will offer the project to someone else. Declining doesn&apos;t affect future matches.</p>
+          <div>
+            <label className="field-label" htmlFor="decline-reason">Reason (optional, only shared with UniPact admins)</label>
+            <textarea id="decline-reason" rows={3} maxLength={500} value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} placeholder="e.g. Final exams that month, or the stack isn't a fit" className="input" />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(10,23,72,0.08)]">
+            <button type="button" onClick={() => setDeclineJob(null)} disabled={!!actionLoading} className="btn-secondary">Keep the offer</button>
+            <button type="submit" disabled={!!actionLoading} className="btn-danger">
+              {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />} Decline project
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Invite teammate modal */}
       <Modal
         isOpen={!!inviteModalJob}
@@ -448,6 +514,72 @@ const StudentDashboard = () => {
   );
 };
 
+// An admin's match that the student still has to accept or decline (wireframe §9)
+const OfferCard = ({ job, busy, onAccept, onDecline }) => {
+  const skills = job.required_skills?.length ? job.required_skills : job.target_platforms || [];
+  const teamSize = (job.match_offers || []).length;
+  return (
+    <article className="card border-2 border-[#00AEEF] p-6 sm:p-8">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <span className="badge bg-[#00AEEF] border-transparent text-white"><Sparkles size={12} /> New offer</span>
+        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(job.type)}</span>
+        {teamSize > 1 && <span className="badge bg-[#F5F7FC] border-[rgba(10,23,72,0.12)] text-[#0A1748]"><Users size={12} /> Team of {teamSize}</span>}
+      </div>
+      <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
+      <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
+        <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
+        <span>Budget: <strong className="text-[#0B1E63]">{formatMoney(job.budget)}</strong></span>
+        <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
+      </p>
+
+      {job.description && <p className="mt-4 text-sm text-[#0A1748] leading-relaxed">{job.description}</p>}
+
+      {job.match_notes && (
+        <div className="mt-4 p-3.5 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg text-sm">
+          <strong className="text-[#0090C6]">Why you were picked:</strong> {job.match_notes}
+        </div>
+      )}
+
+      {(job.requirements?.length > 0 || skills.length > 0) && (
+        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)] grid grid-cols-1 md:grid-cols-2 gap-5">
+          {job.requirements?.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2">What the client needs</h4>
+              <ul className="space-y-1.5 text-sm">
+                {job.requirements.map((req, i) => (
+                  <li key={i} className="flex items-start gap-2"><CheckCircle2 size={15} className="text-[#00AEEF] shrink-0 mt-0.5" /> {req}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {skills.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2">Skills</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {skills.map((s) => <span key={s} className="text-xs px-2 py-1 rounded bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)]">{s}</span>)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-6 pt-5 border-t border-[rgba(10,23,72,0.08)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <p className="text-xs text-[#5B6478] max-w-md">
+          Client files unlock once you accept. The client is asked to confirm after the whole team has accepted.
+        </p>
+        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+          <button type="button" onClick={onDecline} disabled={busy} className="btn-secondary flex-1 sm:flex-none">
+            <X size={15} /> Decline
+          </button>
+          <button type="button" onClick={onAccept} disabled={busy} className="btn-primary flex-1 sm:flex-none whitespace-nowrap">
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Accept project
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+};
+
 const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
   const pendingInvites = (job.team_invitations || []).filter((i) => i.status === 'PENDING');
   const team = job.assigned_students_details || [];
@@ -470,7 +602,7 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
             <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
           </p>
         </div>
-        {isOpen && (
+        {job.status === 'IN_PROGRESS' && (
           <button onClick={onSubmit} className="btn-primary self-start shrink-0 whitespace-nowrap">
             <Upload size={15} /> Submit work
           </button>
@@ -478,8 +610,14 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
       </div>
 
       {job.status === 'MATCHED' && (
-        <p className="mt-4 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3">
-          You&apos;ve been matched! Work starts once the client confirms the match.
+        <p className="mt-4 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 flex items-start gap-2">
+          <Clock size={16} className="shrink-0 mt-0.5" />
+          <span>
+            You accepted this project.{' '}
+            {job.awaiting_student_acceptance
+              ? 'We\'re waiting for the rest of the team to accept, then the client confirms and work starts.'
+              : 'Work starts as soon as the client confirms the match.'}
+          </span>
         </p>
       )}
 

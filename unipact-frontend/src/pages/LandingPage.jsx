@@ -43,7 +43,7 @@ const FAQS = [
   },
   {
     q: 'Can I choose the students myself?',
-    a: 'A UniPact admin proposes the team based on skills and track record. You review the team and their portfolios before confirming, so nothing starts without your approval.',
+    a: 'A UniPact admin picks the team based on skills and track record, and each student confirms they can take it on. You then review the team and their portfolios before confirming, so nothing starts without your approval.',
   },
   {
     q: 'Can students work in teams?',

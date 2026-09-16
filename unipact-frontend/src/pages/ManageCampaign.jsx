@@ -205,6 +205,7 @@ const ManageCampaign = () => {
   }
 
   const team = campaign.assigned_students_details || [];
+  const offerStatus = Object.fromEntries((campaign.match_offers || []).map((o) => [o.student, o.status]));
   const deliverables = campaign.student_deliverables || [];
   const assets = campaign.client_assets || [];
   const applications = campaign.applications || [];
@@ -249,13 +250,24 @@ const ManageCampaign = () => {
             <span><strong>What happens next:</strong> a UniPact admin reviews verified students and proposes the best match. You&apos;ll see the team here to confirm.</span>
           </div>
         )}
-        {campaign.status === 'MATCHED' && (
+        {campaign.status === 'MATCHED' && campaign.awaiting_student_acceptance && (
+          <div className="flex items-start gap-3 p-5 rounded-xl bg-white border border-[rgba(10,23,72,0.12)] text-sm">
+            <Clock size={20} className="text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="block text-base">Waiting for the students to accept</strong>
+              <span className="text-[#5B6478]">
+                A UniPact admin has picked your team and asked each student to accept. We&apos;ll email you as soon as they do, and you can confirm the match here.
+              </span>
+            </div>
+          </div>
+        )}
+        {campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border-2 border-[#00AEEF] shadow-sm">
             <div className="flex items-start gap-3 text-sm">
               <Sparkles size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
               <div>
                 <strong className="block text-base">Your student team is ready</strong>
-                <span className="text-[#5B6478]">Review the team below, then confirm to start the project.</span>
+                <span className="text-[#5B6478]">Every student has accepted. Review the team below, then confirm to start the project.</span>
               </div>
             </div>
             <button onClick={handleConfirmMatch} disabled={busy} className="btn-primary self-start sm:self-auto">
@@ -313,6 +325,11 @@ const ManageCampaign = () => {
                         <span className="font-semibold group-hover:text-[#0090C6]">{s.full_name}</span>
                         <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star size={13} className="fill-amber-400 text-amber-400" /> {s.rating}</span>
                       </div>
+                      {campaign.status === 'MATCHED' && offerStatus[s.id] && (
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold mt-1 ${offerStatus[s.id] === 'ACCEPTED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {offerStatus[s.id] === 'ACCEPTED' ? <><CheckCircle2 size={12} /> Accepted</> : <><Clock size={12} /> Waiting to accept</>}
+                        </span>
+                      )}
                       <div className="text-xs text-[#5B6478] mt-0.5">{[s.university, s.major].filter(Boolean).join(' • ')}</div>
                       {s.skills?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">

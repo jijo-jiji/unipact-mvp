@@ -34,7 +34,7 @@ cd unipact-backend && gunicorn unipact_backend.wsgi:application --bind 0.0.0.0:$
 | `DATABASE_URL` | `postgres://…` | From your PostgreSQL provider |
 | `USE_S3` + `AWS_*` | see `.env.example` | Cloudflare R2 / S3 bucket for uploads (keep the bucket **private**; links are signed) |
 | `FRONTEND_URL` | `https://unipact.my` | Used to build links in emails (password reset, notifications) |
-| `EMAIL_HOST` + `EMAIL_*` | see `.env.example` | Any SMTP provider (Resend, Brevo, SendGrid, Amazon SES…) |
+| `EMAIL_HOST` + `EMAIL_*` | see `.env.example` | Any SMTP provider (Resend, Brevo, SendGrid, Amazon SES…). To start with the project Gmail instead, see "Sending email from Gmail" below |
 | `DEFAULT_FROM_EMAIL` | `UniPact <no-reply@unipact.my>` | Verify this domain with your email provider (SPF/DKIM) or emails land in spam |
 | `SUPPORT_EMAIL` | `support@unipact.my` | Reply-to address shown in emails |
 | `SENTRY_DSN` | from sentry.io | Optional error monitoring; no personal data is sent |
@@ -61,6 +61,24 @@ python manage.py check --deploy
    ```
 4. Send yourself a password reset from the live site to confirm email delivery works.
 
+### Sending email from Gmail (quick start)
+
+Until a domain is verified with an email provider, UniPact can send through the project Gmail account:
+
+```
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=true
+EMAIL_HOST_USER=unipact.my@gmail.com
+EMAIL_HOST_PASSWORD=<16-character Google app password>
+DEFAULT_FROM_EMAIL=UniPact <unipact.my@gmail.com>
+SUPPORT_EMAIL=unipact.my@gmail.com
+```
+
+Create the app password under the Google account's 2-Step Verification settings (a normal password will not work).
+Gmail allows roughly 500 messages a day and always shows the gmail.com sender, so move to a provider with the
+real domain (`no-reply@unipact.my`) before any serious volume.
+
 ## 2. Frontend (React)
 
 On Vercel, set the project root to `unipact-frontend`:
@@ -69,7 +87,7 @@ On Vercel, set the project root to `unipact-frontend`:
 - Environment variables (see `unipact-frontend/.env.example`):
   - `VITE_API_BASE_URL=https://api.unipact.my/api`
   - `VITE_SITE_URL=https://unipact.my`: makes WhatsApp/LinkedIn link previews, `sitemap.xml` and `robots.txt` use your real address
-  - `VITE_LEGAL_ENTITY_NAME`, `VITE_LEGAL_REGISTRATION_NO`, `VITE_LEGAL_ADDRESS`, `VITE_CONTACT_EMAIL`: shown on the Privacy Policy and Terms pages (bracketed placeholders appear until set)
+  - `VITE_LEGAL_ENTITY_NAME`, `VITE_LEGAL_REGISTRATION_NO`, `VITE_LEGAL_ADDRESS`, `VITE_CONTACT_EMAIL`: shown on the Privacy Policy, Terms pages and the footer (bracketed placeholders appear until set). Take them from the SSM registration certificate; the registered business name, registration number and registered address must match it exactly
   - `VITE_SENTRY_DSN` (optional): frontend error monitoring; use a separate Sentry project from the backend
 
 Vite bakes these in at build time, so **redeploy after changing them**.
@@ -97,6 +115,7 @@ After deploying, paste your site link into the [LinkedIn Post Inspector](https:/
 - **Ownership of deliverables** passes to the client once the project is completed and paid for, unless agreed otherwise in writing.
 - **Fees** (RM 150 finder's fee, RM 499/month Pro) are non-refundable once the service is provided.
 - **Minimum age** is 18, or younger with parent/guardian permission.
+- **Business form**: the SSM certificate is a *Borang D* registration under the Registration of Businesses Act 1956 (a sole proprietorship/enterprise), not a Sdn. Bhd. The owner is personally liable, so ask the lawyer whether the liability cap and the payout arrangements still work, and whether incorporating is worth it before handling client money.
 - **Liability** is capped at the fees paid to UniPact in the previous 12 months.
 - **Student payouts:** how and when teams are paid is left to the project details. This must match whatever payment provider you choose.
 - **Data outside Malaysia:** hosting, email and Sentry providers may store data abroad.

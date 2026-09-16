@@ -9,6 +9,7 @@ import StatusBadge from '../components/StatusBadge';
 import { getErrorMessage } from '../utils/format';
 import { meetsPasswordRules } from '../utils/password';
 import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import { LEGAL } from '../utils/legal';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const SECTIONS = [
@@ -43,6 +44,10 @@ const DOCUMENT_COPY = {
   COMPANY: { field: 'ssm_document', label: 'SSM registration certificate' },
   CLUB: { field: 'verification_document', label: 'Club registration letter' },
 };
+
+const SupportLink = () => (
+  <a href={`mailto:${LEGAL.contactEmail}`} className="underline hover:text-[#0A1748]">email the UniPact team</a>
+);
 
 const Section = ({ id, title, description, children }) => (
   <section id={id} className="card p-6 sm:p-8 scroll-mt-28">
@@ -211,7 +216,7 @@ const SettingsPage = () => {
                 ) : (
                   <p className="text-sm text-[#5B6478]">You&apos;re no longer linked to a club.</p>
                 )}
-                <p className="text-xs text-[#5B6478] mt-4">To change your name or committee role, ask your club president or contact the UniPact team.</p>
+                <p className="text-xs text-[#5B6478] mt-4">To change your name or committee role, ask your club president or <SupportLink />.</p>
               </Section>
             )}
             {profile && (
@@ -349,7 +354,7 @@ const SettingsPage = () => {
                 <div className="min-w-0">
                   <div className="text-sm text-[#5B6478]">Sign-in email</div>
                   <div className="font-semibold break-all">{user?.email}</div>
-                  <p className="text-xs text-[#5B6478] mt-1">To change your sign-in email, please contact the UniPact team.</p>
+                  <p className="text-xs text-[#5B6478] mt-1">To change your sign-in email, please <SupportLink />.</p>
                 </div>
               </div>
 
@@ -375,7 +380,7 @@ const SettingsPage = () => {
 
             <p className="text-sm text-[#5B6478] px-1">
               Read how we handle your data in our <Link to="/privacy" className="underline hover:text-[#0A1748]">Privacy Policy</Link>.
-              To request a copy of your data or delete your account, contact the UniPact team.
+              To request a copy of your data or delete your account, <SupportLink />.
             </p>
           </div>
         </div>

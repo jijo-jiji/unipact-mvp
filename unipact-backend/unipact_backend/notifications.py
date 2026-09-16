@@ -144,21 +144,59 @@ def password_changed(user):
 # V3.0 projects
 # ------------------------------------------------------------------
 
-def match_proposed(campaign):
+def match_offered(campaign, students):
+    """Step 1: the admin's pick goes to the students first."""
+    send_email(
+        [s.user.email for s in students], f'Project offer: "{campaign.title}"', 'You\'ve been offered a client project',
+        ['A UniPact admin picked you for a client project. Review the brief and accept or decline it from your dashboard.',
+         'The client is only asked to confirm once the team has accepted.'],
+        details=[
+            ('Project', campaign.title), ('Client', campaign.company.company_name),
+            ('Budget', f'RM {campaign.budget}'),
+            ('Deadline', campaign.deadline.strftime('%d %b %Y') if campaign.deadline else 'Flexible'),
+            ('Why you were picked', campaign.match_notes),
+        ],
+        action_label='Review the offer', action_path='/student/dashboard',
+    )
+
+
+def match_ready(campaign):
+    """Step 2: every student accepted, so the company can confirm."""
     students = _students(campaign)
-    names = ', '.join(s.full_name for s in students)
+    if not students:
+        return
     send_email(
         campaign.company.user.email, f'Your team for "{campaign.title}" is ready', 'Your student team is ready',
-        ['A UniPact admin has proposed a team of verified students for your project. '
+        ['A UniPact admin picked verified students for your project and they have accepted. '
          'Review their profiles and confirm the match to start the project.'],
-        details=[('Project', campaign.title), ('Team', names), ('Note from admin', campaign.match_notes)],
+        details=[('Project', campaign.title), ('Team', ', '.join(s.full_name for s in students)), ('Note from admin', campaign.match_notes)],
         action_label='Review the match', action_path=f'/manage-campaign/{campaign.id}',
     )
+
+
+def match_declined(offer):
+    """Tell the admins so they can pick someone else."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    campaign = offer.campaign
+    remaining = campaign.assigned_students.count()
     send_email(
-        [s.user.email for s in students], f'You\'ve been matched to "{campaign.title}"', 'You\'ve been matched to a project',
-        ['A UniPact admin matched you to a client project. Work starts as soon as the client confirms the match.'],
-        details=[('Project', campaign.title), ('Client', campaign.company.company_name), ('Why you were matched', campaign.match_notes)],
-        action_label='View the project', action_path='/student/dashboard',
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)),
+        f'{offer.student.full_name} declined "{campaign.title}"', 'A student declined a project offer',
+        [f'{offer.student.full_name} declined the offer for "{campaign.title}".',
+         'The project is back in the "Needs match" queue.' if remaining == 0
+         else f'{remaining} student{"s" if remaining != 1 else ""} remain on the team. Add a replacement or leave the team as it is.'],
+        details=[('Project', campaign.title), ('Client', campaign.company.company_name), ('Reason given', offer.decline_reason)],
+        action_label='Open matchmaking', action_path='/admin',
+    )
+
+
+def match_withdrawn(campaign, students):
+    send_email(
+        [s.user.email for s in students], f'Update on "{campaign.title}"', 'A project offer was withdrawn',
+        [f'The UniPact team changed the student team for "{campaign.title}", so this offer is no longer open for you.',
+         'Nothing is needed from you. We\'ll be in touch when another project fits your skills.'],
+        action_label='Open your dashboard', action_path='/student/dashboard',
     )
 
 

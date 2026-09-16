@@ -201,9 +201,16 @@ class NotificationEmailTests(APITestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.client.post(reverse('admin_matchmaking_assign', kwargs={'campaign_id': self.campaign.id}),
                              {'student_ids': [self.student_user.student_profile.id], 'match_notes': 'Great fit'}, format='json')
-        recipients = {tuple(m.to) for m in mail.outbox}
-        self.assertIn(('boss@corp.com',), recipients)
-        self.assertIn(('sam@siswa.my',), recipients)
+        # The offer goes to the student first; the company hears once the student accepts
+        self.assertEqual([m.to for m in mail.outbox], [['sam@siswa.my']])
+        self.assertIn('Project offer', mail.outbox[0].subject)
+
+        mail.outbox.clear()
+        self.client.force_authenticate(self.student_user)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse('respond_match_offer', kwargs={'campaign_id': self.campaign.id}), {'action': 'accept'}, format='json')
+        self.assertEqual([m.to for m in mail.outbox], [['boss@corp.com']])
+        self.assertIn('is ready', mail.outbox[0].subject)
 
         mail.outbox.clear()
         self.client.force_authenticate(self.company_user)

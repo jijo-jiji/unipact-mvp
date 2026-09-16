@@ -262,7 +262,8 @@ All endpoints use HttpOnly cookie authentication. Sign-in, sign-up, password res
 | :--- | :--- | :--- |
 | `/api/campaigns/?mode=my_campaigns` | `GET` | A company's own projects (`POST /api/campaigns/` creates one) |
 | `/api/campaigns/<id>/` | `GET` | Project detail (workspace files only for owner, team and admins) |
-| `/api/campaigns/<id>/finalize/` | `POST` | Company confirms the proposed match (finder's fee on Free plan) |
+| `/api/campaigns/<id>/offer/respond/` | `POST` | Matched student accepts or declines the admin's offer (`action`, optional `reason` for admins) |
+| `/api/campaigns/<id>/finalize/` | `POST` | Company confirms the match once every student has accepted (finder's fee on Free plan) |
 | `/api/campaigns/<id>/assets/` | `GET` `POST` | Project files vault |
 | `/api/campaigns/student/assigned/` | `GET` | Projects assigned to the signed-in student |
 | `/api/campaigns/<id>/student-deliverable/` | `POST` | Submit a link and/or file with a contribution note |
@@ -279,7 +280,7 @@ All endpoints use HttpOnly cookie authentication. Sign-in, sign-up, password res
 | `/api/users/admin/verify/<TYPE>/<id>/` | `POST` | Approve, reject or flag an account (emails the user) |
 | `/api/users/admin/entities/` · `/users/<id>/block/` | `GET` `POST` | User directory, block or unblock |
 | `/api/users/admin/students/` | `GET` | Student pool for matchmaking |
-| `/api/campaigns/<id>/match/` | `POST` | Propose students for a project (`student_ids`, `match_notes`) |
+| `/api/campaigns/<id>/match/` | `POST` | Offer a project to students (`student_ids`, `match_notes`); re-matching withdraws offers from students left out |
 
 ### V2.2.1 Club Committee (postponed track)
 | Endpoint | Method | Description |
@@ -297,7 +298,7 @@ All endpoints use HttpOnly cookie authentication. Sign-in, sign-up, password res
 | `/api/payments/history/` · `/treasury/` | `GET` | Payment history and plan summary |
 
 ### Transactional emails
-Sent automatically (see `unipact_backend/notifications.py`): welcome, account verified/rejected, password reset and changed, match proposed (company and students), match confirmed, team invitation and reply, work submitted, project completed, club committee invitation and member joined, club proposal received and contract awarded, payment receipt.
+Sent automatically (see `unipact_backend/notifications.py`): welcome, account verified/rejected, password reset and changed, project offer (students), offer declined (admins), offer withdrawn, team ready (company), match confirmed, team invitation and reply, work submitted, project completed, club committee invitation and member joined, club proposal received and contract awarded, payment receipt.
 
 ---
 
@@ -310,7 +311,7 @@ The repository enforces mandatory verification gates:
 cd unipact-backend
 python manage.py test
 ```
-*Current Status*: **91/91 tests passing** covering V3.0 matching and team collaboration, access control, uploads, rate limits, production settings, password reset, account settings, emails, sign-up consent, admin commands and the postponed V2.2.1 club track.
+*Current Status*: **98/98 tests passing** covering V3.0 matching and team collaboration, access control, uploads, rate limits, production settings, password reset, account settings, emails, sign-up consent, admin commands and the postponed V2.2.1 club track.
 
 ### 2. Frontend Lint & Production Build
 ```bash

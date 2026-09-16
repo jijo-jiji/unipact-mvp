@@ -31,6 +31,13 @@ const DOMAIN_FIT = {
   DIGITAL_MARKETING: ['MARKETING', 'BOTH'],
 };
 
+// How each student answered this project's offer
+const OFFER_BADGES = {
+  PENDING: { status: 'PENDING', label: 'Offer sent' },
+  ACCEPTED: { status: 'ACCEPTED', label: 'Accepted' },
+  DECLINED: { status: 'REJECTED', label: 'Declined' },
+};
+
 const useDebounced = (value, delay = 400) => {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -182,8 +189,8 @@ const AdminDashboard = () => {
   const handleAssignMatch = async () => {
     setMatchSubmitting(true);
     try {
-      await api.post(`/campaigns/${selectedCampaign.id}/match/`, { student_ids: selectedStudentIds, match_notes: matchNotes });
-      showToast(`Matched ${selectedStudentIds.length} student${selectedStudentIds.length === 1 ? '' : 's'} to "${selectedCampaign.title}". The client can now confirm.`, 'success');
+      const res = await api.post(`/campaigns/${selectedCampaign.id}/match/`, { student_ids: selectedStudentIds, match_notes: matchNotes });
+      showToast(res.data?.message || `Offer sent for "${selectedCampaign.title}".`, 'success');
       if (campaignFilter === 'OPEN') setCampaignFilter('MATCHED');
       else await fetchMatchmakingData();
     } catch (err) {
@@ -264,6 +271,8 @@ const AdminDashboard = () => {
   if (dashboardLoading) return <PageLoader message="Loading admin hub…" />;
 
   const canAssign = selectedCampaign && ['OPEN', 'MATCHED'].includes(selectedCampaign.status);
+  // Latest offer per student for the selected project (admins also see declines and their reasons)
+  const selectedOffers = Object.fromEntries((selectedCampaign?.match_offers || []).map((o) => [o.student, o]));
 
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
@@ -547,7 +556,17 @@ const AdminDashboard = () => {
                         <div className="text-sm text-[#5B6478]">{camp.company_name} · {formatMoney(camp.budget)} · {campaignTypeLabel(camp.type)}</div>
                         {camp.assigned_students_details?.length > 0 && (
                           <div className="mt-2 text-xs text-emerald-700 flex items-center gap-1">
-                            <UserCheck size={13} /> {camp.assigned_students_details.map((s) => s.full_name).join(', ')}
+                            <UserCheck size={13} className="shrink-0" /> {camp.assigned_students_details.map((s) => s.full_name).join(', ')}
+                          </div>
+                        )}
+                        {camp.status === 'MATCHED' && camp.awaiting_student_acceptance && (
+                          <div className="mt-1 text-xs text-amber-700">
+                            {(camp.match_offers || []).filter((o) => o.status === 'ACCEPTED').length} of {(camp.match_offers || []).filter((o) => ['PENDING', 'ACCEPTED'].includes(o.status)).length} accepted · waiting for students
+                          </div>
+                        )}
+                        {(camp.match_offers || []).some((o) => o.status === 'DECLINED') && ['OPEN', 'MATCHED'].includes(camp.status) && (
+                          <div className="mt-1 text-xs text-red-700">
+                            Declined: {camp.match_offers.filter((o) => o.status === 'DECLINED').map((o) => o.student_name).join(', ')}
                           </div>
                         )}
                       </button>
@@ -605,9 +624,13 @@ const AdminDashboard = () => {
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold truncate">{stud.full_name}</span>
                                 <span className="block text-xs text-[#5B6478] truncate">{stud.university} · {domainLabel(stud.domain_focus)}{stud.skills?.length ? ` · ${stud.skills.slice(0, 3).join(', ')}` : ''}</span>
+                                {selectedOffers[stud.id]?.status === 'DECLINED' && selectedOffers[stud.id].decline_reason && (
+                                  <span className="block text-xs text-red-700 mt-0.5 whitespace-normal">Declined: “{selectedOffers[stud.id].decline_reason}”</span>
+                                )}
                               </span>
                             </span>
                             <span className="flex flex-col items-end gap-1 shrink-0">
+                              {OFFER_BADGES[selectedOffers[stud.id]?.status] && <StatusBadge status={OFFER_BADGES[selectedOffers[stud.id].status].status} label={OFFER_BADGES[selectedOffers[stud.id].status].label} />}
                               {isVerified ? <StatusBadge status="VERIFIED" /> : <StatusBadge status="PENDING_VERIFICATION" label="Not verified" />}
                               {stud.isFit && isVerified && <span className="text-[10px] font-semibold text-[#0090C6] inline-flex items-center gap-0.5"><Check size={11} /> Good fit</span>}
                             </span>
@@ -623,13 +646,18 @@ const AdminDashboard = () => {
                       <label className="field-label" htmlFor="match-notes">Note for the client and students</label>
                       <textarea id="match-notes" value={matchNotes} onChange={(e) => setMatchNotes(e.target.value)} rows={3} className="input" placeholder="e.g. Ahmad leads the build based on his Django experience; Farhan handles UI." />
                     </div>
+                    {selectedCampaign.awaiting_student_acceptance && (
+                      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        Waiting for the students to accept. The client is asked to confirm once everyone has. Changing the selection withdraws offers from anyone you untick.
+                      </p>
+                    )}
                     {!canAssign && <p className="text-sm text-[#5B6478]">This project is {selectedCampaign.status.toLowerCase().replace('_', ' ')}, so the team can no longer be changed.</p>}
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button onClick={handleAssignMatch} disabled={!canAssign || matchSubmitting || selectedStudentIds.length === 0} className="btn-primary flex-1">
                         {matchSubmitting ? <Loader2 size={15} className="animate-spin" /> : <UserCheck size={15} />}
                         {selectedCampaign.status === 'MATCHED' ? 'Update match' : 'Match selected students'}
                       </button>
-                      {selectedCampaign.status === 'MATCHED' && (
+                      {selectedCampaign.status === 'MATCHED' && !selectedCampaign.awaiting_student_acceptance && (
                         <button
                           onClick={() => setConfirmState({
                             isOpen: true,

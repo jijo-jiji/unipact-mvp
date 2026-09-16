@@ -45,7 +45,7 @@ const CompanyDashboard = () => {
   const countFor = (statuses) => campaigns.filter((c) => statuses.includes(c.status)).length;
   const currentTab = TABS.find((t) => t.key === activeTab);
   const filteredCampaigns = campaigns.filter((c) => currentTab.statuses.includes(c.status));
-  const matchReady = campaigns.filter((c) => c.status === 'MATCHED');
+  const matchReady = campaigns.filter((c) => c.status === 'MATCHED' && !c.awaiting_student_acceptance);
   const tier = treasury?.tier || user?.company_profile?.tier;
   const isPro = tier === 'PRO';
   const verification = user?.company_profile?.verification_status || user?.verification_status;
@@ -145,7 +145,7 @@ const CompanyDashboard = () => {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1.5">
                           <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(camp.type)}</span>
-                          <StatusBadge status={camp.status} />
+                          <StatusBadge status={camp.status} label={camp.awaiting_student_acceptance ? 'Students accepting' : undefined} />
                         </div>
                         <h3 className="font-heading font-bold text-lg group-hover:text-[#0090C6] transition-colors">{camp.title}</h3>
                         <p className="text-[#5B6478] text-sm mt-1 line-clamp-2">{camp.description}</p>
@@ -167,7 +167,7 @@ const CompanyDashboard = () => {
                         <span className="text-[#5B6478] italic">A UniPact admin is finding the right students for you.</span>
                       )}
                       <span className="inline-flex items-center gap-1 font-semibold text-[#0090C6] shrink-0">
-                        {camp.status === 'MATCHED' ? 'Review match' : 'Open project'} <ArrowUpRight size={14} />
+                        {camp.status === 'MATCHED' && !camp.awaiting_student_acceptance ? 'Review match' : 'Open project'} <ArrowUpRight size={14} />
                       </span>
                     </div>
                   </Link>

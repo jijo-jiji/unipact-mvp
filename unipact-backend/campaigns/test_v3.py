@@ -109,9 +109,17 @@ class V3TalentMarketplaceTests(APITestCase):
         self.assertEqual(match_res.status_code, status.HTTP_200_OK)
         self.assertEqual(match_res.data['campaign']['status'], 'MATCHED')
 
-        # 4. Company Finalizes Match (Paying Finder Fee)
+        # 4. The company can't confirm until the student accepts the offer
         self.client.force_authenticate(user=self.company_user)
         finalize_url = reverse('finalize_match', kwargs={'campaign_id': job_id})
+        self.assertEqual(self.client.post(finalize_url, {'mock_pay': True}, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.client.force_authenticate(user=student_user)
+        accept_res = self.client.post(reverse('respond_match_offer', kwargs={'campaign_id': job_id}), {'action': 'accept'}, format='json')
+        self.assertEqual(accept_res.status_code, status.HTTP_200_OK)
+
+        # 5. Company Finalizes Match (Paying Finder Fee)
+        self.client.force_authenticate(user=self.company_user)
         fin_res = self.client.post(finalize_url, {'mock_pay': True}, format='json')
         self.assertEqual(fin_res.status_code, status.HTTP_200_OK)
         self.assertEqual(fin_res.data['campaign']['status'], 'IN_PROGRESS')

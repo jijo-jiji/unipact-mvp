@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
+import { LEGAL } from '../utils/legal';
 
 // Footer for public pages (landing, legal). Section links jump back to the landing page sections.
 const SiteFooter = () => (
@@ -30,12 +31,13 @@ const SiteFooter = () => (
         <ul className="space-y-1">
           <li><Link to="/privacy" className="inline-block py-1.5 hover:text-[#0A1748]">Privacy Policy</Link></li>
           <li><Link to="/terms" className="inline-block py-1.5 hover:text-[#0A1748]">Terms of Service</Link></li>
+          <li><a href={`mailto:${LEGAL.contactEmail}`} className="inline-block py-1.5 hover:text-[#0A1748] break-all">Contact us</a></li>
         </ul>
       </nav>
     </div>
     <div className="border-t border-[rgba(10,23,72,0.06)]">
       <p className="max-w-[1160px] mx-auto px-4 sm:px-8 py-5 text-xs text-[#5B6478] text-center md:text-left">
-        © {new Date().getFullYear()} UniPact. All rights reserved.
+        © {new Date().getFullYear()} {LEGAL.entityName} ({LEGAL.registrationNumber}). All rights reserved.
       </p>
     </div>
   </footer>

@@ -200,7 +200,7 @@ export const TermsPage = () => {
       body: (
         <ul>
           <li>Companies post projects describing the work, budget, deadline and deliverables.</li>
-          <li>UniPact proposes a team of verified students. The company reviews the team and decides whether to confirm the match. Students may invite other registered students to join their team.</li>
+          <li>UniPact offers the project to verified students, who are free to accept or decline. Once the team has accepted, the company reviews it and decides whether to confirm the match. Students may invite other registered students to join their team.</li>
           <li>The student team completes the work and submits deliverables through UniPact. The company reviews them, completes the project and may leave a rating.</li>
           <li>UniPact provides the platform and matching service. Unless we agree otherwise in writing, we are not a party to the working arrangement between a company and its student team, and we do not guarantee the outcome of any project.</li>
         </ul>
