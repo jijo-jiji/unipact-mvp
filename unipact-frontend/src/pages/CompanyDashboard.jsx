@@ -7,6 +7,7 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { SERVICE_FEE_PERCENT } from '../utils/constants';
 
 const TABS = [
   { key: 'recruiting', label: 'Finding talent', statuses: ['OPEN', 'MATCHED'] },
@@ -19,24 +20,17 @@ const CompanyDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
-  const [treasury, setTreasury] = useState(null);
   const [activeTab, setActiveTab] = useState('recruiting');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
-      // Load independently so a billing hiccup doesn't hide the project list
-      const [campaignsRes, treasuryRes] = await Promise.allSettled([
-        api.get('/campaigns/', { params: { mode: 'my_campaigns' } }),
-        api.get('/payments/treasury/'),
-      ]);
-      if (campaignsRes.status === 'fulfilled') {
-        setCampaigns(campaignsRes.value.data);
-      } else {
+      try {
+        setCampaigns((await api.get('/campaigns/', { params: { mode: 'my_campaigns' } })).data);
+      } catch {
         setLoadError('We could not load your projects. Please refresh the page.');
       }
-      if (treasuryRes.status === 'fulfilled') setTreasury(treasuryRes.value.data);
       setLoading(false);
     };
     fetchData();
@@ -46,8 +40,6 @@ const CompanyDashboard = () => {
   const currentTab = TABS.find((t) => t.key === activeTab);
   const filteredCampaigns = campaigns.filter((c) => currentTab.statuses.includes(c.status));
   const matchReady = campaigns.filter((c) => c.status === 'MATCHED' && !c.awaiting_student_acceptance);
-  const tier = treasury?.tier || user?.company_profile?.tier;
-  const isPro = tier === 'PRO';
   const verification = user?.company_profile?.verification_status || user?.verification_status;
 
   return (
@@ -56,10 +48,21 @@ const CompanyDashboard = () => {
 
       <main className="max-w-[1160px] w-full mx-auto px-4 sm:px-8 py-8 space-y-8 flex-1">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="eyebrow mb-1"><span className="eyebrow-dot" /> {user?.company_profile?.company_name || user?.name || 'Client workspace'}</p>
-            <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight">Your projects</h1>
-            <p className="text-[#5B6478] text-sm mt-1">Post projects, confirm student matches and review deliverables in one place.</p>
+          <div className="flex items-start sm:items-center gap-4">
+            {(user?.avatar_url || user?.company_profile?.logo) && (
+              <div className="w-14 h-14 rounded-xl border border-[rgba(10,23,72,0.12)] bg-white p-1 shadow-sm shrink-0 overflow-hidden flex items-center justify-center">
+                <img
+                  src={user?.avatar_url || user?.company_profile?.logo}
+                  alt={user?.company_profile?.company_name || 'Logo'}
+                  className="w-full h-full object-contain rounded-lg"
+                />
+              </div>
+            )}
+            <div>
+              <p className="eyebrow mb-1"><span className="eyebrow-dot" /> {user?.company_profile?.company_name || user?.name || 'Client workspace'}</p>
+              <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight">Your projects</h1>
+              <p className="text-[#5B6478] text-sm mt-1">Post projects, confirm student matches and review deliverables in one place.</p>
+            </div>
           </div>
           <button onClick={() => navigate('/campaign/new')} className="btn-primary self-start sm:self-auto px-5 py-3">
             <Plus size={16} /> Post a project
@@ -102,9 +105,9 @@ const CompanyDashboard = () => {
             </div>
           ))}
           <div className="card p-5">
-            <span className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] block mb-1">Plan</span>
+            <span className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] block mb-1">Service fee</span>
             <div className="font-heading text-xl font-extrabold mt-1.5 flex items-center gap-2">
-              <ShieldCheck size={20} className="text-[#00AEEF]" /> {tier ? (isPro ? 'Pro' : 'Free') : '–'}
+              <ShieldCheck size={20} className="text-[#00AEEF]" /> {SERVICE_FEE_PERCENT}% per project
             </div>
           </div>
         </div>
@@ -189,17 +192,15 @@ const CompanyDashboard = () => {
           <aside className="card p-6 sm:p-8 h-fit space-y-5">
             <div>
               <h2 className="font-heading font-bold text-lg">Billing</h2>
-              <p className="text-sm text-[#5B6478]">Your plan and matching fees</p>
+              <p className="text-sm text-[#5B6478]">How project fees work</p>
             </div>
-            <div className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] p-5 rounded-xl text-center">
-              <span className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] block mb-1">Current plan</span>
-              <h3 className="font-heading font-extrabold text-2xl text-[#0B1E63] mb-2">{isPro ? 'Pro' : 'Free'}</h3>
+            <div className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] p-5 rounded-xl">
               <p className="text-sm text-[#5B6478]">
-                {isPro ? "Finder's fees are waived on every match." : "Posting is free. A finder's fee applies when you confirm a student match."}
+                Posting is free. When you confirm your student team, you pay the project budget into escrow. UniPact keeps {SERVICE_FEE_PERCENT}% and releases the rest to the team as you approve each milestone.
               </p>
             </div>
             <button onClick={() => navigate('/company/treasury')} className="btn-secondary w-full">
-              <CreditCard size={15} /> {isPro ? 'Manage billing' : 'Upgrade or view invoices'}
+              <CreditCard size={15} /> View payments
             </button>
           </aside>
         </div>

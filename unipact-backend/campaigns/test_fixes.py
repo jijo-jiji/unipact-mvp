@@ -1,4 +1,6 @@
 from decimal import Decimal
+from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -43,6 +45,28 @@ class CampaignAccessControlTests(APITestCase):
         self.assertEqual(created.assigned_students.count(), 0)
         self.assertEqual(created.match_notes, '')
 
+    def test_company_cannot_set_fee_or_payment_structure_on_create(self):
+        self.client.force_authenticate(user=self.company_user)
+        res = self.client.post(reverse('campaign_list_create'), {
+            'title': 'New', 'description': 'd', 'type': 'SOFTWARE_DEVELOPMENT', 'budget': '500.00',
+            'platform_fee_percent': '0.00', 'payment_structure': 'MANUAL',
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Campaign.objects.get(id=res.data['id'])
+        self.assertIsNone(created.platform_fee_percent)
+        self.assertEqual(created.payment_structure, Campaign.PaymentStructure.UPFRONT)
+
+    def test_campaign_shows_students_their_pay_after_the_service_fee(self):
+        url = reverse('campaign_detail', kwargs={'pk': self.campaign.id})
+        self.client.force_authenticate(user=self.lead_user)
+        res = self.client.get(url)
+        self.assertEqual((res.data['student_pool'], res.data['service_fee_percent']), ('900.00', '10'))
+
+        self.campaign.platform_fee_percent = Decimal('12.50')
+        self.campaign.save()
+        res = self.client.get(url)
+        self.assertEqual((res.data['student_pool'], res.data['service_fee_percent']), ('875.00', '12.5'))
+
     def test_private_workspace_fields_hidden_from_outsiders(self):
         url = reverse('campaign_detail', kwargs={'pk': self.campaign.id})
         self.client.force_authenticate(user=self.outsider_user)
@@ -73,6 +97,45 @@ class CampaignAccessControlTests(APITestCase):
         self.assertEqual(ok.data['campaign_company_name'], 'Co')
         self.assertEqual(ProjectTeamInvitation.objects.get(id=ok.data['id']).payout_share_percentage, 30)
 
+    def test_team_invite_rejected_once_accepted_shares_would_exceed_100_percent(self):
+        url = reverse('project_team_invite', kwargs={'campaign_id': self.campaign.id})
+        self.client.force_authenticate(user=self.lead_user)
+
+        first = self.client.post(url, {'invitee_email': 'out@x.my', 'payout_share_percentage': '70'}, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(user=self.outsider_user)
+        accept = self.client.post(reverse('respond_team_invitation', kwargs={'invitation_id': first.data['id']}), {'action': 'accept'}, format='json')
+        self.assertEqual(accept.status_code, status.HTTP_200_OK)
+
+        # Another 40% would push the team's committed split to 110%
+        self.client.force_authenticate(user=self.lead_user)
+        second = self.client.post(url, {'invitee_email': 'fourth@x.my', 'payout_share_percentage': '40'}, format='json')
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('100%', second.data['error'])
+
+    def test_student_shares_never_exceed_100_percent_even_if_data_is_malformed(self):
+        """The invite endpoint blocks over-committing shares, but campaign_student_shares (the
+        last line of defense before payouts are computed) must stay safe even if bad data gets in
+        some other way - directly via the ORM/admin, a bug, or old data from before that guard existed."""
+        from campaigns.utils import campaign_student_shares
+
+        third_user, third = make_student('third@x.my', 'Third')
+        self.campaign.assigned_students.add(self.outsider, third)
+        ProjectTeamInvitation.objects.create(
+            campaign=self.campaign, invited_by=self.lead, invitee_email='out@x.my', invitee_student=self.outsider,
+            payout_share_percentage=60, status=ProjectTeamInvitation.Status.ACCEPTED,
+        )
+        ProjectTeamInvitation.objects.create(
+            campaign=self.campaign, invited_by=self.lead, invitee_email='third@x.my', invitee_student=third,
+            payout_share_percentage=60, status=ProjectTeamInvitation.Status.ACCEPTED,
+        )
+
+        shares = campaign_student_shares(self.campaign)
+        self.assertEqual(sum(shares.values()), Decimal('100'))
+        # Proportionally scaled down from 60/60 (raw sum 120) rather than clamped unevenly
+        self.assertEqual(shares[self.outsider.id], shares[third.id])
+
     def test_student_deliverable_requires_file_or_valid_link(self):
         url = reverse('student_submit_deliverable', kwargs={'campaign_id': self.campaign.id})
         self.client.force_authenticate(user=self.lead_user)
@@ -97,9 +160,48 @@ class CampaignAccessControlTests(APITestCase):
         self.campaign.status = Campaign.Status.MATCHED
         self.campaign.save()
         self.client.force_authenticate(user=self.admin)
-        res = self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')
+        plan_url = reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id})
+        plan_res = self.client.post(plan_url, {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+        self.assertEqual(plan_res.status_code, status.HTTP_201_CREATED)
+
+        res = self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {'mock_pay': True}, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['campaign']['status'], 'IN_PROGRESS')
+
+    def test_admin_finalize_without_mock_pay_requires_real_payment(self):
+        self.campaign.status = Campaign.Status.MATCHED
+        self.campaign.save()
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id}), {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+
+        # An admin's "Lock & start" click sends no body - it must NOT silently fabricate a payment
+        res = self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertFalse(Transaction.objects.filter(related_campaign=self.campaign, transaction_type=Transaction.Type.PROJECT_FEE).exists())
+
+    @override_settings(MOCK_PAYMENTS_ENABLED=False)
+    def test_without_demo_checkout_client_cannot_self_certify_payment(self):
+        self.campaign.status = Campaign.Status.MATCHED
+        self.campaign.save()
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id}), {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+
+        self.client.force_authenticate(user=self.company_user)
+        url = reverse('finalize_match', kwargs={'campaign_id': self.campaign.id})
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(url, {'mock_pay': True}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertEqual(res.data['payment_method'], 'bank_transfer')
+        self.assertFalse(Transaction.objects.filter(related_campaign=self.campaign).exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('admin@x.my', mail.outbox[0].to + mail.outbox[0].bcc)
+        self.assertIn('RM 1000', mail.outbox[0].body)
+
+        # Once an admin records the bank transfer, the client can confirm
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(reverse('admin_record_client_payment', kwargs={'campaign_id': self.campaign.id}), {'amount': '1000.00', 'reference': 'IBG-123'}, format='json')
+        self.client.force_authenticate(user=self.company_user)
+        self.assertEqual(self.client.post(url, {}, format='json').status_code, status.HTTP_200_OK)
 
     def test_matching_rejected_for_in_progress_campaign(self):
         self.client.force_authenticate(user=self.admin)
@@ -170,8 +272,37 @@ class UserAndAdminFixTests(APITestCase):
         self.client.cookies['refresh_token'] = 'garbage'
         self.assertEqual(self.client.post(reverse('token_refresh')).status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_token_refresh_for_deleted_or_blocked_account_is_401_not_500(self):
+        blocked_user, _ = make_student('blocked@x.my', 'Blocked')
+        deleted_user, _ = make_student('gone@x.my', 'Gone')
+        blocked_token, deleted_token = str(RefreshToken.for_user(blocked_user)), str(RefreshToken.for_user(deleted_user))
+        blocked_user.is_active = False
+        blocked_user.save()
+        deleted_user.delete()
+
+        for token in (blocked_token, deleted_token):
+            self.client.cookies['refresh_token'] = token
+            res = self.client.post(reverse('token_refresh'))
+            self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+            self.assertEqual(res.cookies['refresh_token'].value, '')  # dead session cookie is cleared
+
 
 class MockCheckoutTests(APITestCase):
+    @override_settings(MOCK_PAYMENTS_ENABLED=False)
+    def test_demo_checkout_is_closed_when_disabled(self):
+        user = User.objects.create_user(username='pay@corp.com', email='pay@corp.com', password='Pass12345!', role=User.Role.COMPANY)
+        company = CompanyProfile.objects.create(user=user, company_name='Pay', verification_status='VERIFIED')
+        tx = Transaction.objects.create(company=company, amount=499, transaction_type='SUBSCRIPTION', status='PENDING', stripe_payment_id='pi_mock_x')
+        self.client.force_authenticate(user=user)
+        for res in (
+            self.client.post(reverse('create_intent'), {'amount': '499', 'type': 'SUBSCRIPTION'}, format='json'),
+            self.client.post(reverse('mock_checkout', args=[tx.id])),
+            self.client.post(reverse('confirm_payment', args=[tx.id])),
+        ):
+            self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        company.refresh_from_db()
+        self.assertEqual(company.tier, CompanyProfile.Tier.FREE)
+
     def test_checkout_then_confirm_succeeds_and_upgrades(self):
         user = User.objects.create_user(username='pay@corp.com', email='pay@corp.com', password='Pass12345!', role=User.Role.COMPANY)
         company = CompanyProfile.objects.create(user=user, company_name='Pay', verification_status='VERIFIED')

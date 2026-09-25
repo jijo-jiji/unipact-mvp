@@ -57,6 +57,7 @@ const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
 const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
+const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
 
 function App() {
   return (
@@ -78,6 +79,8 @@ function App() {
           <Route path="/join-club" element={<JoinClubPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          {/* Verified Impact Ledger: public once published, previewable by its student/client/admin */}
+          <Route path="/ledger/:slug" element={<ImpactLedgerPage />} />
 
           {/* === ANY SIGNED-IN USER === */}
           <Route

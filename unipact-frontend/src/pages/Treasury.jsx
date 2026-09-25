@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, FileText, CheckCircle2, CreditCard, Sparkles } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, FileText, CheckCircle2, CreditCard } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,10 +10,11 @@ import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { formatDate, formatMoney, getErrorMessage, transactionTypeLabel } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { CARD_CHECKOUT_ENABLED, SERVICE_FEE_PERCENT } from '../utils/constants';
 
 const PRO_PRICE = 499;
 
-// The RM 1 "Add card" check is stored as a subscription-type payment; name it for what it is
+// Legacy Pro plan price. The RM 1 "Add card" check is stored as a subscription-type payment; name it for what it is
 const describe = (tx) => (tx.transaction_type === 'SUBSCRIPTION' && Number(tx.amount) < PRO_PRICE ? 'Card verification' : transactionTypeLabel(tx.transaction_type));
 // A checkout that was opened but never paid
 const historyStatus = (tx) => (tx.status === 'PENDING' ? 'NOT_COMPLETED' : tx.status);
@@ -51,8 +52,6 @@ const Treasury = () => {
 
   if (loading) return <PageLoader message="Loading billing…" />;
 
-  const isPro = account?.tier === 'PRO';
-
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
       <WorkspaceNav />
@@ -63,31 +62,25 @@ const Treasury = () => {
 
         <div>
           <h1 className="font-heading font-extrabold text-2xl sm:text-3xl">Billing</h1>
-          <p className="text-sm text-[#5B6478] mt-1">Manage your plan, payment method and past payments.</p>
+          <p className="text-sm text-[#5B6478] mt-1">Your payment method and past payments.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <section className={`md:col-span-2 card p-6 sm:p-8 ${isPro ? '' : 'border-2 border-[#00AEEF]/40'}`}>
-            <p className="eyebrow mb-2"><span className="eyebrow-dot" /> Current plan</p>
-            <div className="flex items-center gap-3 mb-2">
+          <section className={`${CARD_CHECKOUT_ENABLED ? 'md:col-span-2' : 'md:col-span-3'} card p-6 sm:p-8`}>
+            <p className="eyebrow mb-2"><span className="eyebrow-dot" /> How you&apos;re billed</p>
+            <div className="flex items-center gap-3 mb-4">
               <ShieldCheck size={28} className="text-[#00AEEF]" />
-              <h2 className="font-heading font-extrabold text-3xl">{isPro ? 'Pro' : 'Free'}</h2>
+              <h2 className="font-heading font-extrabold text-2xl sm:text-3xl">Escrow-secured projects</h2>
             </div>
-            <p className="text-sm text-[#5B6478] max-w-lg mb-6">
-              {isPro
-                ? "You're on Pro. Finder's fees are waived on every student match."
-                : "Posting projects is free. A finder's fee applies each time you confirm a student match. Upgrade to Pro to waive all finder's fees."}
-            </p>
-            {!isPro && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <button onClick={() => setPayment({ amount: PRO_PRICE, description: 'Pro plan (1 month)', type: 'SUBSCRIPTION' })} className="btn-primary px-6 py-3">
-                  <Sparkles size={16} /> Upgrade to Pro · {formatMoney(PRO_PRICE)}/month
-                </button>
-                <span className="text-xs text-[#5B6478]">Cancel anytime.</span>
-              </div>
-            )}
+            <ol className="text-sm text-[#5B6478] max-w-lg space-y-2 list-decimal pl-5">
+              <li>Posting projects is free, with no subscription.</li>
+              <li>When you confirm your student team, you pay the project budget into UniPact escrow.</li>
+              <li>UniPact keeps {SERVICE_FEE_PERCENT}% for matching and managing the project, and releases the rest to the team as you approve each milestone.</li>
+            </ol>
+            {!CARD_CHECKOUT_ENABLED && <p className="text-sm text-[#5B6478] mt-4">Project fees are paid by bank transfer against an invoice from UniPact.</p>}
           </section>
 
+          {CARD_CHECKOUT_ENABLED && (
           <section className="card p-6 flex flex-col justify-between gap-6">
             <div>
               <h2 className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] mb-4">Payment method</h2>
@@ -105,6 +98,7 @@ const Treasury = () => {
               <CreditCard size={15} /> {account?.card_last_4 ? 'Update card' : 'Add card'}
             </button>
           </section>
+          )}
         </div>
 
         <section className="card p-6 sm:p-8">

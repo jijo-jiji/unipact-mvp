@@ -5,7 +5,8 @@ from django.conf import settings
 from rest_framework import serializers
 
 # Verification documents: student IDs, SSM certificates, club letters
-DOCUMENT_EXTENSIONS = {'.pdf', '.png', '.jpg', '.jpeg', '.webp'}
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
+DOCUMENT_EXTENSIONS = {'.pdf'} | IMAGE_EXTENSIONS
 
 # Project files: briefs, brand assets, raw footage, audio stems and deliverables
 PROJECT_FILE_EXTENSIONS = DOCUMENT_EXTENSIONS | {
@@ -61,3 +62,9 @@ def validate_document_upload(file_obj, label='Document'):
 
 def validate_project_file_upload(file_obj, label='File'):
     return _check(file_obj, PROJECT_FILE_EXTENSIONS, settings.MAX_PROJECT_FILE_UPLOAD_MB, label)
+
+
+def validate_image_upload(file_obj, label='Image', max_mb=None):
+    limit = max_mb if max_mb is not None else getattr(settings, 'MAX_IMAGE_UPLOAD_MB', 5)
+    return _check(file_obj, IMAGE_EXTENSIONS, limit, label)
+

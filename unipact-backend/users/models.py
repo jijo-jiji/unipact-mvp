@@ -42,6 +42,7 @@ class CompanyProfile(models.Model):
         default=VerificationStatus.PENDING_REVIEW
     )
     ssm_document = models.FileField(upload_to='company_docs/', blank=True, null=True)
+    logo = models.ImageField(upload_to='profile_photos/companies/', blank=True, null=True)
     
     # Payment Method Details (Mock Storage)
     card_last_4 = models.CharField(max_length=4, blank=True, null=True)
@@ -76,6 +77,7 @@ class ClubProfile(models.Model):
         default=Rank.C
     )
     verification_document = models.FileField(upload_to='club_docs/', blank=True, null=True)
+    logo = models.ImageField(upload_to='profile_photos/clubs/', blank=True, null=True)
 
     # Rank Calculation
     def calculate_rank(self):
@@ -133,6 +135,7 @@ class StudentProfile(models.Model):
         default=VerificationStatus.PENDING_VERIFICATION
     )
     verification_document = models.FileField(upload_to='student_docs/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to='profile_photos/students/', blank=True, null=True)
     secondary_email = models.EmailField(blank=True, null=True)
     
     # Lightweight Club Affiliation per REQ-3.6.2 (Forward-compatible with postponed v2.2.1)
@@ -143,8 +146,20 @@ class StudentProfile(models.Model):
     bio = models.TextField(blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
 
+    # Malaysian Bank Account Details for Project Payouts
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    bank_account_number = models.CharField(max_length=50, blank=True, null=True)
+    bank_account_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    duitnow_id = models.CharField(max_length=50, blank=True, null=True)
+
     def __str__(self):
         return f"{self.full_name} ({self.university})"
+
+    @property
+    def has_bank_details(self):
+        """Enough on file for UniPact to make a bank transfer."""
+        return bool(self.bank_name and self.bank_account_number)
+
 
 class ShadowUser(models.Model):
     """

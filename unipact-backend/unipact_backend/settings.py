@@ -200,6 +200,14 @@ STORAGES = {
 # Upload limits (MB), enforced in unipact_backend/validators.py
 MAX_DOCUMENT_UPLOAD_MB = int(os.getenv('MAX_DOCUMENT_UPLOAD_MB', '10'))
 MAX_PROJECT_FILE_UPLOAD_MB = int(os.getenv('MAX_PROJECT_FILE_UPLOAD_MB', '500'))
+MAX_IMAGE_UPLOAD_MB = int(os.getenv('MAX_IMAGE_UPLOAD_MB', '5'))
+# Default UniPact cut of a project's full fee (percent). Per-campaign overrides live on Campaign.platform_fee_percent.
+DEFAULT_PLATFORM_FEE_PERCENT = os.getenv('DEFAULT_PLATFORM_FEE_PERCENT', '10')
+# The card checkout is a simulation that marks payments as paid without collecting any money.
+# Never allow it in production: clients pay by bank transfer and an admin records the payment.
+MOCK_PAYMENTS_ENABLED = env_bool('MOCK_PAYMENTS_ENABLED', default=not IS_PRODUCTION)
+if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
+    raise ImproperlyConfigured('MOCK_PAYMENTS_ENABLED must be false in production: the demo checkout collects no money.')
 # Keep large uploads on disk while processing instead of in memory
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024

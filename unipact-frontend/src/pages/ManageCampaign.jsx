@@ -2,22 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Trophy, Clock, CheckCircle2, Star, FileText, Download, Upload, Sparkles,
-  CalendarDays, Loader2, ArrowUpRight, AlertCircle, Info, Lock,
+  CalendarDays, Loader2, ArrowUpRight, AlertCircle, Info, Lock, RotateCcw, Wallet, Flag,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
-import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
 import PaymentModal from '../components/PaymentModal';
+import ImpactStatementCard from '../components/ImpactStatementCard';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { CARD_CHECKOUT_ENABLED } from '../utils/constants';
 
-// Fees mirror the backend: FinalizeMatchView (V3 match) and AwardApplicationView (club award)
-const MATCH_FINDERS_FEE = 150;
+// Mirrors the backend: AwardApplicationView (club award) still charges this flat fee.
+// The V3 student flow (FinalizeMatchView) now charges the full project fee instead - see finalizeMatch below.
 const CLUB_FINDERS_FEE = 100;
 
 const STEPS = [
@@ -64,18 +65,18 @@ const ManageCampaign = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { user } = useAuth();
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const [payment, setPayment] = useState(null); // { amount, description, onPaid }
+  const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
   const [asset, setAsset] = useState({ file: null, title: '', type: 'DOCUMENT' });
   const [uploading, setUploading] = useState(false);
-
-  const isFreeTier = (user?.company_profile?.tier || user?.tier) !== 'PRO';
+  const [revisionModal, setRevisionModal] = useState({ isOpen: false, milestoneId: null, feedback: '' });
+  const [milestoneBusy, setMilestoneBusy] = useState(null);
 
   const fetchCampaign = useCallback(async () => {
     try {
@@ -92,7 +93,7 @@ const ManageCampaign = () => {
     fetchCampaign();
   }, [fetchCampaign]);
 
-  // ---- V3 match confirmation ----
+  // ---- V3 match confirmation (managed escrow: full project fee, released to the team per milestone) ----
   const finalizeMatch = async () => {
     setBusy(true);
     try {
@@ -100,8 +101,12 @@ const ManageCampaign = () => {
       showToast('Match confirmed. Your student team can start work now.', 'success');
       await fetchCampaign();
     } catch (error) {
-      if (error.response?.status === 402) {
-        setPayment({ amount: MATCH_FINDERS_FEE, description: `Finder's fee · ${campaign.title}`, onPaid: finalizeMatch });
+      if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
+        // No card checkout yet: UniPact's admins were emailed to send an invoice
+        setInvoiceDue(error.response.data.project_fee ?? campaign.budget);
+      } else if (error.response?.status === 402) {
+        // The server reports what's still outstanding, so a partially-paid project only asks for the rest
+        setPayment({ amount: error.response.data?.project_fee ?? campaign.budget, description: `Project fee · ${campaign.title}`, type: 'PROJECT_FEE', onPaid: finalizeMatch });
       } else {
         showToast(getErrorMessage(error, 'Could not confirm the match.'), 'error');
       }
@@ -110,16 +115,35 @@ const ManageCampaign = () => {
     }
   };
 
+  const isManualBilling = campaign?.payment_structure === 'MANUAL';
+
   const handleConfirmMatch = () => {
     setConfirmState({
       isOpen: true,
       title: 'Confirm this student match?',
-      message: isFreeTier
-        ? `Confirming locks in the team and starts the project. As a Free plan client, a one-time finder's fee of ${formatMoney(MATCH_FINDERS_FEE)} applies.`
-        : 'Confirming locks in the team and starts the project. Finder\'s fees are waived on your Pro plan.',
-      confirmText: isFreeTier ? 'Continue to payment' : 'Confirm match',
+      message: isManualBilling
+        ? 'Confirming locks in the team and starts the project. UniPact will invoice you separately for this project.'
+        : CARD_CHECKOUT_ENABLED
+          ? `Confirming locks in the team and starts the project. This charges the full project fee of ${formatMoney(campaign.budget)}, held in escrow. UniPact keeps its ${campaign.service_fee_percent}% service fee and releases the rest to the team as each milestone is approved.`
+          : `The project starts once the full project fee of ${formatMoney(campaign.budget)} is in escrow. If it isn't paid yet, UniPact will email you an invoice to pay by bank transfer. UniPact keeps its ${campaign.service_fee_percent}% service fee and releases the rest to the team as each milestone is approved.`,
+      confirmText: isManualBilling || !CARD_CHECKOUT_ENABLED ? 'Confirm match' : 'Continue to payment',
       onConfirm: finalizeMatch,
     });
+  };
+
+  // ---- Milestones (managed escrow) ----
+  const reviewMilestone = async (milestoneId, action, feedback) => {
+    setMilestoneBusy(milestoneId);
+    try {
+      await api.post(`/campaigns/${id}/milestones/${milestoneId}/review/`, { action, feedback });
+      showToast(action === 'approve' ? 'Milestone approved. Payout has been queued for the team.' : 'Revision requested.', 'success');
+      setRevisionModal({ isOpen: false, milestoneId: null, feedback: '' });
+      await fetchCampaign();
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Could not update this milestone.'), 'error');
+    } finally {
+      setMilestoneBusy(null);
+    }
   };
 
   // ---- V2.2.1 club award ----
@@ -207,10 +231,12 @@ const ManageCampaign = () => {
   const team = campaign.assigned_students_details || [];
   const offerStatus = Object.fromEntries((campaign.match_offers || []).map((o) => [o.student, o.status]));
   const deliverables = campaign.student_deliverables || [];
+  const milestones = campaign.milestones || [];
   const assets = campaign.client_assets || [];
   const applications = campaign.applications || [];
   const clubAwaitingReview = applications.some((a) => a.status === 'SUBMITTED');
-  const canComplete = campaign.status === 'IN_PROGRESS' && (deliverables.length > 0 || clubAwaitingReview);
+  const milestonesOutstanding = milestones.length > 0 && milestones.some((m) => m.status !== 'APPROVED');
+  const canComplete = campaign.status === 'IN_PROGRESS' && (deliverables.length > 0 || clubAwaitingReview) && !milestonesOutstanding;
   const isCompleted = campaign.status === 'COMPLETED';
 
   return (
@@ -266,8 +292,12 @@ const ManageCampaign = () => {
             <div className="flex items-start gap-3 text-sm">
               <Sparkles size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
               <div>
-                <strong className="block text-base">Your student team is ready</strong>
-                <span className="text-[#5B6478]">Every student has accepted. Review the team below, then confirm to start the project.</span>
+                <strong className="block text-base">{invoiceDue ? 'Invoice on its way' : 'Your student team is ready'}</strong>
+                <span className="text-[#5B6478]">
+                  {invoiceDue
+                    ? `UniPact will email you an invoice for ${formatMoney(invoiceDue)} to pay by bank transfer, usually within one business day. Once we've received it, click Confirm match again to start the project.`
+                    : 'Every student has accepted. Review the team below, then confirm to start the project.'}
+                </span>
               </div>
             </div>
             <button onClick={handleConfirmMatch} disabled={busy} className="btn-primary self-start sm:self-auto">
@@ -280,9 +310,11 @@ const ManageCampaign = () => {
             <div className="flex items-start gap-3 text-sm">
               <Info size={18} className="text-[#00AEEF] shrink-0 mt-0.5" />
               <span>
-                {canComplete
-                  ? 'Work has been submitted. When you are happy with it, approve and complete the project.'
-                  : 'The team is working on it. You can approve the project once they submit their work.'}
+                {milestonesOutstanding
+                  ? 'Approve every milestone above before closing out the project.'
+                  : canComplete
+                    ? 'Work has been submitted. When you are happy with it, approve and complete the project.'
+                    : 'The team is working on it. You can approve the project once they submit their work.'}
               </span>
             </div>
             <button onClick={() => setReview({ isOpen: true, rating: 5, comment: '' })} disabled={!canComplete || busy} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
@@ -304,6 +336,7 @@ const ManageCampaign = () => {
             )}
           </div>
         )}
+        {isCompleted && team.length > 0 && <ImpactStatementCard campaign={campaign} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -340,6 +373,54 @@ const ManageCampaign = () => {
                       )}
                       <span className="text-xs font-semibold text-[#0090C6] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
                     </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Milestones (managed escrow) */}
+            {milestones.length > 0 && (
+              <section className="card p-6 sm:p-8">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h2 className="font-heading text-lg font-bold flex items-center gap-2">
+                    <Flag size={18} className="text-[#00AEEF]" /> Milestones ({milestones.length})
+                  </h2>
+                  {campaign.escrow && (
+                    <span className="text-xs text-[#5B6478] inline-flex items-center gap-1">
+                      <Wallet size={13} /> Escrow available: <strong className="text-[#0B1E63]">{formatMoney(campaign.escrow.available)}</strong>
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-[#5B6478] mb-4">Funds are held by UniPact and released to the team as each milestone is approved.</p>
+                <div className="space-y-3">
+                  {milestones.map((m) => (
+                    <div key={m.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 text-sm">
+                      <div className="flex flex-wrap justify-between items-start gap-2 mb-1">
+                        <div className="font-semibold text-base">{m.step_number}. {m.title}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-heading font-bold text-[#0B1E63]">{formatMoney(m.amount)}</span>
+                          <StatusBadge status={m.status} />
+                        </div>
+                      </div>
+                      {m.description && <p className="text-[#5B6478] mb-2">{m.description}</p>}
+                      {m.status === 'SUBMITTED' && (
+                        <div className="mt-2 mb-3 flex flex-wrap gap-4 text-xs">
+                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open submission <ArrowUpRight size={12} /></a>}
+                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={12} /> Download file</a>}
+                          {m.deliverable_notes && <p className="text-[#5B6478] w-full">{m.deliverable_notes}</p>}
+                        </div>
+                      )}
+                      {m.status === 'SUBMITTED' && (
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={() => reviewMilestone(m.id, 'approve')} disabled={milestoneBusy === m.id} className="btn-primary btn-sm">
+                            {milestoneBusy === m.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Approve & release
+                          </button>
+                          <button onClick={() => setRevisionModal({ isOpen: true, milestoneId: m.id, feedback: '' })} disabled={milestoneBusy === m.id} className="btn-secondary btn-sm">
+                            <RotateCcw size={13} /> Request revision
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </section>
@@ -509,6 +590,7 @@ const ManageCampaign = () => {
           <div>
             <label className="field-label" htmlFor="review-comment">Feedback (optional)</label>
             <textarea id="review-comment" rows={4} value={review.comment} onChange={(e) => setReview((r) => ({ ...r, comment: e.target.value }))} className="input" placeholder="What went well? Anything they could improve?" />
+            {team.length > 0 && <p className="field-hint">This becomes the starting draft of your testimonial on the students&apos; impact ledgers. You can edit it before signing.</p>}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setReview((r) => ({ ...r, isOpen: false }))} disabled={busy} className="btn-secondary">Cancel</button>
@@ -519,11 +601,38 @@ const ManageCampaign = () => {
         </div>
       </Modal>
 
+      {/* Milestone revision modal */}
+      <Modal
+        isOpen={revisionModal.isOpen}
+        onClose={() => !milestoneBusy && setRevisionModal({ isOpen: false, milestoneId: null, feedback: '' })}
+        title="Request a revision"
+        subtitle="Tell the team what needs to change before you approve this milestone."
+        icon={<RotateCcw size={20} />}
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <textarea
+            rows={4}
+            value={revisionModal.feedback}
+            onChange={(e) => setRevisionModal((r) => ({ ...r, feedback: e.target.value }))}
+            className="input"
+            placeholder="What needs to change?"
+          />
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setRevisionModal({ isOpen: false, milestoneId: null, feedback: '' })} disabled={!!milestoneBusy} className="btn-secondary">Cancel</button>
+            <button onClick={() => reviewMilestone(revisionModal.milestoneId, 'request_revision', revisionModal.feedback)} disabled={!!milestoneBusy} className="btn-primary">
+              {milestoneBusy ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} Send back for revision
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <PaymentModal
         isOpen={!!payment}
         onClose={() => setPayment(null)}
         amount={payment?.amount}
         description={payment?.description}
+        type={payment?.type}
         campaignId={campaign.id}
         onSuccess={() => payment?.onPaid?.()}
       />

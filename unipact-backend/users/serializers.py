@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import CompanyProfile, ClubProfile, StudentProfile, ShadowUser, SystemLog
-from unipact_backend.validators import validate_document_upload
+from unipact_backend.validators import validate_document_upload, validate_image_upload
 
 User = get_user_model()
 
@@ -88,11 +88,14 @@ class CompanyProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, ser
 
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'email', 'password', 'verification_status', 'tier', 'ssm_document']
+        fields = ['company_name', 'company_details', 'email', 'password', 'verification_status', 'tier', 'ssm_document', 'logo']
         read_only_fields = ['verification_status', 'tier']
 
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
+
+    def validate_logo(self, value):
+        return validate_image_upload(value, 'Company logo')
 
 class ClubProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
@@ -100,11 +103,14 @@ class ClubProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serial
 
     class Meta:
         model = ClubProfile
-        fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document', 'rank']
+        fields = ['club_name', 'university', 'email', 'password', 'verification_status', 'verification_document', 'rank', 'logo']
         read_only_fields = ['verification_status', 'rank']
 
     def validate_verification_document(self, value):
         return validate_document_upload(value, 'Verification document')
+
+    def validate_logo(self, value):
+        return validate_image_upload(value, 'Club logo')
 
 class StudentProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -114,11 +120,13 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         model = StudentProfile
         fields = [
             'id', 'user_id', 'full_name', 'university', 'major', 'domain_focus',
-            'verification_status', 'verification_document', 'secondary_email',
+            'verification_status', 'verification_document', 'profile_photo', 'secondary_email',
             'club_affiliation_name', 'club_affiliation_role', 'skills',
-            'bio', 'rating', 'email'
+            'bio', 'rating', 'email',
+            'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id'
         ]
         read_only_fields = ['verification_status', 'rating']
+
 
 class StudentRegistrationSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
@@ -151,7 +159,7 @@ class PublicClubProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ClubProfile
-        fields = ['id', 'club_name', 'university', 'verification_status', 'rank', 'campaign_history']
+        fields = ['id', 'club_name', 'university', 'verification_status', 'rank', 'logo', 'campaign_history']
 
     def get_campaign_history(self, obj):
         # Fetch awarded applications
@@ -310,7 +318,10 @@ class StudentSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'full_name', 'university', 'major', 'domain_focus', 'skills', 'bio',
             'club_affiliation_name', 'club_affiliation_role', 'secondary_email', 'verification_document',
+            'profile_photo',
+            'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id',
         ]
+
         extra_kwargs = {
             'full_name': {'allow_blank': False},
             'university': {'allow_blank': False},
@@ -328,11 +339,14 @@ class StudentSettingsSerializer(serializers.ModelSerializer):
     def validate_verification_document(self, value):
         return validate_document_upload(value, 'Student ID document')
 
+    def validate_profile_photo(self, value):
+        return validate_image_upload(value, 'Profile picture')
+
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'ssm_document']
+        fields = ['company_name', 'company_details', 'ssm_document', 'logo']
         extra_kwargs = {
             'company_name': {'allow_blank': False},
             'ssm_document': {'write_only': True},
@@ -341,11 +355,14 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
 
+    def validate_logo(self, value):
+        return validate_image_upload(value, 'Company logo')
+
 
 class ClubSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClubProfile
-        fields = ['club_name', 'university', 'verification_document']
+        fields = ['club_name', 'university', 'verification_document', 'logo']
         extra_kwargs = {
             'club_name': {'allow_blank': False},
             'university': {'allow_blank': False},
@@ -354,6 +371,9 @@ class ClubSettingsSerializer(serializers.ModelSerializer):
 
     def validate_verification_document(self, value):
         return validate_document_upload(value, 'Verification document')
+
+    def validate_logo(self, value):
+        return validate_image_upload(value, 'Club logo')
 
 
 class ClaimProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):

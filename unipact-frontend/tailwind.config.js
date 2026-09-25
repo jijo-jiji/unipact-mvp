@@ -27,6 +27,7 @@ export default {
       fontFamily: {
         heading: ['Outfit', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
+        signature: ['"Dancing Script"', 'cursive'],
       },
     },
   },

@@ -1,5 +1,9 @@
+from decimal import Decimal
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from users.models import CompanyProfile, ClubProfile, StudentProfile
+
+CENT = Decimal('0.01')
 
 class Campaign(models.Model):
     class Type(models.TextChoices):
@@ -16,6 +20,10 @@ class Campaign(models.Model):
         COMPLETED = 'COMPLETED', 'Completed'
         ARCHIVED = 'ARCHIVED', 'Archived'
 
+    class PaymentStructure(models.TextChoices):
+        UPFRONT = 'UPFRONT', 'Upfront (full project fee before work starts)'
+        MANUAL = 'MANUAL', 'Manual (admin logs client payments as they arrive)'
+
     company = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name='campaigns')
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -24,6 +32,14 @@ class Campaign(models.Model):
     requirements = models.JSONField(default=list) # Stores list of deliverables/conditions
     deadline = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+
+    # Managed-escrow settings (V3.0 student flow only; the Club/SRS v2.2.1 flat-fee flow is untouched)
+    payment_structure = models.CharField(max_length=20, choices=PaymentStructure.choices, default=PaymentStructure.UPFRONT)
+    platform_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))],
+        help_text="Overrides the default platform cut for this campaign (e.g. 10.00 = 10%). Leave blank to use the site default."
+    )
     
     # V3.0 Specialized Category Fields (REQ-3.3.1)
     software_sub_type = models.CharField(max_length=50, blank=True, null=True) # e.g. CRM, ERP, Landing Page
@@ -36,12 +52,30 @@ class Campaign(models.Model):
     assigned_students = models.ManyToManyField(StudentProfile, related_name='assigned_jobs', blank=True)
     match_notes = models.TextField(blank=True)
     is_match_finalized = models.BooleanField(default=False)
-    
+
+    # When work actually started (match finalized) and finished - the ledger's "execution time"
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
+
+    def resolved_fee_percent(self):
+        if self.platform_fee_percent is not None:
+            return self.platform_fee_percent
+        from django.conf import settings
+        return Decimal(str(settings.DEFAULT_PLATFORM_FEE_PERCENT))
+
+    def net_of_fee(self, amount):
+        """What's left of a client payment for the students once UniPact's cut is taken."""
+        return (amount * (Decimal('100') - self.resolved_fee_percent()) / Decimal('100')).quantize(CENT)
+
+    def student_pool(self):
+        """The student-facing pool for this project: the full fee minus UniPact's cut."""
+        return self.net_of_fee(self.budget)
 
     def has_pending_offers(self):
         return self.match_offers.filter(status=MatchOffer.Status.PENDING).exists()
@@ -154,7 +188,7 @@ class Milestone(models.Model):
     step_number = models.PositiveSmallIntegerField(default=1) # 1, 2, 3
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    percentage = models.PositiveSmallIntegerField(default=33) # e.g. 30, 40, 30
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('100'))  # share of the student pool
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     max_revisions = models.PositiveSmallIntegerField(default=2)
     revisions_used = models.PositiveSmallIntegerField(default=0)
@@ -210,3 +244,75 @@ class ProjectTeamInvitation(models.Model):
 
     def __str__(self):
         return f"Invite: {self.invitee_email} to {self.campaign.title} as {self.role_in_project} ({self.status})"
+
+
+class ProjectImpactReport(models.Model):
+    """The client's side of the Verified Impact Ledger, shared by everyone on the project team.
+
+    Only what the client account itself entered and signed goes here - that's what makes the
+    ledger "verified". UniPact admins publish ledgers but never edit this.
+    """
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='impact_report')
+    client_rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    business_pain_point = models.TextField(blank=True)
+    client_industry = models.CharField(max_length=120, blank=True)
+    metrics = models.JSONField(default=list, blank=True)  # up to 2 of {"value": "14 Hrs", "label": "Saved per agent / week"}
+    verified_skills = models.JSONField(default=list, blank=True)
+    testimonial = models.TextField(blank=True)
+    signer_name = models.CharField(max_length=150, blank=True)
+    signer_title = models.CharField(max_length=150, blank=True)
+    signed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='signed_impact_reports')
+    signed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Impact report for {self.campaign.title}"
+
+
+def _ledger_slug(campaign_id):
+    import secrets
+    alphabet = 'abcdefghjkmnpqrstuvwxyz23456789'  # no lookalikes (0/o, 1/l/i), easy to read off a CV
+    return f"UP-{campaign_id:03d}-{''.join(secrets.choice(alphabet) for _ in range(6))}"
+
+
+class ImpactLedger(models.Model):
+    """One student's Verified Impact Ledger for one completed project - the public proof of work."""
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        PUBLISHED = 'PUBLISHED', 'Published'
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='impact_ledgers')
+    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='impact_ledgers')
+    # The random suffix keeps unpublished ledgers from being found by guessing sequential ids
+    slug = models.CharField(max_length=32, unique=True, editable=False)
+
+    role = models.CharField(max_length=150, blank=True)
+    technical_solution = models.TextField(blank=True)
+    proof_url = models.URLField(blank=True)
+    before_image = models.ImageField(upload_to='ledger_proof/', blank=True, null=True)
+    before_caption = models.CharField(max_length=150, blank=True)
+    after_image = models.ImageField(upload_to='ledger_proof/', blank=True, null=True)
+    after_caption = models.CharField(max_length=150, blank=True)
+    student_submitted_at = models.DateTimeField(null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='published_ledgers')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('campaign', 'student')
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            slug = _ledger_slug(self.campaign_id)
+            while ImpactLedger.objects.filter(slug=slug).exists():
+                slug = _ledger_slug(self.campaign_id)
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Ledger {self.slug} - {self.student.full_name}"

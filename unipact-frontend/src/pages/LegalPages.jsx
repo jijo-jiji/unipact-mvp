@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PublicNav from '../components/PublicNav';
 import SiteFooter from '../components/SiteFooter';
 import { LEGAL } from '../utils/legal';
+import { SERVICE_FEE_PERCENT } from '../utils/constants';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 /*
@@ -202,7 +203,7 @@ export const TermsPage = () => {
           <li>Companies post projects describing the work, budget, deadline and deliverables.</li>
           <li>UniPact offers the project to verified students, who are free to accept or decline. Once the team has accepted, the company reviews it and decides whether to confirm the match. Students may invite other registered students to join their team.</li>
           <li>The student team completes the work and submits deliverables through UniPact. The company reviews them, completes the project and may leave a rating.</li>
-          <li>UniPact provides the platform and matching service. Unless we agree otherwise in writing, we are not a party to the working arrangement between a company and its student team, and we do not guarantee the outcome of any project.</li>
+          <li>UniPact provides the platform and matching service, and holds project fees and pays students as described under Fees and payments. Unless we agree otherwise in writing, we are not a party to the working arrangement between a company and its student team, and we do not guarantee the outcome of any project.</li>
         </ul>
       ),
     },
@@ -211,9 +212,10 @@ export const TermsPage = () => {
       body: (
         <ul>
           <li>Posting a project is free.</li>
-          <li>On the Free plan, a one-time finder&apos;s fee applies when a company confirms a student match (currently RM 150 per project). The Pro plan (currently RM 499 per month) waives finder&apos;s fees.</li>
-          <li>The price is always shown before you pay. Fees are charged through our payment provider and, except where the law requires otherwise, are non-refundable once the service has been provided.</li>
-          <li>The project budget is the amount agreed for the student team&apos;s work. How and when the team is paid is set out in the project details and any separate agreement between the parties.</li>
+          <li>When a company confirms its student team, it pays the project fee (the project budget) to UniPact. Unless agreed otherwise in writing, the full project fee is paid before work starts; UniPact may agree a different schedule, such as monthly payments, with a company in writing.</li>
+          <li>UniPact keeps a service fee from each project fee for matching and managing the project (currently {SERVICE_FEE_PERCENT}%, unless a different fee is agreed for that project). The remainder is held by UniPact and paid to the student team as the company approves each milestone, split between team members by their agreed shares. Students see the amount they will be paid before they accept a project.</li>
+          <li>The amount is always shown before you pay. Except where the law requires otherwise, the service fee is non-refundable once the student team has been matched and confirmed. If a project ends early, amounts held for milestones that were not delivered are handled case by case; contact us.</li>
+          <li>Students must keep their bank details up to date. Payouts are made to the account on file, and we may pause a payout to confirm recent changes to bank details.</li>
         </ul>
       ),
     },

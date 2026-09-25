@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, CheckCircle2, XCircle, Search, Activity, Users, ChevronLeft, ChevronRight, Ban,
   Briefcase, UserCheck, Check, Sparkles, Lock, FileText, Loader2, Inbox,
+  CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye,
 } from 'lucide-react';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import ConfirmationModal from '../components/ConfirmationModal';
+import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import PageLoader from '../components/PageLoader';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
@@ -16,7 +18,16 @@ const TABS = [
   { key: 'dashboard', label: 'Overview', icon: <Activity size={16} /> },
   { key: 'entities', label: 'Users', icon: <Users size={16} /> },
   { key: 'matchmaking', label: 'Matchmaking', icon: <Sparkles size={16} /> },
+  { key: 'payouts', label: 'Payouts', icon: <CreditCard size={16} /> },
+  { key: 'ledgers', label: 'Impact ledgers', icon: <Award size={16} /> },
 ];
+
+const LEDGER_CHECKS = [
+  ['client_signed', 'Client signed'],
+  ['student_submitted', 'Student submitted'],
+  ['escrow_released', 'Payout disbursed'],
+];
+
 
 const LOG_COLORS = {
   FINANCIAL: 'text-emerald-700',
@@ -78,8 +89,61 @@ const AdminDashboard = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [matchNotes, setMatchNotes] = useState('');
   const [matchSubmitting, setMatchSubmitting] = useState(false);
+  const [milestoneRows, setMilestoneRows] = useState([{ title: 'Delivery', percentage: 100 }]);
+  const [savingMilestonePlan, setSavingMilestonePlan] = useState(false);
+  const [billing, setBilling] = useState({ payment_structure: 'UPFRONT', platform_fee_percent: '' });
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [selectedEscrow, setSelectedEscrow] = useState(null);
+  const [clientPayment, setClientPayment] = useState({ amount: '', reference: '' });
+  const [recordingClientPayment, setRecordingClientPayment] = useState(false);
+
+  // Payouts state
+  const [payoutsData, setPayoutsData] = useState({ total_disbursed: '0.00', total_pending: '0.00', count_ready: 0, payouts: [] });
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutFilter, setPayoutFilter] = useState('');
+  const [selectedPayout, setSelectedPayout] = useState(null);
+  const [transferRef, setTransferRef] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [confirmBankChange, setConfirmBankChange] = useState(false);
+  const [recordingPayout, setRecordingPayout] = useState(false);
+
+  const fetchPayouts = useCallback(async (statusFilter = '') => {
+    setPayoutsLoading(true);
+    try {
+      const url = statusFilter ? `/payments/admin/payouts/?status=${statusFilter}` : '/payments/admin/payouts/';
+      const res = await api.get(url);
+      setPayoutsData(res.data);
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not load payouts registry.'), 'error');
+    } finally {
+      setPayoutsLoading(false);
+    }
+  }, [showToast]);
+
+  const handleRecordPayout = async (e) => {
+    e.preventDefault();
+    if (!selectedPayout || !transferRef.trim()) return;
+    setRecordingPayout(true);
+    try {
+      const res = await api.post(`/payments/admin/payouts/${selectedPayout.id}/record/`, {
+        transfer_reference: transferRef.trim(),
+        notes: payoutNotes.trim(),
+        confirm_bank_change: confirmBankChange,
+      });
+      showToast(res.data.message || 'Payout recorded as disbursed.', 'success');
+      setSelectedPayout(null);
+      setTransferRef('');
+      setPayoutNotes('');
+      fetchPayouts(payoutFilter);
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Failed to record payout disbursement.'), 'error');
+    } finally {
+      setRecordingPayout(false);
+    }
+  };
 
   const fetchLogs = useCallback(async () => {
+
     try {
       const res = await api.get('/users/admin/logs/');
       setLogs(res.data);
@@ -111,6 +175,46 @@ const AdminDashboard = () => {
     const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
   }, [activeTab, fetchLogs]);
+
+  useEffect(() => {
+    if (activeTab === 'payouts') {
+      fetchPayouts(payoutFilter);
+    }
+  }, [activeTab, payoutFilter, fetchPayouts]);
+
+  // Impact ledgers review queue
+  const [ledgers, setLedgers] = useState([]);
+  const [ledgersLoading, setLedgersLoading] = useState(false);
+  const [ledgerBusy, setLedgerBusy] = useState(null);
+
+  const fetchLedgers = useCallback(async () => {
+    setLedgersLoading(true);
+    try {
+      setLedgers((await api.get('/campaigns/ledgers/admin/')).data);
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not load impact ledgers.'), 'error');
+    } finally {
+      setLedgersLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    if (activeTab === 'ledgers') fetchLedgers();
+  }, [activeTab, fetchLedgers]);
+
+  const setLedgerPublished = async (ledger, publish) => {
+    setLedgerBusy(ledger.slug);
+    try {
+      const res = await api.post(`/campaigns/ledgers/${ledger.slug}/${publish ? 'publish' : 'unpublish'}/`);
+      showToast(res.data.message, 'success');
+      await fetchLedgers();
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not update the ledger.'), 'error');
+    } finally {
+      setLedgerBusy(null);
+    }
+  };
+
 
   const fetchEntities = useCallback(async () => {
     setEntityLoading(true);
@@ -168,9 +272,90 @@ const AdminDashboard = () => {
     setSelectedCampaignId(camp.id);
     setSelectedStudentIds(camp.assigned_students || []);
     setMatchNotes(camp.match_notes || '');
+    setMilestoneRows(
+      camp.milestones?.length
+        ? camp.milestones.map((m) => ({ title: m.title, percentage: Number(m.percentage) }))
+        : [{ title: 'Delivery', percentage: 100 }]
+    );
+    setBilling({ payment_structure: camp.payment_structure || 'UPFRONT', platform_fee_percent: camp.platform_fee_percent ?? '' });
+    setClientPayment({ amount: '', reference: '' });
+    setSelectedEscrow(null);
+    loadEscrow(camp.id);
     // Below the lg breakpoint the match panel sits under the project list, so bring it into view
     if (window.matchMedia('(max-width: 1023px)').matches) {
       requestAnimationFrame(() => document.getElementById('match-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  };
+
+  // Keyed by campaign so a slow response for a previously-selected project is never shown on another
+  const loadEscrow = async (campaignId) => {
+    try {
+      const res = await api.get(`/campaigns/${campaignId}/`);
+      setSelectedEscrow({ campaignId, ...res.data.escrow });
+    } catch {
+      // Escrow is informational here; the record-payment and approval endpoints enforce it server-side
+    }
+  };
+
+  const saveBilling = async () => {
+    setSavingBilling(true);
+    try {
+      const fee = String(billing.platform_fee_percent).trim();
+      const res = await api.patch(`/campaigns/${selectedCampaign.id}/`, {
+        payment_structure: billing.payment_structure,
+        platform_fee_percent: fee === '' ? null : fee,
+      });
+      showToast('Billing settings saved.', 'success');
+      setCampaigns((prev) => prev.map((c) => (c.id === selectedCampaign.id ? { ...c, ...res.data } : c)));
+      setSelectedEscrow({ campaignId: selectedCampaign.id, ...res.data.escrow });
+      if (res.data.milestones?.length) {
+        setMilestoneRows(res.data.milestones.map((m) => ({ title: m.title, percentage: Number(m.percentage) })));
+      }
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not save billing settings.'), 'error');
+    } finally {
+      setSavingBilling(false);
+    }
+  };
+
+  const recordClientPayment = async (e) => {
+    e.preventDefault();
+    setRecordingClientPayment(true);
+    try {
+      const res = await api.post(`/payments/admin/campaigns/${selectedCampaign.id}/record-payment/`, {
+        amount: clientPayment.amount.trim(),
+        reference: clientPayment.reference.trim(),
+      });
+      showToast(res.data.message || 'Client payment recorded.', 'success');
+      setSelectedEscrow({ campaignId: selectedCampaign.id, ...res.data.escrow });
+      setClientPayment({ amount: '', reference: '' });
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not record the payment.'), 'error');
+    } finally {
+      setRecordingClientPayment(false);
+    }
+  };
+
+  // Rounded to the cent so 33.34 + 33.33 + 33.33 reads as exactly 100, not 99.99999999999999
+  const milestonePercentTotal = Math.round(milestoneRows.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0) * 100) / 100;
+
+  const updateMilestoneRow = (index, changes) =>
+    setMilestoneRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...changes } : r)));
+  const addMilestoneRow = () => setMilestoneRows((rows) => [...rows, { title: '', percentage: 0 }]);
+  const removeMilestoneRow = (index) => setMilestoneRows((rows) => rows.filter((_, i) => i !== index));
+
+  const saveMilestonePlan = async () => {
+    setSavingMilestonePlan(true);
+    try {
+      const res = await api.post(`/campaigns/${selectedCampaign.id}/milestones/plan/`, {
+        milestones: milestoneRows.map((r, i) => ({ title: r.title.trim() || `Milestone ${i + 1}`, percentage: Number(r.percentage) || 0 })),
+      });
+      showToast('Milestone plan saved.', 'success');
+      setCampaigns((prev) => prev.map((c) => (c.id === selectedCampaign.id ? { ...c, milestones: res.data } : c)));
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not save the milestone plan.'), 'error');
+    } finally {
+      setSavingMilestonePlan(false);
     }
   };
 
@@ -641,6 +826,130 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
+                  {/* Billing & escrow (admin-only levers) */}
+                  <div className="pt-4 border-t border-[rgba(10,23,72,0.08)] space-y-3">
+                    <div className="flex flex-wrap justify-between items-center gap-2">
+                      <h3 className="font-semibold flex items-center gap-2"><Wallet size={15} className="text-[#00AEEF]" /> Billing &amp; escrow</h3>
+                      {selectedEscrow?.campaignId === selectedCampaign.id && (
+                        <span className="text-xs text-[#5B6478]">
+                          Collected {formatMoney(selectedEscrow.collected)} · Released {formatMoney(selectedEscrow.released)} ·{' '}
+                          <strong className="text-[#0B1E63]">Available {formatMoney(selectedEscrow.available)}</strong>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="field-label" htmlFor="billing-structure">Payment structure</label>
+                        <select
+                          id="billing-structure"
+                          value={billing.payment_structure}
+                          onChange={(e) => setBilling((b) => ({ ...b, payment_structure: e.target.value }))}
+                          className="input"
+                        >
+                          <option value="UPFRONT">Upfront - client pays the full fee to confirm</option>
+                          <option value="MANUAL">Manual - UniPact invoices and records payments</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor="billing-fee">UniPact fee (%)</label>
+                        <input
+                          id="billing-fee"
+                          type="number" min="0" max="100" step="0.01"
+                          value={billing.platform_fee_percent}
+                          onChange={(e) => setBilling((b) => ({ ...b, platform_fee_percent: e.target.value }))}
+                          placeholder="Site default"
+                          disabled={selectedCampaign.is_match_finalized}
+                          className="input"
+                        />
+                        {selectedCampaign.is_match_finalized && <p className="field-hint">Locked once the match is finalized.</p>}
+                      </div>
+                    </div>
+                    <button type="button" onClick={saveBilling} disabled={savingBilling} className="btn-secondary btn-sm">
+                      {savingBilling ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save billing settings
+                    </button>
+
+                    <form onSubmit={recordClientPayment} className="p-3 rounded-lg bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] space-y-2">
+                      <p className="text-sm font-medium">Record a client payment received outside the card checkout</p>
+                      <p className="text-xs text-[#5B6478]">Only record money that has actually reached UniPact&apos;s bank account - it immediately becomes available to release to students.</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={clientPayment.amount}
+                          onChange={(e) => setClientPayment((p) => ({ ...p, amount: e.target.value }))}
+                          placeholder="Amount (RM)"
+                          aria-label="Amount received"
+                          className="input sm:w-36"
+                        />
+                        <input
+                          value={clientPayment.reference}
+                          onChange={(e) => setClientPayment((p) => ({ ...p, reference: e.target.value }))}
+                          placeholder="Bank / DuitNow reference"
+                          aria-label="Payment reference"
+                          className="input flex-1 font-mono"
+                        />
+                        <button type="submit" disabled={recordingClientPayment || !clientPayment.amount || !clientPayment.reference.trim()} className="btn-primary btn-sm whitespace-nowrap">
+                          {recordingClientPayment ? <Loader2 size={13} className="animate-spin" /> : <CreditCard size={13} />} Record payment
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Milestone plan (managed escrow) - required before the match can be finalized */}
+                  <div className="pt-4 border-t border-[rgba(10,23,72,0.08)]">
+                    <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
+                      <h3 className="font-semibold flex items-center gap-2"><Flag size={15} className="text-[#00AEEF]" /> Milestone plan</h3>
+                      <span className={`text-sm font-medium ${milestonePercentTotal === 100 ? 'text-emerald-700' : 'text-amber-700'}`}>{milestonePercentTotal}% of student pool</span>
+                    </div>
+                    <p className="text-xs text-[#5B6478] mb-3">
+                      Percentages are of the student pool - the {formatMoney(selectedCampaign.budget)} project fee minus UniPact&apos;s cut.
+                      They must add up to 100, and the plan can&apos;t change once the match is finalized.
+                    </p>
+                    <div className="space-y-2">
+                      {milestoneRows.map((row, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            value={row.title}
+                            onChange={(e) => updateMilestoneRow(i, { title: e.target.value })}
+                            placeholder={`Milestone ${i + 1} title`}
+                            disabled={selectedCampaign.is_match_finalized}
+                            className="input flex-1"
+                          />
+                          <div className="relative w-24 shrink-0">
+                            <input
+                              type="number" min="0" max="100" step="0.01"
+                              value={row.percentage}
+                              onChange={(e) => updateMilestoneRow(i, { percentage: e.target.value })}
+                              disabled={selectedCampaign.is_match_finalized}
+                              className="input pr-6 text-right"
+                            />
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#5B6478]">%</span>
+                          </div>
+                          {milestoneRows.length > 1 && !selectedCampaign.is_match_finalized && (
+                            <button type="button" onClick={() => removeMilestoneRow(i)} className="p-2 text-[#5B6478] hover:text-red-600 shrink-0" aria-label="Remove milestone">
+                              <X size={15} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {!selectedCampaign.is_match_finalized && (
+                      <div className="flex flex-wrap gap-3 mt-3">
+                        <button type="button" onClick={addMilestoneRow} className="btn-secondary btn-sm">+ Add milestone</button>
+                        <button
+                          type="button"
+                          onClick={saveMilestonePlan}
+                          disabled={savingMilestonePlan || milestonePercentTotal !== 100 || milestoneRows.some((r) => !r.title.trim())}
+                          className="btn-primary btn-sm"
+                        >
+                          {savingMilestonePlan ? <Loader2 size={13} className="animate-spin" /> : <Flag size={13} />} Save milestone plan
+                        </button>
+                      </div>
+                    )}
+                    {selectedCampaign.milestones?.length > 0 && selectedCampaign.is_match_finalized && (
+                      <p className="text-xs text-[#5B6478] mt-2">Locked in - {selectedCampaign.milestones.length} milestone(s) set.</p>
+                    )}
+                  </div>
+
                   <div className="space-y-4 pt-4 border-t border-[rgba(10,23,72,0.08)]">
                     <div>
                       <label className="field-label" htmlFor="match-notes">Note for the client and students</label>
@@ -679,9 +988,329 @@ const AdminDashboard = () => {
             </section>
           </div>
         )}
+
+        {/* PAYOUTS MANAGEMENT */}
+        {activeTab === 'payouts' && (
+          <div className="space-y-6">
+            {/* Stats row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Total Disbursed</span>
+                    <Wallet size={16} className="text-emerald-600" />
+                  </div>
+                  <p className="font-heading font-extrabold text-2xl text-emerald-700">
+                    RM {formatMoney(payoutsData.total_disbursed)}
+                  </p>
+                </div>
+                <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
+                  <CheckCircle2 size={12} className="text-emerald-600" /> Disbursed to student bank accounts
+                </p>
+              </div>
+
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Pending Milestone Escrow</span>
+                    <Clock size={16} className="text-[#0090C6]" />
+                  </div>
+                  <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
+                    RM {formatMoney(payoutsData.total_pending)}
+                  </p>
+                </div>
+                <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
+                  <Clock size={12} /> Held for completed or active milestones
+                </p>
+              </div>
+
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Ready for Bank Transfer</span>
+                    <CreditCard size={16} className="text-[#0B1E63]" />
+                  </div>
+                  <p className="font-heading font-extrabold text-2xl text-[#0B1E63]">
+                    {payoutsData.count_ready}
+                  </p>
+                </div>
+                <p className="text-xs text-amber-700 mt-2 font-medium">
+                  Requires online banking transfer & ref entry
+                </p>
+              </div>
+            </div>
+
+            {/* Payouts Table */}
+            <div className="card overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-[rgba(10,23,72,0.08)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-[#0A1748]">Student Milestone Payout Registry</h3>
+                  <p className="text-xs text-[#5B6478] mt-0.5">Disburse milestone stipends from client escrow to students via Malaysian bank transfer.</p>
+                </div>
+                <div className="flex gap-1" role="group" aria-label="Filter payouts">
+                  {[
+                    ['', 'All'],
+                    ['PROCESSING', 'Ready for Transfer'],
+                    ['PAID', 'Disbursed'],
+                    ['PENDING', 'Awaiting Bank'],
+                  ].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setPayoutFilter(val)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                        payoutFilter === val
+                          ? 'bg-[#0B1E63] text-white border-[#0B1E63]'
+                          : 'bg-white text-[#5B6478] border-[rgba(10,23,72,0.15)] hover:text-[#0A1748]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {payoutsLoading ? (
+                <div className="p-12 text-center text-[#5B6478] text-sm">
+                  <Loader2 size={20} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading payouts...
+                </div>
+              ) : !payoutsData.payouts || payoutsData.payouts.length === 0 ? (
+                <div className="p-12 text-center text-[#5B6478] text-sm">
+                  <Inbox className="mx-auto mb-2 opacity-50" size={28} />
+                  No payout records found in this view.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#F5F7FC] text-xs font-semibold text-[#5B6478] uppercase tracking-wider border-b border-[rgba(10,23,72,0.08)]">
+                      <tr>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Project & Amount</th>
+                        <th className="px-4 py-3">Malaysian Bank Details</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[rgba(10,23,72,0.06)] bg-white">
+                      {payoutsData.payouts.map((p) => {
+                        const hasBank = !!(p.bank_name && p.bank_account_number);
+                        return (
+                          <tr key={p.id} className="hover:bg-[#F8FAFD] transition-colors">
+                            <td className="px-4 py-3.5">
+                              <p className="font-semibold text-[#0A1748]">{p.student_name}</p>
+                              <p className="text-xs text-[#5B6478]">{p.student_email}</p>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <p className="font-medium text-[#0A1748]">{p.campaign_title}</p>
+                              {p.milestone_title && <p className="text-xs text-[#5B6478]">Milestone: {p.milestone_title}</p>}
+                              <p className="font-heading font-extrabold text-[#0B1E63] mt-0.5">
+                                RM {formatMoney(p.amount)}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              {hasBank ? (
+                                <div className="text-xs">
+                                  <p className="font-semibold text-[#0A1748]">{p.bank_name}</p>
+                                  <p className="font-mono text-[#5B6478]">{p.bank_account_number}</p>
+                                  <p className="text-[#5B6478]">{p.bank_account_holder_name}</p>
+                                  {p.duitnow_id && <p className="text-[11px] text-[#0090C6]">DuitNow: {p.duitnow_id}</p>}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-amber-700 italic flex items-center gap-1">
+                                  <AlertCircle size={13} /> Bank details pending
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <StatusBadge status={p.status} label={p.status === 'PENDING' ? 'Awaiting bank details' : undefined} />
+                              {p.status === 'PAID' && p.transfer_reference && (
+                                <p className="text-[11px] font-mono text-[#5B6478] mt-1">Ref: {p.transfer_reference}</p>
+                              )}
+                              {p.status === 'PROCESSING' && p.bank_details_changed_at && (
+                                <p className="text-[11px] text-amber-800 mt-1 flex items-center gap-1">
+                                  <AlertCircle size={11} /> Bank details changed {formatDate(p.bank_details_changed_at)}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              {p.status === 'PROCESSING' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedPayout(p);
+                                    setTransferRef('');
+                                    setPayoutNotes('');
+                                    setConfirmBankChange(false);
+                                  }}
+                                  className="btn-primary btn-sm whitespace-nowrap"
+                                >
+                                  <CreditCard size={13} /> Record Transfer
+                                </button>
+                              )}
+                              {p.status === 'PAID' && (
+                                <span className="text-xs text-emerald-600 font-medium">
+                                  Completed {p.paid_at ? formatDate(p.paid_at) : ''}
+                                </span>
+                              )}
+                              {p.status === 'PENDING' && (
+                                <span className="text-xs text-[#5B6478]">
+                                  Waiting on student
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* IMPACT LEDGERS */}
+        {activeTab === 'ledgers' && (
+          <section className="card overflow-hidden">
+            <div className="p-5 border-b border-[rgba(10,23,72,0.08)]">
+              <h3 className="font-heading font-bold text-lg text-[#0A1748]">Verified Impact Ledgers</h3>
+              <p className="text-xs text-[#5B6478] mt-0.5">
+                Publish a ledger once the client has signed, the student has submitted their part, and their payout is disbursed.
+                You can&apos;t edit either side&apos;s words - that&apos;s what keeps it verified.
+              </p>
+            </div>
+            {ledgersLoading ? (
+              <div className="p-12 text-center text-[#5B6478] text-sm"><Loader2 size={20} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading ledgers...</div>
+            ) : ledgers.length === 0 ? (
+              <div className="p-12 text-center text-[#5B6478] text-sm">
+                <Inbox className="mx-auto mb-2 opacity-50" size={28} />
+                No ledgers yet. One is created for each student when a project is completed.
+              </div>
+            ) : (
+              <ul className="divide-y divide-[rgba(10,23,72,0.08)]">
+                {ledgers.map((l) => {
+                  const published = l.status === 'PUBLISHED';
+                  return (
+                    <li key={l.slug} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-[#0A1748]">{l.student_name}</span>
+                          {published
+                            ? <StatusBadge status="COMPLETED" label="Published" />
+                            : <StatusBadge status={l.readiness.ready ? 'ACCEPTED' : 'PENDING'} label={l.readiness.ready ? 'Ready to publish' : 'In progress'} />}
+                        </div>
+                        <p className="text-sm text-[#5B6478]">{l.project_title} · {l.client_name} · <span className="font-mono text-xs">{l.slug}</span></p>
+                        {!published && (
+                          <ul className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs">
+                            {LEDGER_CHECKS.map(([key, label]) => (
+                              <li key={key} className={`flex items-center gap-1 ${l.readiness[key] ? 'text-emerald-700' : 'text-amber-800'}`}>
+                                {l.readiness[key] ? <CheckCircle2 size={12} /> : <Clock size={12} />} {label}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {published && <p className="text-xs text-[#5B6478] mt-1">Published {formatDate(l.published_at)}</p>}
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <a href={`/ledger/${l.slug}`} target="_blank" rel="noreferrer" className="btn-secondary btn-sm"><Eye size={13} /> Preview</a>
+                        {published ? (
+                          <button onClick={() => setLedgerPublished(l, false)} disabled={ledgerBusy === l.slug} className="btn-secondary btn-sm">Unpublish</button>
+                        ) : (
+                          <button onClick={() => setLedgerPublished(l, true)} disabled={!l.readiness.ready || ledgerBusy === l.slug} className="btn-primary btn-sm">
+                            {ledgerBusy === l.slug ? <Loader2 size={13} className="animate-spin" /> : <Award size={13} />} Publish
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
       </main>
 
+      {/* Modal to record bank transfer disbursement */}
+      <Modal
+        isOpen={!!selectedPayout}
+        onClose={() => setSelectedPayout(null)}
+        title="Record Bank Transfer Payout"
+      >
+        {selectedPayout && (
+          <form onSubmit={handleRecordPayout} className="space-y-4">
+            <div className="p-4 rounded-xl bg-[#F5F8FE] border border-[rgba(10,23,72,0.08)] space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-[#5B6478]">Recipient Student:</span>
+                <span className="font-bold text-[#0A1748]">{selectedPayout.student_name}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-[#5B6478]">Project:</span>
+                <span className="font-semibold text-[#0A1748]">{selectedPayout.campaign_title}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-[#5B6478]">Stipend Amount:</span>
+                <span className="font-heading font-extrabold text-lg text-[#0B1E63]">RM {formatMoney(selectedPayout.amount)}</span>
+              </div>
+              <div className="pt-2 border-t border-[rgba(10,23,72,0.08)] text-xs text-[#5B6478]">
+                <p><strong>Bank:</strong> {selectedPayout.bank_name || 'Not specified'}</p>
+                <p><strong>Account Number:</strong> <span className="font-mono">{selectedPayout.bank_account_number}</span></p>
+                <p><strong>Account Holder:</strong> {selectedPayout.bank_account_holder_name}</p>
+                {selectedPayout.duitnow_id && <p><strong>DuitNow ID:</strong> {selectedPayout.duitnow_id}</p>}
+              </div>
+            </div>
+
+            {selectedPayout.bank_details_changed_at && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900 space-y-2">
+                <p className="flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span>
+                    {selectedPayout.student_name} changed these bank details on {formatDate(selectedPayout.bank_details_changed_at)},
+                    after this payout was approved. Contact them on a channel you already trust to confirm it&apos;s really their account.
+                  </span>
+                </p>
+                <label className="flex items-center gap-2 font-medium cursor-pointer">
+                  <input type="checkbox" checked={confirmBankChange} onChange={(e) => setConfirmBankChange(e.target.checked)} className="w-4 h-4 accent-[#00AEEF]" />
+                  I&apos;ve confirmed the new account with the student
+                </label>
+              </div>
+            )}
+
+            <div>
+              <label className="field-label" htmlFor="p-ref">Bank Transfer Reference <span className="text-red-500">*</span></label>
+              <input
+                id="p-ref"
+                required
+                placeholder="e.g. MBB-20260918-883921 or DuitNow Ref"
+                value={transferRef}
+                onChange={(e) => setTransferRef(e.target.value)}
+                className="input font-mono"
+              />
+              <p className="field-hint">Enter the transaction reference from your Maybank2u, CIMB Clicks, or corporate banking receipt.</p>
+            </div>
+
+            <div>
+              <label className="field-label" htmlFor="p-notes">Admin Notes (optional)</label>
+              <input
+                id="p-notes"
+                placeholder="e.g. Disbursed via instant transfer"
+                value={payoutNotes}
+                onChange={(e) => setPayoutNotes(e.target.value)}
+                className="input"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-[rgba(10,23,72,0.08)]">
+              <button type="button" onClick={() => setSelectedPayout(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" disabled={recordingPayout || !transferRef.trim() || (!!selectedPayout.bank_details_changed_at && !confirmBankChange)} className="btn-primary">
+                {recordingPayout ? <><Loader2 size={15} className="animate-spin" /> Recording…</> : 'Confirm & Notify Student'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       <ConfirmationModal
+
         isOpen={confirmState.isOpen}
         onClose={() => setConfirmState((s) => ({ ...s, isOpen: false }))}
         onConfirm={confirmState.onConfirm || (() => {})}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { ChevronRight, LogOut, Menu, Settings, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -46,16 +46,31 @@ const WorkspaceNav = () => {
   const roleLabel = ROLE_LABEL[user?.role] || 'Account';
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
 
+  const avatarUrl = user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login', { replace: true });
   };
 
-  const renderAvatar = (size = 'w-9 h-9 text-sm') => (
-    <span className={`${size} rounded-full bg-[#0B1E63] text-white font-semibold flex items-center justify-center shrink-0`} aria-hidden="true">
-      {initial}
-    </span>
-  );
+  const renderAvatar = (size = 'w-9 h-9 text-sm') => {
+    if (avatarUrl && !avatarFailed) {
+      return (
+        <img
+          src={avatarUrl}
+          alt={displayName}
+          onError={() => setAvatarFailed(true)}
+          className={`${size} rounded-full object-cover shrink-0 border border-[rgba(10,23,72,0.12)] shadow-sm`}
+        />
+      );
+    }
+    return (
+      <span className={`${size} rounded-full bg-[#0B1E63] text-white font-semibold flex items-center justify-center shrink-0 shadow-sm`} aria-hidden="true">
+        {initial}
+      </span>
+    );
+  };
 
   return (
     <header className={navShellClass(scrolled, open)}>

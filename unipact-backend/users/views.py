@@ -77,6 +77,8 @@ def account_payload(user):
     club_profile_data = None
     student_profile_data = None
 
+    avatar_url = None
+
     if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
         ver_status = user.company_profile.verification_status
         tier = user.company_profile.tier
@@ -84,14 +86,20 @@ def account_payload(user):
         card_last_4 = user.company_profile.card_last_4
         card_brand = user.company_profile.card_brand
         company_profile_data = CompanyProfileSerializer(user.company_profile).data
+        if user.company_profile.logo:
+            avatar_url = user.company_profile.logo.url
     elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
         ver_status = user.club_profile.verification_status
         name = user.club_profile.club_name
         club_profile_data = ClubProfileSerializer(user.club_profile).data
+        if user.club_profile.logo:
+            avatar_url = user.club_profile.logo.url
     elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
         ver_status = user.student_profile.verification_status
         name = user.student_profile.full_name
         student_profile_data = StudentProfileSerializer(user.student_profile).data
+        if user.student_profile.profile_photo:
+            avatar_url = user.student_profile.profile_photo.url
     else:
         name = user.get_full_name() or user.username
 
@@ -108,6 +116,7 @@ def account_payload(user):
         "email": user.email,
         "role": user.role,
         "name": name,
+        "avatar_url": avatar_url,
         "verification_status": ver_status,
         "tier": tier,
         "card_last_4": card_last_4,
@@ -153,6 +162,11 @@ class AccountSettingsView(views.APIView):
 
         profile_attr, serializer_class, document_field, pending_status = config
         profile = getattr(user, profile_attr)
+        # Snapshot bank fields before save: the frontend's single profile form always resends every
+        # field (including untouched ones), so checking "is this key in validated_data" would fire
+        # on any unrelated edit. Only an actual value change should count.
+        bank_field_names = ('bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id')
+        old_bank_snapshot = {f: getattr(profile, f, None) for f in bank_field_names} if user.role == User.Role.STUDENT else None
         serializer = serializer_class(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         changed = sorted(serializer.validated_data.keys())
@@ -166,6 +180,54 @@ class AccountSettingsView(views.APIView):
             if user.role == User.Role.STUDENT and 'full_name' in serializer.validated_data:
                 user.first_name = profile.full_name[:150]
                 user.save(update_fields=['first_name'])
+            bank_fields_changed = old_bank_snapshot is not None and any(
+                getattr(profile, f, None) != old_bank_snapshot[f] for f in bank_field_names
+            )
+            if bank_fields_changed:
+                from payments.models import Payout
+                unpaid = Payout.objects.filter(student=profile)
+                if profile.has_bank_details:
+                    snapshot = dict(
+                        bank_name=profile.bank_name,
+                        bank_account_number=profile.bank_account_number,
+                        bank_account_holder_name=profile.bank_account_holder_name or profile.full_name,
+                        duitnow_id=profile.duitnow_id or '',
+                    )
+                    # Already approved for transfer with the old account: take the new details (a real
+                    # typo fix must reach the transfer), but flag it - the admin has to confirm with the
+                    # student before sending money to an account that changed after approval.
+                    unpaid.filter(status=Payout.Status.PROCESSING).update(
+                        **snapshot,
+                        bank_details_changed_at=timezone.now(),
+                        notes='Student changed bank details after approval. Confirm the new account with them before transferring.',
+                    )
+                    # Waiting on details for the first time: nothing to confirm, just ready it
+                    unpaid.filter(status=Payout.Status.PENDING).update(
+                        **snapshot,
+                        status=Payout.Status.PROCESSING,
+                        notes='Ready for disbursement (bank details added by student).',
+                    )
+                else:
+                    unpaid.filter(status=Payout.Status.PROCESSING).update(
+                        status=Payout.Status.PENDING,
+                        bank_name='', bank_account_number='', bank_account_holder_name='', duitnow_id='',
+                        notes='Awaiting student bank details.',
+                    )
+                notifications.bank_details_changed(user, profile)
+
+            remove_photo = str(request.data.get('remove_photo', '')).lower() in ('true', '1') or str(request.data.get('remove_logo', '')).lower() in ('true', '1')
+            if remove_photo:
+                if user.role == User.Role.STUDENT and profile.profile_photo:
+                    profile.profile_photo.delete(save=False)
+                    profile.profile_photo = None
+                    profile.save(update_fields=['profile_photo'])
+                    changed.append('profile_photo (removed)')
+                elif user.role in (User.Role.COMPANY, User.Role.CLUB) and profile.logo:
+                    profile.logo.delete(save=False)
+                    profile.logo = None
+                    profile.save(update_fields=['logo'])
+                    changed.append('logo (removed)')
+
 
         if changed:
             log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"Profile updated by {user.email}: {', '.join(changed)}")
@@ -345,7 +407,9 @@ class CookieTokenRefreshView(views.APIView):
         serializer = TokenRefreshSerializer(data={'refresh': raw_refresh})
         try:
             serializer.is_valid(raise_exception=True)
-        except (TokenError, InvalidToken, exceptions.ValidationError):
+        # The serializer looks the user up: a deleted account raises DoesNotExist (a 500 otherwise) and a
+        # blocked one AuthenticationFailed - both mean "sign in again", and the dead cookie must be cleared.
+        except (TokenError, InvalidToken, exceptions.ValidationError, exceptions.AuthenticationFailed, User.DoesNotExist):
             response = Response({"error": "Session expired. Please sign in again."}, status=status.HTTP_401_UNAUTHORIZED)
             clear_auth_cookies(response)
             return response
@@ -574,7 +638,9 @@ class StudentPublicProfileView(views.APIView):
         if not profile:
             return Response({"error": "Student profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        completed = profile.assigned_jobs.filter(status='COMPLETED')
+        completed = profile.assigned_jobs.filter(status='COMPLETED').select_related('company')
+        # Only published ledgers are public proof; drafts stay private until UniPact publishes them
+        published_ledgers = dict(profile.impact_ledgers.filter(status='PUBLISHED').values_list('campaign_id', 'slug'))
         showcase = []
         for c in completed:
             showcase.append({
@@ -583,7 +649,8 @@ class StudentPublicProfileView(views.APIView):
                 'company_name': c.company.company_name,
                 'type': c.type,
                 'requirements': c.requirements,
-                'completed_at': c.updated_at
+                'completed_at': c.completed_at or c.updated_at,
+                'ledger_slug': published_ledgers.get(c.id),
             })
 
         return Response({
@@ -599,6 +666,7 @@ class StudentPublicProfileView(views.APIView):
             'verification_status': profile.verification_status,
             'club_affiliation_name': profile.club_affiliation_name,
             'club_affiliation_role': profile.club_affiliation_role,
+            'profile_photo': profile.profile_photo.url if profile.profile_photo else None,
             'completed_projects': showcase
         })
 

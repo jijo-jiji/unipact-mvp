@@ -140,6 +140,28 @@ def password_changed(user):
     )
 
 
+def bank_details_changed(user, student_profile):
+    """Alert on any change to payout bank details - real money follows these, so a silent
+    change is exactly what an account-takeover attacker would want."""
+    masked_account = (
+        f'****{student_profile.bank_account_number[-4:]}'
+        if student_profile.bank_account_number and len(student_profile.bank_account_number) >= 4
+        else 'Not set'
+    )
+    send_email(
+        user.email, 'Your payout bank details were changed', 'Your payout bank details were updated',
+        [f'The Malaysian bank details on your UniPact account ({user.email}) were just changed.'],
+        details=[
+            ('Bank', student_profile.bank_name or 'Not set'),
+            ('Account number', masked_account),
+            ('Account holder', student_profile.bank_account_holder_name or 'Not set'),
+        ],
+        note='If this wasn\'t you, change your password immediately using "Forgot password?" on the sign-in page, '
+             'restore your correct bank details, and contact us straight away.',
+        action_label='Review account settings', action_path='/settings',
+    )
+
+
 # ------------------------------------------------------------------
 # V3.0 projects
 # ------------------------------------------------------------------
@@ -254,9 +276,30 @@ def project_completed(campaign, rating=None):
     send_email(
         [s.user.email for s in _students(campaign)], f'"{campaign.title}" is complete', 'Project completed',
         [f'{campaign.company.company_name} approved the work and closed the project. Well done!',
-         'The project now appears on your public portfolio.'],
+         'The project now appears on your public portfolio. Next, add your part to your Verified Impact Ledger from your dashboard.'],
         details=[('Project', campaign.title), ('Client rating', f'{rating} out of 5' if rating else None)],
-        action_label='View your portfolio', action_path='/student/dashboard',
+        action_label='Open your dashboard', action_path='/student/dashboard',
+    )
+
+
+def impact_statement_signed(campaign):
+    send_email(
+        [s.user.email for s in _students(campaign)], f'{campaign.company.company_name} confirmed your impact on "{campaign.title}"',
+        'Your client signed your impact statement',
+        [f'{campaign.company.company_name} signed off the results of "{campaign.title}".',
+         'Add what you built and your before/after screenshots, and UniPact will publish your Verified Impact Ledger - '
+         'a shareable proof of work for your CV and LinkedIn.'],
+        action_label='Build your ledger', action_path='/student/dashboard',
+    )
+
+
+def impact_ledger_published(ledger):
+    send_email(
+        ledger.student.user.email, 'Your Verified Impact Ledger is live', 'Your Verified Impact Ledger is published',
+        [f'Your proof of work for "{ledger.campaign.title}" with {ledger.campaign.company.company_name} is now public.',
+         'Share the link on your CV, LinkedIn or job applications - anyone who opens it sees it was confirmed by the client and verified by UniPact.'],
+        details=[('Ledger ID', ledger.slug)],
+        action_label='View your ledger', action_path=f'/ledger/{ledger.slug}',
     )
 
 
@@ -311,21 +354,70 @@ def club_contract_awarded(application):
 # Payments
 # ------------------------------------------------------------------
 
-def payment_receipt(transaction_obj):
+def project_fee_due(campaign, outstanding):
+    """No online checkout yet: ask the admins to invoice the client for a bank transfer."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    send_email(
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)) + [settings.SUPPORT_EMAIL],
+        f'Invoice needed: "{campaign.title}"', 'A client is ready to pay a project fee',
+        [f'{campaign.company.company_name} tried to confirm their student team. Send them an invoice with the UniPact bank details, '
+         'then record the transfer under Billing & escrow once it arrives. The client can confirm the match after that.'],
+        details=[('Project', campaign.title), ('Client', campaign.company.company_name),
+                 ('Client email', campaign.company.user.email), ('Amount due', f'RM {outstanding}')],
+        action_label='Open admin dashboard', action_path='/admin',
+    )
+
+
+def payment_receipt(transaction_obj, outstanding=None):
     company = transaction_obj.company
+    campaign = transaction_obj.related_campaign
     if transaction_obj.transaction_type == 'SUBSCRIPTION':
         kind = 'Pro plan subscription' if transaction_obj.amount >= 499 else 'Card verification'
+    elif transaction_obj.transaction_type == 'PROJECT_FEE':
+        kind = 'Project fee (held in escrow)'
     else:
         kind = "Finder's fee"
+    lines = [f'Thanks, {company.company_name}. We received your payment.']
+    if outstanding is not None and outstanding > 0:
+        lines.append(f'RM {outstanding} of the project fee is still outstanding.')
+    elif campaign and campaign.status == 'MATCHED' and not campaign.is_match_finalized:
+        lines.append('Your project fee is paid in full. Confirm the match to start the project.')
     send_email(
         company.user.email, 'Payment receipt', 'Payment received',
-        [f'Thanks, {company.company_name}. We received your payment.'],
+        lines,
         details=[
             ('Description', kind),
-            ('Project', transaction_obj.related_campaign.title if transaction_obj.related_campaign else None),
+            ('Project', campaign.title if campaign else None),
             ('Amount', f'RM {transaction_obj.amount}'),
             ('Reference', f'TX-{transaction_obj.id}'),
+            ('Bank reference', transaction_obj.reference or None),
             ('Date', transaction_obj.created_at.strftime('%d %b %Y')),
         ],
-        action_label='View billing', action_path='/company/treasury',
+        action_label='Open project' if campaign else 'View billing',
+        action_path=f'/manage-campaign/{campaign.id}' if campaign else '/company/treasury',
     )
+
+
+def payout_released(payout):
+    student = payout.student
+    masked_account = f"****{payout.bank_account_number[-4:]}" if len(payout.bank_account_number) >= 4 else payout.bank_account_number
+    send_email(
+        student.user.email,
+        f'Payout disbursed: RM {payout.amount}',
+        'Project payout disbursed',
+        [
+            f'Hi {student.full_name}, your project payout of RM {payout.amount} has been disbursed via Malaysian bank transfer.'
+        ],
+        details=[
+            ('Project', payout.campaign.title),
+            ('Amount', f'RM {payout.amount}'),
+            ('Bank', payout.bank_name or 'Bank Transfer'),
+            ('Account Number', masked_account or 'On File'),
+            ('Transfer Reference', payout.transfer_reference or 'Disbursed'),
+            ('Disbursed Date', payout.paid_at.strftime('%d %b %Y') if payout.paid_at else 'Today'),
+        ],
+        action_label='View earnings & payouts', action_path='/student/dashboard',
+        note='Depending on your bank, funds typically reflect in your account within a few minutes to 1 business day.'
+    )
+
