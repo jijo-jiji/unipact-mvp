@@ -50,6 +50,10 @@ if not SECRET_KEY:
 ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', '' if IS_PRODUCTION else 'localhost,127.0.0.1,testserver')
 if IS_PRODUCTION and not ALLOWED_HOSTS:
     raise ImproperlyConfigured('Set DJANGO_ALLOWED_HOSTS, e.g. "api.unipact.my".')
+# Render sets this to the service's own *.onrender.com address (its health checks and pre-DNS testing use it)
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 
 # ------------------------------------------------------------------
