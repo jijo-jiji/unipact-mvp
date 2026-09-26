@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, FileUp, KeyRound, Loader2, Mail, ShieldCheck, User, X } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle2, CreditCard, FileUp, KeyRound, Loader2, Mail, ShieldCheck, Trash2, User, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
@@ -8,15 +8,17 @@ import PasswordField from '../components/PasswordField';
 import StatusBadge from '../components/StatusBadge';
 import { getErrorMessage } from '../utils/format';
 import { meetsPasswordRules } from '../utils/password';
-import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES, MALAYSIAN_BANKS } from '../utils/constants';
 import { LEGAL } from '../utils/legal';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: <User size={16} /> },
+  { id: 'payouts', label: 'Bank & payouts', icon: <CreditCard size={16} /> },
   { id: 'verification', label: 'Verification', icon: <ShieldCheck size={16} /> },
   { id: 'security', label: 'Password & sign-in', icon: <KeyRound size={16} /> },
 ];
+
 
 // Initial form values from the signed-in account, per role
 const profileFromUser = (user) => {
@@ -26,8 +28,11 @@ const profileFromUser = (user) => {
       full_name: p.full_name || '', domain_focus: p.domain_focus || 'SOFTWARE_DEV', university: p.university || '',
       major: p.major || '', skills: p.skills || [], bio: p.bio || '', club_affiliation_name: p.club_affiliation_name || '',
       club_affiliation_role: p.club_affiliation_role || '', secondary_email: p.secondary_email || '',
+      bank_name: p.bank_name || '', bank_account_number: p.bank_account_number || '',
+      bank_account_holder_name: p.bank_account_holder_name || '', duitnow_id: p.duitnow_id || '',
     };
   }
+
   if (user?.role === 'COMPANY') {
     const p = user.company_profile || {};
     return { company_name: p.company_name || '', company_details: p.company_details || '' };
@@ -124,7 +129,57 @@ const SettingsPage = () => {
   const dirty = initial && profile && JSON.stringify(initial) !== JSON.stringify(profile);
   const set = (field) => (e) => setProfile((p) => ({ ...p, [field]: e.target.value }));
 
+  const fileInputRef = useRef(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Images must be 5 MB or smaller.', 'error');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      showToast('Please upload a PNG, JPG, or WebP image.', 'error');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      if (role === 'STUDENT') {
+        formData.append('profile_photo', file);
+      } else {
+        formData.append('logo', file);
+      }
+      await updateAccount(formData);
+      showToast(role === 'STUDENT' ? 'Profile picture updated.' : 'Logo updated.', 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Failed to upload image.'), 'error');
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setAvatarUploading(true);
+    try {
+      await updateAccount({ remove_photo: true, remove_logo: true });
+      showToast(role === 'STUDENT' ? 'Profile picture removed.' : 'Logo removed.', 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Failed to remove image.'), 'error');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleProfileSave = async (e) => {
+
     e.preventDefault();
     setProfileError('');
     setSavingProfile(true);
@@ -177,9 +232,11 @@ const SettingsPage = () => {
   const verificationStatus = user?.verification_status;
   const sections = SECTIONS.filter((s) => {
     if (s.id === 'profile') return Boolean(profile) || isClubMember;
+    if (s.id === 'payouts') return role === 'STUDENT';
     if (s.id === 'verification') return Boolean(docCopy);
     return true;
   });
+
 
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body">
@@ -222,6 +279,84 @@ const SettingsPage = () => {
             {profile && (
               <Section id="profile" title="Profile" description={role === 'STUDENT' ? 'This appears on your public portfolio and helps admins match you to projects.' : 'Shown to students and UniPact admins.'}>
                 {profileError && <div className="alert-error mb-5" role="alert"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{profileError}</span></div>}
+
+                {/* Photo / Logo Upload Widget */}
+                {['STUDENT', 'COMPANY', 'CLUB'].includes(role) && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5 p-4 sm:p-5 rounded-xl border border-[rgba(10,23,72,0.1)] bg-gradient-to-br from-white to-[#F5F8FE] mb-6 shadow-sm">
+                    <div className={`relative w-20 h-20 shrink-0 ${role === 'STUDENT' ? 'rounded-full' : 'rounded-2xl'} overflow-hidden bg-[#0B1E63] flex items-center justify-center border-2 border-[rgba(10,23,72,0.12)] shadow-sm`}>
+                      {(user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo) ? (
+                        <img
+                          src={user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo}
+                          alt={role === 'STUDENT' ? 'Profile picture' : 'Logo'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="font-heading font-extrabold text-2xl text-[#00AEEF] flex items-center justify-center w-full h-full"
+                        style={{ display: (user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo) ? 'none' : 'flex' }}
+                      >
+                        {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                      </span>
+                      {avatarUploading && (
+                        <div className="absolute inset-0 bg-[#0A1748]/60 flex items-center justify-center text-white">
+                          <Loader2 size={20} className="animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-heading font-bold text-sm text-[#0A1748]">
+                          {role === 'STUDENT' ? 'Profile photo' : role === 'COMPANY' ? 'Company logo' : 'Club logo'}
+                        </h3>
+                        {(user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo) && (
+                          <span className="badge bg-emerald-50 border-emerald-200 text-emerald-700 text-[0.7rem] py-0.5">Uploaded</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#5B6478] mt-0.5">
+                        PNG, JPG or WebP up to 5 MB. {role === 'STUDENT' ? 'A clear portrait helps companies and clients recognize your portfolio.' : 'Your logo is displayed across your project briefs and workspace.'}
+                      </p>
+
+                      <div className="flex items-center gap-3 mt-3">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={handleAvatarSelected}
+                          disabled={avatarUploading}
+                        />
+                        <button
+                          type="button"
+                          disabled={avatarUploading}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="btn-secondary btn-sm"
+                        >
+                          {avatarUploading ? (
+                            <><Loader2 size={13} className="animate-spin" /> Uploading…</>
+                          ) : (
+                            <><Camera size={13} /> {(user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo) ? `Change ${role === 'STUDENT' ? 'photo' : 'logo'}` : `Upload ${role === 'STUDENT' ? 'photo' : 'logo'}`}</>
+                          )}
+                        </button>
+                        {(user?.avatar_url || user?.student_profile?.profile_photo || user?.company_profile?.logo || user?.club_profile?.logo) && (
+                          <button
+                            type="button"
+                            disabled={avatarUploading}
+                            onClick={handleAvatarRemove}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 py-1 px-2 rounded"
+                          >
+                            <Trash2 size={13} /> Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleProfileSave} className="space-y-5">
                   {role === 'STUDENT' && (
                     <>
@@ -271,8 +406,73 @@ const SettingsPage = () => {
                         <input id="s-email2" type="email" value={profile.secondary_email} onChange={set('secondary_email')} className="input" placeholder="personal@gmail.com" />
                         <p className="field-hint">Useful if you lose access to your university email after graduating.</p>
                       </div>
+
+                      {/* Malaysian Bank Account Details for Project Payouts */}
+                      <div id="payouts" className="p-5 rounded-xl border border-[rgba(10,23,72,0.12)] bg-gradient-to-br from-white to-[#F5F8FE] shadow-sm space-y-4 scroll-mt-28 mt-6">
+                        <div className="flex items-center gap-2 pb-2 border-b border-[rgba(10,23,72,0.08)]">
+                          <div className="w-8 h-8 rounded-lg bg-[#00AEEF]/10 text-[#0090C6] flex items-center justify-center">
+                            <CreditCard size={18} />
+                          </div>
+                          <div>
+                            <h3 className="font-heading font-bold text-base text-[#0A1748]">Malaysian Bank Payout Details</h3>
+                            <p className="text-xs text-[#5B6478]">Where UniPact will disburse your project stipends upon milestone completion.</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="field-label" htmlFor="s-bank-name">Bank name</label>
+                            <input
+                              id="s-bank-name"
+                              list="settings-bank-list"
+                              placeholder="e.g. Maybank, CIMB Bank"
+                              value={profile.bank_name}
+                              onChange={set('bank_name')}
+                              className="input bg-white"
+                            />
+                            <datalist id="settings-bank-list">
+                              {MALAYSIAN_BANKS.map((b) => <option key={b} value={b} />)}
+                            </datalist>
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="s-bank-account">Account number</label>
+                            <input
+                              id="s-bank-account"
+                              placeholder="e.g. 114012345678"
+                              value={profile.bank_account_number}
+                              onChange={set('bank_account_number')}
+                              className="input bg-white font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="s-bank-holder">Account holder name</label>
+                            <input
+                              id="s-bank-holder"
+                              placeholder="Must match your NRIC / registered bank name"
+                              value={profile.bank_account_holder_name}
+                              onChange={set('bank_account_holder_name')}
+                              className="input bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="field-label" htmlFor="s-duitnow">DuitNow ID (optional)</label>
+                            <input
+                              id="s-duitnow"
+                              placeholder="e.g. NRIC or mobile number"
+                              value={profile.duitnow_id}
+                              onChange={set('duitnow_id')}
+                              className="input bg-white font-mono"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-[#5B6478] flex items-center gap-1.5 pt-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#00AEEF]" />
+                          Funds are disbursed via Malaysian DuitNow / IBG bank transfers directly to your account.
+                        </p>
+                      </div>
                     </>
                   )}
+
 
                   {role === 'COMPANY' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,4 +1,7 @@
 from decimal import Decimal, InvalidOperation
+from django.db import transaction as db_transaction
+from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -6,15 +9,26 @@ from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
 from campaigns.models import Campaign
-from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer
-from .models import Transaction, Subscription
+from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer
+from .models import Transaction, Subscription, Payout
 from .services import MockStripeService
 from unipact_backend import notifications
+from django.conf import settings
+
+
+def online_payments_unavailable():
+    return Response({
+        "error": "Card payments aren't available yet. UniPact will email you an invoice to pay by bank transfer.",
+        "code": "online_payments_unavailable",
+    }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
 
 class CreatePaymentIntentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        if not settings.MOCK_PAYMENTS_ENABLED:
+            return online_payments_unavailable()
         if request.user.role != User.Role.COMPANY:
             return Response({"error": "Only companies can make payments"}, status=status.HTTP_403_FORBIDDEN)
         
@@ -63,6 +77,8 @@ class MockCheckoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, transaction_id):
+        if not settings.MOCK_PAYMENTS_ENABLED:
+            return online_payments_unavailable()
         transaction = get_object_or_404(Transaction, pk=transaction_id)
         if transaction.company != getattr(request.user, 'company_profile', None):
             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
@@ -80,6 +96,8 @@ class ConfirmPaymentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, transaction_id):
+        if not settings.MOCK_PAYMENTS_ENABLED:
+            return online_payments_unavailable()
         transaction = get_object_or_404(Transaction, pk=transaction_id)
 
         # Verify ownership
@@ -186,3 +204,161 @@ class CreateTransactionView(generics.CreateAPIView):
             company=company_profile, 
             status=Transaction.Status.SUCCESS
         )
+
+
+class StudentPayoutListView(APIView):
+    """Returns payout records and earnings breakdown for the authenticated student."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.STUDENT or not hasattr(request.user, 'student_profile'):
+            return Response({"error": "Only student talent can view their payouts."}, status=status.HTTP_403_FORBIDDEN)
+
+        student = request.user.student_profile
+        payouts = Payout.objects.filter(student=student).select_related('campaign', 'milestone', 'student__user').order_by('-created_at')
+
+        total_earned = payouts.filter(status=Payout.Status.PAID).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        pending_amount = payouts.filter(status__in=[Payout.Status.PENDING, Payout.Status.PROCESSING]).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        return Response({
+            "total_earned": total_earned,
+            "pending_amount": pending_amount,
+            "has_bank_details": student.has_bank_details,
+            "bank_details": {
+                "bank_name": student.bank_name or "",
+                "bank_account_number": student.bank_account_number or "",
+                "bank_account_holder_name": student.bank_account_holder_name or "",
+                "duitnow_id": student.duitnow_id or "",
+            },
+            "payouts": PayoutSerializer(payouts, many=True).data,
+        })
+
+
+class AdminPayoutListView(APIView):
+    """Allows administrators to view and manage student milestone payouts."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.ADMIN:
+            return Response({"error": "Only admins can view the payout registry."}, status=status.HTTP_403_FORBIDDEN)
+
+        status_filter = request.query_params.get('status')
+        queryset = Payout.objects.select_related('campaign', 'milestone', 'student', 'student__user').order_by('-created_at')
+        if status_filter and status_filter in Payout.Status.values:
+            queryset = queryset.filter(status=status_filter)
+
+        total_disbursed = Payout.objects.filter(status=Payout.Status.PAID).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        total_pending = Payout.objects.filter(status__in=[Payout.Status.PENDING, Payout.Status.PROCESSING]).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        return Response({
+            "total_disbursed": total_disbursed,
+            "total_pending": total_pending,
+            "count_ready": Payout.objects.filter(status=Payout.Status.PROCESSING).count(),
+            "payouts": PayoutSerializer(queryset, many=True).data,
+        })
+
+
+class AdminRecordPayoutView(APIView):
+    """Allows administrators to record a bank transfer (e.g. DuitNow/IBG) and disburse payout to student."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != User.Role.ADMIN:
+            return Response({"error": "Only admins can record payouts."}, status=status.HTTP_403_FORBIDDEN)
+
+        get_object_or_404(Payout, pk=pk)
+
+        transfer_reference = str(request.data.get('transfer_reference') or '').strip()
+        if not transfer_reference:
+            return Response({"error": "Bank transfer reference (e.g. DuitNow/IBG reference number) is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        notes = str(request.data.get('notes') or '').strip()
+        confirmed_bank_change = str(request.data.get('confirm_bank_change', '')).lower() in ('true', '1')
+
+        with db_transaction.atomic():
+            # Lock the row so a double-submit can't record (and notify) the same transfer twice
+            payout = Payout.objects.select_for_update().select_related('student', 'student__user', 'campaign').get(pk=pk)
+            if payout.status == Payout.Status.PAID:
+                return Response({"error": f"This payout was already recorded as disbursed (Ref: {payout.transfer_reference})."}, status=status.HTTP_400_BAD_REQUEST)
+            if payout.status != Payout.Status.PROCESSING:
+                return Response({"error": "This payout has no bank details to transfer to yet."}, status=status.HTTP_400_BAD_REQUEST)
+            if payout.bank_details_changed_at and not confirmed_bank_change:
+                return Response({
+                    "error": "The student changed their bank details after this payout was approved. Confirm the new account with them before recording the transfer.",
+                    "code": "bank_change_unconfirmed",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            payout.status = Payout.Status.PAID
+            payout.transfer_reference = transfer_reference
+            if notes:
+                payout.notes = notes
+            payout.paid_at = timezone.now()
+            payout.save(update_fields=['status', 'transfer_reference', 'notes', 'paid_at', 'updated_at'])
+
+        log_event(
+            SystemLog.Category.FINANCIAL,
+            SystemLog.Level.INFO,
+            f"Payout of RM {payout.amount} disbursed to {payout.student.full_name} for project '{payout.campaign.title}' (Ref: {transfer_reference})"
+        )
+
+        try:
+            notifications.payout_released(payout)
+        except Exception:
+            pass
+
+        return Response({
+            "message": f"Payout of RM {payout.amount} successfully recorded as disbursed.",
+            "payout": PayoutSerializer(payout).data,
+        })
+
+
+class AdminRecordClientPaymentView(APIView):
+    """Records a client's project-fee payment an admin received outside the card checkout - bank
+    transfer, or instalments for a MANUAL-billing client - so it funds the project's escrow."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        if request.user.role != User.Role.ADMIN:
+            return Response({"error": "Only admins can record client payments."}, status=status.HTTP_403_FORBIDDEN)
+
+        from campaigns.utils import campaign_escrow, paid_project_fees
+
+        try:
+            amount = Decimal(str(request.data.get('amount')))
+        except (InvalidOperation, TypeError):
+            amount = None
+        if amount is None or not amount.is_finite() or amount <= 0 or amount != amount.quantize(Decimal('0.01')):
+            return Response({"error": "Enter a positive amount in ringgit, e.g. 1500.00."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reference = str(request.data.get('reference') or '').strip()[:100]
+        if not reference:
+            return Response({"error": "The bank or DuitNow reference for this payment is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with db_transaction.atomic():
+            campaign = get_object_or_404(Campaign.objects.select_for_update().select_related('company'), pk=campaign_id)
+            outstanding = campaign.budget - paid_project_fees(campaign)
+            # Catches a typo (RM 15000 for RM 1500) before it inflates escrow and lets milestones release money never received
+            if amount > outstanding:
+                return Response({
+                    "error": f"That's more than the RM {max(outstanding, Decimal('0'))} still outstanding on this project's RM {campaign.budget} fee. Check the amount, or raise the budget first.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+            tx = Transaction.objects.create(
+                company=campaign.company,
+                related_campaign=campaign,
+                amount=amount,
+                transaction_type=Transaction.Type.PROJECT_FEE,
+                status=Transaction.Status.SUCCESS,
+                reference=reference,
+            )
+
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
+                  f"Admin {request.user.email} recorded client payment RM {amount} for '{campaign.title}' (Ref: {reference})")
+        notifications.payment_receipt(tx, outstanding=outstanding - amount)
+
+        return Response({
+            "message": f"Recorded RM {amount} from {campaign.company.company_name}.",
+            "transaction": TransactionSerializer(tx).data,
+            "escrow": campaign_escrow(campaign),
+            "outstanding": outstanding - amount,
+        }, status=status.HTTP_201_CREATED)
+

@@ -8,6 +8,7 @@ import PublicNav from '../components/PublicNav';
 import SiteFooter from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
+import { SERVICE_FEE_PERCENT } from '../utils/constants';
 
 const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
@@ -28,14 +29,14 @@ const FEATURES = [
   { title: 'Student teams', text: 'Matched students can invite classmates as teammates with a clear role and payout share.', icon: Users },
   { title: 'Project files vault', text: 'Share briefs, brand assets and raw footage with your team in one place.', icon: FolderOpen },
   { title: 'Verified portfolios', text: 'Completed, client-rated projects appear automatically on each student’s public portfolio.', icon: BadgeCheck },
-  { title: 'Simple pricing', text: 'Free to post. A one-time finder’s fee when you confirm a match, or go Pro to waive it.', icon: Wallet },
+  { title: 'Escrow-secured pricing', text: `Free to post. Your project fee is held in escrow and released to the team milestone by milestone. UniPact keeps ${SERVICE_FEE_PERCENT}%.`, icon: Wallet },
   { title: 'Verified accounts', text: 'Companies and students are reviewed by UniPact before they can take part.', icon: CheckCircle2 },
 ];
 
 const FAQS = [
   {
     q: 'How much does it cost to post a project?',
-    a: 'Posting is free. On the Free plan a one-time finder’s fee of RM 150 applies when you confirm a student match. The Pro plan (RM 499/month) waives finder’s fees on every match. The project budget you set goes to the student team.',
+    a: `Posting is free. When you confirm your student team, you pay the project budget you set into UniPact escrow. UniPact keeps a ${SERVICE_FEE_PERCENT}% service fee for matching and managing the project, and releases the rest to the team as you approve each milestone. There are no subscriptions or hidden charges.`,
   },
   {
     q: 'How are students verified?',
@@ -190,7 +191,7 @@ const LandingPage = () => {
             <article id="companies" className="scroll-mt-24 rounded-xl p-8 sm:p-10 bg-[#0B1E63] text-white flex flex-col">
               <p className="eyebrow mb-3"><span className="eyebrow-dot" /> For companies & SMEs</p>
               <h2 className="font-heading font-bold text-3xl text-white mb-3">Fresh talent without the hiring overhead</h2>
-              <p className="text-white/75 mb-6">Get a curated student team for websites, internal systems or social campaigns, and only pay a finder&apos;s fee when you confirm the match.</p>
+              <p className="text-white/75 mb-6">Get a curated student team for websites, internal systems or social campaigns, and pay nothing until you confirm the match. Your money is held in escrow until you approve each milestone.</p>
               <ul className="space-y-3 mb-8">
                 {['Post projects for free, as many as you need', 'Review the proposed team and their portfolios', 'Share briefs and raw assets in a secure files vault', 'Approve work, rate the team and download a report'].map((t) => (
                   <li key={t} className="flex items-start gap-2.5"><CheckCircle2 size={18} className="text-[#00AEEF] shrink-0 mt-0.5" /> <span className="text-white/90">{t}</span></li>

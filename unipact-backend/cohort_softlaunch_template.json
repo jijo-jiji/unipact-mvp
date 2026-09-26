@@ -1,0 +1,172 @@
+{
+  "students": [
+    {
+      "email": "student.sarah@student.um.edu.my",
+      "full_name": "Sarah Tan",
+      "university": "Universiti Malaya (UM)",
+      "major": "Software Engineering",
+      "domain_focus": "SOFTWARE_DEV",
+      "skills": ["React", "TypeScript", "Tailwind CSS", "Node.js", "Git"],
+      "bio": "Final year software engineering student focusing on clean, accessible web applications and responsive frontends.",
+      "password": ""
+    },
+    {
+      "email": "student.amir@student.usm.my",
+      "full_name": "Amirul Haziq",
+      "university": "Universiti Sains Malaysia (USM)",
+      "major": "Computer Science",
+      "domain_focus": "SOFTWARE_DEV",
+      "skills": ["Django", "Python", "PostgreSQL", "REST APIs", "Docker"],
+      "bio": "Backend-focused CS student experienced with scalable REST APIs, relational databases, and microservices.",
+      "password": ""
+    },
+    {
+      "email": "student.chong@imail.sunway.edu.my",
+      "full_name": "Chong Wei Lun",
+      "university": "Sunway University",
+      "major": "Information Technology",
+      "domain_focus": "SOFTWARE_DEV",
+      "skills": ["Full-Stack", "Next.js", "Express", "Supabase", "UI/UX"],
+      "bio": "Full-stack developer building fast, modern web portals and enterprise dashboards.",
+      "password": ""
+    },
+    {
+      "email": "student.divya@taylors.edu.my",
+      "full_name": "Divya Nair",
+      "university": "Taylor's University",
+      "major": "Computer Science (Mobile Computing)",
+      "domain_focus": "SOFTWARE_DEV",
+      "skills": ["Flutter", "React Native", "Firebase", "Mobile UI", "API Integration"],
+      "bio": "Passionate mobile app developer with published cross-platform apps on Google Play and Apple App Store.",
+      "password": ""
+    },
+    {
+      "email": "student.afiq@ukm.edu.my",
+      "full_name": "Afiq Danish",
+      "university": "Universiti Kebangsaan Malaysia (UKM)",
+      "major": "Software Engineering",
+      "domain_focus": "SOFTWARE_DEV",
+      "skills": ["Python", "Flask", "Tailwind CSS", "Automation", "MySQL"],
+      "bio": "Software developer skilled in building internal tooling, workflow automation, and custom CRM systems.",
+      "password": ""
+    },
+    {
+      "email": "student.nadia@monash.edu.my",
+      "full_name": "Nadia Farhana",
+      "university": "Monash University Malaysia",
+      "major": "Digital Media & Communications",
+      "domain_focus": "MARKETING",
+      "skills": ["Social Media Strategy", "TikTok Content", "Copywriting", "Canva", "CapCut"],
+      "bio": "Creative digital marketer specializing in short-form video production, viral TikTok campaigns, and brand storytelling.",
+      "password": ""
+    },
+    {
+      "email": "student.kevin@apu.edu.my",
+      "full_name": "Kevin Lee",
+      "university": "Asia Pacific University (APU)",
+      "major": "Marketing with Digital Tech",
+      "domain_focus": "MARKETING",
+      "skills": ["SEO", "Google Analytics 4", "Meta Ads", "Content Marketing", "A/B Testing"],
+      "bio": "Performance marketer focused on organic search traffic, keyword ranking, and paid ad optimization for SMEs.",
+      "password": ""
+    },
+    {
+      "email": "student.farah@uitm.edu.my",
+      "full_name": "Nurul Farah",
+      "university": "Universiti Teknologi MARA (UiTM)",
+      "major": "Mass Communication (PR & Advertising)",
+      "domain_focus": "MARKETING",
+      "skills": ["Community Management", "KOL Outreach", "Event Marketing", "Press Releases", "Copywriting"],
+      "bio": "Strategic communicator with hands-on experience running university influencer campaigns and community activations.",
+      "password": ""
+    },
+    {
+      "email": "student.jason@student.um.edu.my",
+      "full_name": "Jason Teo",
+      "university": "Universiti Malaya (UM)",
+      "major": "Business Administration (Marketing)",
+      "domain_focus": "MARKETING",
+      "skills": ["Email Marketing", "Brand Positioning", "Market Research", "B2B Lead Gen", "HubSpot"],
+      "bio": "Data-driven marketing student with experience crafting outbound campaigns and converting B2B leads.",
+      "password": ""
+    },
+    {
+      "email": "student.alyssa@taylors.edu.my",
+      "full_name": "Alyssa Wong",
+      "university": "Taylor's University",
+      "major": "Interactive Media & UI/UX Design",
+      "domain_focus": "BOTH",
+      "skills": ["Figma", "UI/UX Prototyping", "Design Systems", "Front-end Dev", "Digital Branding"],
+      "bio": "Hybrid designer and developer bridging user research, high-fidelity UI design, and interactive web implementation.",
+      "password": ""
+    }
+  ],
+  "companies": [
+    {
+      "email": "partner@greentech-solutions.com.my",
+      "company_name": "GreenTech Solutions Sdn Bhd",
+      "tier": "PRO",
+      "industry": "Sustainability & CleanTech",
+      "password": "",
+      "campaign": {
+        "title": "CleanEnergy Consumer Carbon Tracking Web App MVP",
+        "type": "SOFTWARE_DEVELOPMENT",
+        "budget": 2500.00,
+        "deadline": "2026-11-15",
+        "description": "Develop an interactive web portal where residential users can calculate their household carbon savings and track solar ROI. Includes user dashboard, carbon calculation engine, and responsive mobile-friendly UI.",
+        "software_sub_type": "Web Portal / Calculator",
+        "required_skills": ["React", "Tailwind CSS", "REST APIs", "Data Visualization"],
+        "project_outcome": "Functional MVP deployed with user authentication, calculator form, and interactive charts.",
+        "requirements": [
+          "Interactive savings calculator with live calculation graphs",
+          "Responsive mobile and desktop UI matching GreenTech brand guidelines",
+          "Clean GitHub repository with setup README and deployment instructions"
+        ]
+      }
+    },
+    {
+      "email": "marketing@kopicraft-artisans.com",
+      "company_name": "KopiCraft Artisan Roasters",
+      "tier": "PRO",
+      "industry": "Food & Beverage / Retail",
+      "password": "",
+      "campaign": {
+        "title": "National Launch: Cold Brew Series TikTok & IG Campaign",
+        "type": "DIGITAL_MARKETING",
+        "budget": 1800.00,
+        "deadline": "2026-10-31",
+        "description": "Execute a month-long social media activation across TikTok and Instagram for the launch of our bottled cold brew series targeting university students and young professionals.",
+        "campaign_objective": "Drive 50,000+ targeted organic views and 1,000+ coupon redemptions across Klang Valley campuses.",
+        "target_platforms": ["TikTok", "Instagram Reels", "Lemon8"],
+        "required_skills": ["Short-Form Video Production", "Copywriting", "Trend Research", "CapCut"],
+        "requirements": [
+          "Content calendar with 8 ready-to-post short-form video reels",
+          "Hooks, scripts, and editing tailored to Malaysian university culture",
+          "Campaign analytics report summarizing engagement, reach, and redemption metrics"
+        ]
+      }
+    },
+    {
+      "email": "ops@apexlogistics.com.my",
+      "company_name": "Apex OmniLogistics PLT",
+      "tier": "PRO",
+      "industry": "Supply Chain & Logistics",
+      "password": "",
+      "campaign": {
+        "title": "Automated Dispatch & Driver Assignment Internal Dashboard",
+        "type": "SOFTWARE_DEVELOPMENT",
+        "budget": 3000.00,
+        "deadline": "2026-11-30",
+        "description": "Build an internal operations dashboard to replace manual spreadsheets for route scheduling and driver assignments. Connects to existing shipment API and displays real-time dispatch status.",
+        "software_sub_type": "Internal Operations Dashboard",
+        "required_skills": ["Django", "React", "PostgreSQL", "Tailwind CSS"],
+        "project_outcome": "Fast, operational internal dashboard allowing dispatchers to assign jobs and review delivery status in one view.",
+        "requirements": [
+          "Dispatcher dashboard with filterable shipment list and driver assignment modal",
+          "Role-based access (Operations Manager vs Driver view)",
+          "Exportable daily dispatch summary report (CSV / PDF)"
+        ]
+      }
+    }
+  ]
+}

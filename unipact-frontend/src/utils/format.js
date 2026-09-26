@@ -25,6 +25,12 @@ const STATUS = {
   SUCCESS: { label: 'Paid', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   FAILED: { label: 'Failed', className: 'bg-red-50 text-red-700 border-red-200' },
   NOT_COMPLETED: { label: 'Not completed', className: 'bg-slate-50 text-slate-500 border-slate-200' },
+  // Milestones
+  REVISION_REQUESTED: { label: 'Revision requested', className: 'bg-amber-50 text-amber-800 border-amber-200' },
+  APPROVED: { label: 'Approved · escrow released', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  // Payouts
+  PROCESSING: { label: 'Ready for disbursement', className: 'bg-amber-50 text-amber-800 border-amber-200' },
+  PAID: { label: 'Disbursed', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 };
 
 export const statusLabel = (status) => STATUS[status]?.label || status || '—';
@@ -48,6 +54,7 @@ export const domainLabel = (domain) => DOMAINS[domain] || 'Not specified';
 const TRANSACTION_TYPES = {
   FINDERS_FEE: "Finder's fee",
   SUBSCRIPTION: 'Subscription',
+  PROJECT_FEE: 'Project fee',
 };
 export const transactionTypeLabel = (type) => TRANSACTION_TYPES[type] || type;
 

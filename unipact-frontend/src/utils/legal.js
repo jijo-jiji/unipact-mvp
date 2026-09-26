@@ -6,5 +6,5 @@ export const LEGAL = {
   registrationNumber: import.meta.env.VITE_LEGAL_REGISTRATION_NO || '[SSM registration number]',
   address: import.meta.env.VITE_LEGAL_ADDRESS || '[Registered business address]',
   contactEmail: import.meta.env.VITE_CONTACT_EMAIL || '[privacy contact email]',
-  lastUpdated: import.meta.env.VITE_LEGAL_LAST_UPDATED || '15 September 2026',
+  lastUpdated: import.meta.env.VITE_LEGAL_LAST_UPDATED || '1 October 2026',
 };

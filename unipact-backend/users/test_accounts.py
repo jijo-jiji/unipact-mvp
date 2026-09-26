@@ -127,6 +127,31 @@ class AccountSettingsTests(APITestCase):
         self.assertEqual(user.email, 'sam@siswa.my')
         self.assertEqual(res.data['student_profile']['full_name'], 'Samantha Lee')
 
+    def test_bank_details_change_alerts_the_student_by_email(self):
+        user = make_student(verification_status='VERIFIED')
+        self.client.force_authenticate(user)
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.patch(reverse('account_settings'), {
+                'bank_name': 'Maybank', 'bank_account_number': '114012345678',
+                'bank_account_holder_name': 'Samantha Lee',
+            }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual([m.to for m in mail.outbox], [['sam@siswa.my']])
+        self.assertIn('bank details', mail.outbox[0].subject.lower())
+        self.assertIn('****5678', mail.outbox[0].body)
+
+        # The real frontend resends the whole profile form on every save, including untouched bank
+        # fields - only an actual value change should trigger the alert, not mere presence in the payload.
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(reverse('account_settings'), {
+                'bio': 'Updated bio',
+                'bank_name': 'Maybank', 'bank_account_number': '114012345678',
+                'bank_account_holder_name': 'Samantha Lee',
+            }, format='json')
+        self.assertEqual(mail.outbox, [])
+
     def test_rejected_student_resubmits_document_back_to_review(self):
         user = make_student(verification_status='REJECTED')
         self.client.force_authenticate(user)
@@ -148,6 +173,66 @@ class AccountSettingsTests(APITestCase):
         self.client.force_authenticate(user)
         res = self.client.patch(reverse('account_settings'), {'company_name': ''}, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_student_uploads_profile_photo_and_avatar_url_returned(self):
+        user = make_student()
+        self.client.force_authenticate(user)
+        png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82'
+        res = self.client.patch(
+            reverse('account_settings'),
+            {'profile_photo': SimpleUploadedFile('avatar.png', png_data, content_type='image/png')},
+            format='multipart'
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        profile = StudentProfile.objects.get(user=user)
+        self.assertTrue(bool(profile.profile_photo))
+        self.assertTrue(res.data['avatar_url'].endswith('.png'))
+
+    def test_student_invalid_image_type_rejected(self):
+        user = make_student()
+        self.client.force_authenticate(user)
+        res = self.client.patch(
+            reverse('account_settings'),
+            {'profile_photo': SimpleUploadedFile('avatar.txt', b'some text', content_type='text/plain')},
+            format='multipart'
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('profile_photo', res.data)
+
+    def test_student_removes_profile_photo(self):
+        user = make_student()
+        self.client.force_authenticate(user)
+        png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82'
+        self.client.patch(
+            reverse('account_settings'),
+            {'profile_photo': SimpleUploadedFile('avatar.png', png_data, content_type='image/png')},
+            format='multipart'
+        )
+        # Now remove
+        res = self.client.patch(reverse('account_settings'), {'remove_photo': 'true'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        profile = StudentProfile.objects.get(user=user)
+        self.assertFalse(bool(profile.profile_photo))
+        self.assertIsNone(res.data['avatar_url'])
+
+    def test_company_uploads_logo_and_removes_logo(self):
+        user = make_company()
+        self.client.force_authenticate(user)
+        png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82'
+        res = self.client.patch(
+            reverse('account_settings'),
+            {'logo': SimpleUploadedFile('logo.png', png_data, content_type='image/png')},
+            format='multipart'
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data['avatar_url'].endswith('.png'))
+        self.assertTrue(bool(CompanyProfile.objects.get(user=user).logo))
+
+        # Remove logo
+        remove_res = self.client.patch(reverse('account_settings'), {'remove_logo': 'true'}, format='json')
+        self.assertEqual(remove_res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(remove_res.data['avatar_url'])
+        self.assertFalse(bool(CompanyProfile.objects.get(user=user).logo))
 
     def test_requires_sign_in(self):
         self.assertIn(self.client.patch(reverse('account_settings'), {}, format='json').status_code, (401, 403))
@@ -212,10 +297,15 @@ class NotificationEmailTests(APITestCase):
         self.assertEqual([m.to for m in mail.outbox], [['boss@corp.com']])
         self.assertIn('is ready', mail.outbox[0].subject)
 
+        self.client.force_authenticate(self.admin)
+        plan_res = self.client.post(reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id}),
+                                     {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+        milestone_id = plan_res.data[0]['id']
+
         mail.outbox.clear()
         self.client.force_authenticate(self.company_user)
         with self.captureOnCommitCallbacks(execute=True):
-            self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')
+            self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {'mock_pay': True}, format='json')
         self.assertTrue(any('has started' in s for s in self.subjects()))
 
         mail.outbox.clear()
@@ -228,6 +318,14 @@ class NotificationEmailTests(APITestCase):
         invite = next(m for m in mail.outbox if m.to == ['friend@siswa.my'])
         self.assertIn('/register/student', invite.body)  # not registered yet, so they're asked to sign up
         self.assertTrue(any(m.to == ['boss@corp.com'] and 'New work' in m.subject for m in mail.outbox))
+
+        self.client.force_authenticate(self.student_user)
+        self.client.post(reverse('milestone_submit', kwargs={'campaign_id': self.campaign.id, 'milestone_id': milestone_id}),
+                          {'deliverable_url': 'https://github.com/sam/portal'}, format='json')
+        self.client.force_authenticate(self.company_user)
+        review_res = self.client.post(reverse('milestone_review', kwargs={'campaign_id': self.campaign.id, 'milestone_id': milestone_id}),
+                                       {'action': 'approve'}, format='json')
+        self.assertEqual(review_res.status_code, 200)
 
         mail.outbox.clear()
         self.client.force_authenticate(self.company_user)

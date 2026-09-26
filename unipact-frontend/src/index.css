@@ -167,3 +167,11 @@ h1, h2, h3, h4, h5, h6 {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Verified Impact Ledger "Download PDF" is the browser's print of /ledger/:slug */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #FFFFFF !important; }
+  .ledger-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ledger-sheet section { break-inside: avoid; }
+}

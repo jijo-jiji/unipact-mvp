@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Briefcase, ShieldCheck, Code2, GraduationCap, CheckCircle2, Star, Share2 } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Award, Briefcase, ShieldCheck, Code2, GraduationCap, CheckCircle2, Star, Share2 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -75,8 +75,24 @@ const StudentProfile = () => {
         </div>
 
         <section className="card p-6 sm:p-10 flex flex-col md:flex-row gap-8 items-start">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#0B1E63] flex items-center justify-center shrink-0 shadow-md">
-            <span className="font-heading font-extrabold text-4xl text-[#00AEEF]">{profile.full_name?.charAt(0)}</span>
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#0B1E63] flex items-center justify-center shrink-0 shadow-md overflow-hidden border border-[rgba(10,23,72,0.12)]">
+            {profile.profile_photo ? (
+              <img
+                src={profile.profile_photo}
+                alt={profile.full_name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'block';
+                }}
+              />
+            ) : null}
+            <span
+              className="font-heading font-extrabold text-4xl text-[#00AEEF]"
+              style={{ display: profile.profile_photo ? 'none' : 'block' }}
+            >
+              {profile.full_name?.charAt(0) || 'S'}
+            </span>
           </div>
 
           <div className="flex-1 min-w-0">
@@ -140,6 +156,11 @@ const StudentProfile = () => {
                         <li key={i} className="flex items-start gap-2"><CheckCircle2 size={14} className="text-[#00AEEF] shrink-0 mt-0.5" /> {r}</li>
                       ))}
                     </ul>
+                  )}
+                  {proj.ledger_slug && (
+                    <Link to={`/ledger/${proj.ledger_slug}`} className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#0090C6] hover:underline">
+                      <Award size={15} /> View verified impact ledger
+                    </Link>
                   )}
                 </article>
               ))}

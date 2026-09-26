@@ -118,7 +118,14 @@ class V3TalentMarketplaceTests(APITestCase):
         accept_res = self.client.post(reverse('respond_match_offer', kwargs={'campaign_id': job_id}), {'action': 'accept'}, format='json')
         self.assertEqual(accept_res.status_code, status.HTTP_200_OK)
 
-        # 5. Company Finalizes Match (Paying Finder Fee)
+        # 4b. Admin sets the milestone plan (required before a match can be finalized)
+        self.client.force_authenticate(user=self.admin_user)
+        plan_res = self.client.post(reverse('milestone_plan', kwargs={'campaign_id': job_id}), {
+            'milestones': [{'title': 'Delivery', 'percentage': 100}]
+        }, format='json')
+        self.assertEqual(plan_res.status_code, status.HTTP_201_CREATED)
+
+        # 5. Company Finalizes Match (Paying the full project fee)
         self.client.force_authenticate(user=self.company_user)
         fin_res = self.client.post(finalize_url, {'mock_pay': True}, format='json')
         self.assertEqual(fin_res.status_code, status.HTTP_200_OK)
@@ -140,8 +147,21 @@ class V3TalentMarketplaceTests(APITestCase):
         }, format='json')
         self.assertEqual(deliv_res.status_code, status.HTTP_201_CREATED)
 
-        # 6. Company Approves Deliverables & Marks Completed
+        # 6. Student submits the milestone, company approves it (releasing escrow to the student)
+        milestone_id = plan_res.data[0]['id']
+        self.client.force_authenticate(user=student_user)
+        submit_res = self.client.post(reverse('milestone_submit', kwargs={'campaign_id': job_id, 'milestone_id': milestone_id}), {
+            'deliverable_url': 'https://github.com/siswa-dev/crm'
+        }, format='json')
+        self.assertEqual(submit_res.status_code, status.HTTP_200_OK)
+
         self.client.force_authenticate(user=self.company_user)
+        review_res = self.client.post(reverse('milestone_review', kwargs={'campaign_id': job_id, 'milestone_id': milestone_id}), {
+            'action': 'approve'
+        }, format='json')
+        self.assertEqual(review_res.status_code, status.HTTP_200_OK)
+
+        # 7. Company Approves Deliverables & Marks Completed
         complete_url = reverse('campaign_complete', kwargs={'campaign_id': job_id})
         comp_res = self.client.post(complete_url, {
             'rating': 5,

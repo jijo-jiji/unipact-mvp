@@ -17,7 +17,7 @@ const OPTIONS = [
       'Post software and marketing projects for free',
       'Review and confirm admin-curated student teams',
       'Share briefs, brand assets and raw footage',
-      "Pay a finder's fee only when you confirm a match",
+      'Pay into escrow, released only as you approve milestones',
     ],
     cta: 'Create a client account',
     iconClass: 'bg-[#0B1E63] text-[#00AEEF]',

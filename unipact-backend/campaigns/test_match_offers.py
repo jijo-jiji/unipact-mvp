@@ -38,7 +38,7 @@ class MatchOfferFlowTests(APITestCase):
 
     def finalize(self):
         self.client.force_authenticate(self.company_user)
-        return self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')
+        return self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {'mock_pay': True}, format='json')
 
     def test_team_must_all_accept_before_company_can_confirm(self):
         self.match(self.ali, self.mei)
@@ -52,6 +52,12 @@ class MatchOfferFlowTests(APITestCase):
 
         self.respond(self.mei_user, 'accept')
         self.assertEqual([m.to for m in mail.outbox], [['co@x.com']])
+
+        self.client.force_authenticate(self.admin)
+        plan_res = self.client.post(reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id}),
+                                     {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+        self.assertEqual(plan_res.status_code, status.HTTP_201_CREATED)
+
         self.assertEqual(self.finalize().status_code, status.HTTP_200_OK)
         self.campaign.refresh_from_db()
         self.assertEqual(self.campaign.status, Campaign.Status.IN_PROGRESS)

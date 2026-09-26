@@ -7,6 +7,7 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import ClubCommittee from '../components/ClubCommittee';
+import ImpactLedgerPanel from '../components/ImpactLedgerPanel';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
 import {
   GraduationCap,
@@ -29,6 +30,9 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  CreditCard,
+  Wallet,
+  Flag,
 } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -54,6 +58,13 @@ const StudentDashboard = () => {
   const [assignedJobs, setAssignedJobs] = useState([]);
   const [clubApplications, setClubApplications] = useState([]);
   const [incomingInvites, setIncomingInvites] = useState([]);
+  const [payoutsData, setPayoutsData] = useState({
+    total_earned: '0.00',
+    pending_amount: '0.00',
+    has_bank_details: false,
+    bank_details: {},
+    payouts: [],
+  });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -73,6 +84,12 @@ const StudentDashboard = () => {
   const [declineJob, setDeclineJob] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
 
+  // Milestone submission modal state (managed escrow)
+  const [milestoneTarget, setMilestoneTarget] = useState(null); // { job, milestone }
+  const [milestoneForm, setMilestoneForm] = useState({ url: '', notes: '', file: null });
+  const [submittingMilestone, setSubmittingMilestone] = useState(false);
+  const [milestoneError, setMilestoneError] = useState('');
+
   const fetchDashboard = useCallback(async () => {
     try {
       if (isClubMember) {
@@ -81,12 +98,14 @@ const StudentDashboard = () => {
         const res = await api.get('/campaigns/applications/me/');
         setClubApplications(res.data);
       } else {
-        const [jobsRes, invitesRes] = await Promise.all([
+        const [jobsRes, invitesRes, payoutsRes] = await Promise.all([
           api.get('/campaigns/student/assigned/'),
           api.get('/campaigns/team/invitations/me/'),
+          api.get('/payments/payouts/me/').catch(() => ({ data: { total_earned: '0.00', pending_amount: '0.00', has_bank_details: false, bank_details: {}, payouts: [] } })),
         ]);
         setAssignedJobs(jobsRes.data);
         setIncomingInvites(invitesRes.data);
+        if (payoutsRes?.data) setPayoutsData(payoutsRes.data);
       }
     } catch (err) {
       showToast(getErrorMessage(err, 'Could not load your workspace.'), 'error');
@@ -94,6 +113,7 @@ const StudentDashboard = () => {
       setLoading(false);
     }
   }, [isClub, isClubMember, showToast]);
+
 
   useEffect(() => {
     fetchDashboard();
@@ -188,6 +208,40 @@ const StudentDashboard = () => {
     }
   };
 
+  const openMilestoneModal = (job, milestone) => {
+    setMilestoneTarget({ job, milestone });
+    setMilestoneForm({ url: milestone.deliverable_url || '', notes: '', file: null });
+    setMilestoneError('');
+  };
+
+  const handleSubmitMilestone = async (e) => {
+    e.preventDefault();
+    if (!milestoneForm.url.trim() && !milestoneForm.file) {
+      setMilestoneError('Add a link to your work or attach a file.');
+      return;
+    }
+    setSubmittingMilestone(true);
+    setMilestoneError('');
+    try {
+      const { job, milestone } = milestoneTarget;
+      const formData = new FormData();
+      if (milestoneForm.url.trim()) formData.append('deliverable_url', milestoneForm.url.trim());
+      formData.append('deliverable_notes', milestoneForm.notes);
+      if (milestoneForm.file) formData.append('deliverable_file', milestoneForm.file);
+
+      await api.post(`/campaigns/${job.id}/milestones/${milestone.id}/submit/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      showToast('Milestone submitted. The client has been notified.', 'success');
+      setMilestoneTarget(null);
+      await fetchDashboard();
+    } catch (err) {
+      setMilestoneError(getErrorMessage(err, 'Could not submit this milestone.'));
+    } finally {
+      setSubmittingMilestone(false);
+    }
+  };
+
   // Admin match offers the student hasn't answered yet are shown apart from their projects
   const offers = assignedJobs.filter((j) => j.status === 'MATCHED' && j.my_offer?.status === 'PENDING');
   const projects = assignedJobs.filter((j) => !offers.includes(j));
@@ -219,8 +273,24 @@ const StudentDashboard = () => {
         {/* Profile header */}
         <section className="card p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start sm:items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-[#0B1E63] flex items-center justify-center shadow-md shrink-0">
-              {isClub ? <Users size={30} className="text-[#00AEEF]" /> : <GraduationCap size={32} className="text-[#00AEEF]" />}
+            <div className="w-16 h-16 rounded-xl bg-[#0B1E63] flex items-center justify-center shadow-md shrink-0 overflow-hidden border border-[rgba(10,23,72,0.12)]">
+              {(user?.avatar_url || studentProfile.profile_photo || user?.club_profile?.logo) ? (
+                <img
+                  src={user?.avatar_url || studentProfile.profile_photo || user?.club_profile?.logo}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div
+                className="w-full h-full items-center justify-center"
+                style={{ display: (user?.avatar_url || studentProfile.profile_photo || user?.club_profile?.logo) ? 'none' : 'flex' }}
+              >
+                {isClub ? <Users size={30} className="text-[#00AEEF]" /> : <GraduationCap size={32} className="text-[#00AEEF]" />}
+              </div>
             </div>
             <div>
               <p className="eyebrow mb-1"><span className="eyebrow-dot" /> Welcome back</p>
@@ -292,6 +362,122 @@ const StudentDashboard = () => {
           </>
         ) : (
           <>
+            {/* Missing Bank Details Warning Alert */}
+            {!payoutsData.has_bank_details && (
+              <div className="card border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/15 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <CreditCard size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-heading font-bold text-sm text-amber-950">Add Malaysian Bank Details for Project Payouts</h4>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      You haven&apos;t set up your payout account yet. Add your bank account number or DuitNow ID in Settings so UniPact can disburse your milestone earnings.
+                    </p>
+                  </div>
+                </div>
+                <Link to="/settings#payouts" className="btn-secondary bg-white text-xs font-semibold whitespace-nowrap self-start sm:self-auto hover:border-amber-400">
+                  <CreditCard size={14} /> Add bank details &rarr;
+                </Link>
+              </div>
+            )}
+
+            {/* Earnings & Managed Escrow Payout Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in">
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Total Earned</span>
+                    <Wallet size={16} className="text-[#00AEEF]" />
+                  </div>
+                  <p className="font-heading font-extrabold text-2xl text-[#0B1E63]">
+                    RM {formatMoney(payoutsData.total_earned)}
+                  </p>
+                </div>
+                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1 font-medium">
+                  <CheckCircle2 size={12} /> Disbursed to your Malaysian bank
+                </p>
+              </div>
+
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Pending Escrow</span>
+                    <Clock size={16} className="text-[#0090C6]" />
+                  </div>
+                  <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
+                    RM {formatMoney(payoutsData.pending_amount)}
+                  </p>
+                </div>
+                <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
+                  <Clock size={12} /> Milestone in progress or ready for payout
+                </p>
+              </div>
+
+              <div className="card p-5 bg-white border border-[rgba(10,23,72,0.1)] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[#5B6478] mb-1">
+                    <span className="text-xs font-medium">Payout Account</span>
+                    <CreditCard size={16} className="text-[#5B6478]" />
+                  </div>
+                  {payoutsData.has_bank_details ? (
+                    <div>
+                      <p className="font-semibold text-sm text-[#0A1748] truncate">
+                        {payoutsData.bank_details?.bank_name}
+                      </p>
+                      <p className="text-xs font-mono text-[#5B6478] mt-0.5">
+                        ****{payoutsData.bank_details?.bank_account_number?.slice(-4)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-amber-700 font-medium">No account on file</p>
+                      <Link to="/settings#payouts" className="text-xs text-[#0090C6] hover:underline font-semibold mt-1 inline-block">
+                        Configure bank &rarr;
+                      </Link>
+                    </div>
+                  )}
+                </div>
+                <Link to="/settings#payouts" className="text-xs text-[#5B6478] hover:text-[#0A1748] underline mt-2 block">
+                  Update bank details
+                </Link>
+              </div>
+            </div>
+
+            {/* Payouts History Table (if any payouts exist) */}
+            {payoutsData.payouts && payoutsData.payouts.length > 0 && (
+              <section className="card p-6 space-y-4 animate-fade-in">
+                <SectionHeading
+                  title="Stipends & Payout History"
+                  description="Milestone stipends disbursed from client project escrow to your bank account."
+                />
+                <div className="divide-y divide-[rgba(10,23,72,0.08)]">
+                  {payoutsData.payouts.map((p) => (
+                    <div key={p.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-sm text-[#0A1748]">{p.campaign_title}</p>
+                        <p className="text-xs text-[#5B6478] mt-0.5">
+                          {p.bank_name ? `${p.bank_name} (****${p.bank_account_number?.slice(-4)})` : 'Bank Transfer'}
+                          {p.paid_at && ` • Disbursed ${formatDate(p.paid_at)}`}
+                          {p.transfer_reference && (
+                            <span className="font-mono text-[#0B1E63] font-medium ml-1.5 bg-[#0B1E63]/5 px-1.5 py-0.5 rounded">
+                              Ref: {p.transfer_reference}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 self-end sm:self-auto">
+                        <span className="font-heading font-bold text-base text-[#0A1748]">
+                          RM {formatMoney(p.amount)}
+                        </span>
+                        <StatusBadge status={p.status} label={p.status === 'PENDING' ? 'Awaiting bank details' : undefined} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Admin match offers waiting for an answer */}
             {offers.length > 0 && (
               <section className="space-y-4 animate-fade-in">
@@ -299,6 +485,7 @@ const StudentDashboard = () => {
                   title={`Project offers (${offers.length})`}
                   description="A UniPact admin picked you for these client projects. Accept to join the team, or decline if the timing or scope doesn't work for you."
                 />
+
                 {offers.map((job) => (
                   <OfferCard
                     key={job.id}
@@ -393,6 +580,7 @@ const StudentDashboard = () => {
                       myProfileId={studentProfile.id}
                       onSubmit={() => openSubmitModal(job)}
                       onInvite={() => openInviteModal(job)}
+                      onSubmitMilestone={(milestone) => openMilestoneModal(job, milestone)}
                     />
                   ))}
                 </div>
@@ -440,6 +628,41 @@ const StudentDashboard = () => {
             <button type="button" onClick={() => setActiveJob(null)} disabled={submitting} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={submitting} className="btn-primary">
               {submitting ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : 'Submit deliverable'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Milestone submission modal (managed escrow) */}
+      <Modal
+        isOpen={!!milestoneTarget}
+        onClose={() => !submittingMilestone && setMilestoneTarget(null)}
+        title="Submit milestone"
+        subtitle={milestoneTarget ? `${milestoneTarget.milestone.title} · ${milestoneTarget.job.title}` : ''}
+        icon={<Flag size={20} />}
+        maxWidth="max-w-xl"
+      >
+        {milestoneError && (
+          <div className="alert-error mb-4"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{milestoneError}</span></div>
+        )}
+        <form onSubmit={handleSubmitMilestone} className="space-y-4">
+          <div>
+            <label className="field-label" htmlFor="milestone-url">Link to your work</label>
+            <input id="milestone-url" type="url" value={milestoneForm.url} onChange={(e) => setMilestoneForm({ ...milestoneForm, url: e.target.value })} placeholder="https://github.com/… or https://staging.example.com" className="input" />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="milestone-file">Or attach a file</label>
+            <input id="milestone-file" type="file" onChange={(e) => setMilestoneForm({ ...milestoneForm, file: e.target.files?.[0] || null })} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
+            <p className="field-hint">Provide a link, a file, or both.</p>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="milestone-notes">Notes for the client (optional)</label>
+            <textarea id="milestone-notes" rows={3} value={milestoneForm.notes} onChange={(e) => setMilestoneForm({ ...milestoneForm, notes: e.target.value })} placeholder="What's included in this milestone?" className="input" />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(10,23,72,0.08)]">
+            <button type="button" onClick={() => setMilestoneTarget(null)} disabled={submittingMilestone} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={submittingMilestone} className="btn-primary">
+              {submittingMilestone ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : 'Submit milestone'}
             </button>
           </div>
         </form>
@@ -528,7 +751,7 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
       <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
       <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
-        <span>Budget: <strong className="text-[#0B1E63]">{formatMoney(job.budget)}</strong></span>
+        <span>Team pay: <strong className="text-[#0B1E63]">{formatMoney(job.student_pool ?? job.budget)}</strong>{job.student_pool && <span className="text-xs"> (after {job.service_fee_percent}% UniPact fee)</span>}</span>
         <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
       </p>
 
@@ -580,12 +803,14 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
   );
 };
 
-const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
+const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }) => {
   const pendingInvites = (job.team_invitations || []).filter((i) => i.status === 'PENDING');
   const team = job.assigned_students_details || [];
   const assets = job.client_assets || [];
   const submissions = job.student_deliverables || [];
+  const milestones = job.milestones || [];
   const isOpen = job.status !== 'COMPLETED';
+  const canSubmitMilestone = (m) => ['PENDING', 'IN_PROGRESS', 'REVISION_REQUESTED'].includes(m.status);
 
   return (
     <article className="card p-6 sm:p-8 hover:border-[#00AEEF] transition-colors">
@@ -598,7 +823,7 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
           <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
           <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
             <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
-            <span>Budget: <strong className="text-[#0B1E63]">{formatMoney(job.budget)}</strong></span>
+            <span>Team pay: <strong className="text-[#0B1E63]">{formatMoney(job.student_pool ?? job.budget)}</strong>{job.student_pool && <span className="text-xs"> (after {job.service_fee_percent}% UniPact fee)</span>}</span>
             <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
           </p>
         </div>
@@ -698,6 +923,38 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
         )}
       </div>
 
+      {/* Milestones (managed escrow) */}
+      {milestones.length > 0 && (
+        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
+          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2 flex items-center gap-2">
+            <Flag size={14} className="text-[#00AEEF]" /> Milestones ({milestones.length})
+          </h4>
+          <div className="space-y-2">
+            {milestones.map((m) => (
+              <div key={m.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">{m.step_number}. {m.title}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading font-bold text-[#0B1E63]">{formatMoney(m.amount)}</span>
+                    <StatusBadge status={m.status} />
+                  </div>
+                </div>
+                {m.status === 'REVISION_REQUESTED' && m.deliverable_notes && (
+                  <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+                    <strong>Client feedback:</strong> {m.deliverable_notes}
+                  </p>
+                )}
+                {canSubmitMilestone(m) && (
+                  <button onClick={() => onSubmitMilestone(m)} className="btn-secondary btn-sm mt-2">
+                    <Upload size={13} /> {m.status === 'REVISION_REQUESTED' ? 'Resubmit' : 'Submit milestone'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Submissions */}
       {submissions.length > 0 && (
         <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
@@ -715,6 +972,8 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite }) => {
           </ul>
         </div>
       )}
+
+      {job.status === 'COMPLETED' && <ImpactLedgerPanel campaignId={job.id} />}
     </article>
   );
 };

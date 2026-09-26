@@ -1,3 +1,7 @@
+import csv
+import json
+import os
+import tempfile
 from io import StringIO
 from unittest import mock
 
@@ -8,6 +12,7 @@ from django.test import TestCase, override_settings
 
 from users.models import User
 from unipact_backend.demo_data import refuse_in_production
+
 
 
 class CreateAdminCommandTests(TestCase):
@@ -71,3 +76,107 @@ class SeedScriptGuardTests(TestCase):
 
     def test_allowed_locally(self):
         refuse_in_production('create_seed_users.py')  # no error in development
+
+
+class OnboardCohortCommandTests(TestCase):
+    def setUp(self):
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.json_path = os.path.join(self.temp_dir.name, 'cohort.json')
+        self.csv_path = os.path.join(self.temp_dir.name, 'credentials.csv')
+        self.valid_data = {
+            'students': [
+                {
+                    'email': 'student.test@um.edu.my',
+                    'full_name': 'Test Student',
+                    'university': 'Universiti Malaya (UM)',
+                    'major': 'CS',
+                    'domain_focus': 'SOFTWARE_DEV',
+                    'skills': ['Python', 'Django'],
+                    'bio': 'Passionate builder',
+                }
+            ],
+            'companies': [
+                {
+                    'email': 'client.test@startup.my',
+                    'company_name': 'Test Startup Sdn Bhd',
+                    'tier': 'PRO',
+                    'industry': 'FinTech',
+                    'campaign': {
+                        'title': 'Test FinTech MVP',
+                        'type': 'SOFTWARE_DEVELOPMENT',
+                        'budget': 2000.00,
+                        'description': 'Build test dashboard',
+                        'requirements': ['Auth', 'Dashboard'],
+                    }
+                }
+            ]
+        }
+        with open(self.json_path, 'w', encoding='utf-8') as f:
+            json.dump(self.valid_data, f)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_missing_file_raises_error(self):
+        with self.assertRaises(CommandError):
+            call_command('onboard_cohort', '--file', 'non_existent_file.json')
+
+    def test_dry_run_does_not_modify_database(self):
+        out = StringIO()
+        call_command('onboard_cohort', '--file', self.json_path, '--dry-run', stdout=out)
+        self.assertIn('[DRY-RUN]', out.getvalue())
+        self.assertFalse(User.objects.filter(email='student.test@um.edu.my').exists())
+        self.assertFalse(User.objects.filter(email='client.test@startup.my').exists())
+
+    def test_full_cohort_creation_and_credentials_export(self):
+        out = StringIO()
+        call_command(
+            'onboard_cohort',
+            '--file', self.json_path,
+            '--credentials-output', self.csv_path,
+            stdout=out
+        )
+        self.assertIn('[SUCCESS] Cohort Onboarding Completed!', out.getvalue())
+
+        # Verify Student
+        student_user = User.objects.get(email='student.test@um.edu.my')
+        self.assertEqual(student_user.role, User.Role.STUDENT)
+        self.assertTrue(student_user.is_verified)
+        self.assertIsNotNone(student_user.terms_accepted_at)
+        self.assertEqual(student_user.student_profile.full_name, 'Test Student')
+        self.assertEqual(student_user.student_profile.verification_status, 'VERIFIED')
+
+        # Verify Company & Campaign
+        company_user = User.objects.get(email='client.test@startup.my')
+        self.assertEqual(company_user.role, User.Role.COMPANY)
+        self.assertTrue(company_user.is_verified)
+        self.assertEqual(company_user.company_profile.company_name, 'Test Startup Sdn Bhd')
+        self.assertEqual(company_user.company_profile.verification_status, 'VERIFIED')
+
+        # Verify Campaign
+        from campaigns.models import Campaign
+        camp = Campaign.objects.get(title='Test FinTech MVP')
+        self.assertEqual(camp.company, company_user.company_profile)
+        self.assertEqual(camp.status, Campaign.Status.OPEN)
+        self.assertEqual(float(camp.budget), 2000.00)
+
+        # Verify Credentials CSV
+        self.assertTrue(os.path.exists(self.csv_path))
+        with open(self.csv_path, 'r', encoding='utf-8') as f:
+            reader = list(csv.DictReader(f))
+            self.assertEqual(len(reader), 2)
+            self.assertEqual(reader[0]['Email'], 'student.test@um.edu.my')
+            self.assertTrue(student_user.check_password(reader[0]['Temporary Password']))
+            self.assertEqual(reader[1]['Email'], 'client.test@startup.my')
+            self.assertTrue(company_user.check_password(reader[1]['Temporary Password']))
+
+    def test_invalid_data_raises_error(self):
+        bad_data = {'students': [{'email': 'not-an-email', 'full_name': 'Bad'}]}
+        bad_json = os.path.join(self.temp_dir.name, 'bad.json')
+        with open(bad_json, 'w', encoding='utf-8') as f:
+            json.dump(bad_data, f)
+
+        with self.assertRaises(CommandError):
+            call_command('onboard_cohort', '--file', bad_json)
+
