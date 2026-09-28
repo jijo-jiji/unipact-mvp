@@ -340,8 +340,12 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', '' if IS_PRODUCTION else 'http://localh
 if IS_PRODUCTION and not FRONTEND_URL:
     raise ImproperlyConfigured('Set FRONTEND_URL to the public website address, e.g. "https://unipact.my" (used in email links).')
 
-# Any SMTP provider works: Resend, Brevo, SendGrid, Mailgun, Amazon SES, Zoho, Google Workspace.
-# Without EMAIL_HOST, emails are printed to the console instead of being sent (handy locally).
+# Email delivery:
+# 1. Resend REST API via HTTPS (Port 443) - Recommended on Render/Vercel (bypasses blocked SMTP ports)
+# 2. Standard SMTP (EMAIL_HOST) - Resend, Brevo, SendGrid, Amazon SES, Google Workspace
+# 3. Console backend during local development
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+
 EMAIL_HOST = os.getenv('EMAIL_HOST', '')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
@@ -349,15 +353,25 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', default=False)
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', default=not EMAIL_USE_SSL)
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND') or (
-    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST else 'django.core.mail.backends.console.EmailBackend'
+
+if os.getenv('EMAIL_BACKEND'):
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
+elif RESEND_API_KEY:
+    EMAIL_BACKEND = 'unipact_backend.email_backends.ResendEmailBackend'
+elif EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+DEFAULT_FROM_EMAIL = os.getenv(
+    'DEFAULT_FROM_EMAIL',
+    'UniPact <onboarding@resend.dev>' if RESEND_API_KEY else 'UniPact <no-reply@unipact.local>'
 )
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'UniPact <no-reply@unipact.local>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', '')  # shown in emails and used as the reply-to address
 
-if IS_PRODUCTION and not EMAIL_HOST and not env_bool('ALLOW_CONSOLE_EMAIL', default=False):
-    raise ImproperlyConfigured('Set EMAIL_HOST and the EMAIL_* settings in production so password resets and notifications are delivered.')
+if IS_PRODUCTION and not RESEND_API_KEY and not EMAIL_HOST and not env_bool('ALLOW_CONSOLE_EMAIL', default=False):
+    raise ImproperlyConfigured('Set RESEND_API_KEY (recommended on Render) or EMAIL_HOST and the EMAIL_* settings in production so password resets and notifications are delivered.')
 
 # Password reset links expire after an hour (Django's default is 3 days)
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))

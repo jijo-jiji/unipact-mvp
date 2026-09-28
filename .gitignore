@@ -40,3 +40,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.claude/
+skills-lock.json
