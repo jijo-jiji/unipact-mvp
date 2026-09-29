@@ -29,6 +29,11 @@ class Transaction(models.Model):
         FAILED = 'FAILED', 'Failed'
         PENDING = 'PENDING', 'Pending'
 
+    class Provider(models.TextChoices):
+        MOCK = 'MOCK', 'Demo checkout'
+        TOYYIBPAY = 'TOYYIBPAY', 'ToyyibPay (FPX)'
+        MANUAL = 'MANUAL', 'Recorded by admin'
+
     company = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name='transactions')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_type = models.CharField(max_length=20, choices=Type.choices)
@@ -37,6 +42,10 @@ class Transaction(models.Model):
     # Bank/DuitNow reference for client payments an admin records by hand (offline or MANUAL billing)
     reference = models.CharField(max_length=100, blank=True)
     related_campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
+    provider = models.CharField(max_length=20, choices=Provider.choices, blank=True)
+    # The payment gateway's id for this payment (a ToyyibPay BillCode)
+    provider_bill_code = models.CharField(max_length=40, blank=True, db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

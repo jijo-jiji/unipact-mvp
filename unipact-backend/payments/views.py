@@ -14,6 +14,15 @@ from .models import Transaction, Subscription, Payout
 from .services import MockStripeService
 from unipact_backend import notifications
 from django.conf import settings
+from django.http import HttpResponse
+from django.urls import reverse
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from datetime import timedelta
+import logging
+import re
+from . import toyyibpay
+
+logger = logging.getLogger(__name__)
 
 
 def online_payments_unavailable():
@@ -349,6 +358,8 @@ class AdminRecordClientPaymentView(APIView):
                 transaction_type=Transaction.Type.PROJECT_FEE,
                 status=Transaction.Status.SUCCESS,
                 reference=reference,
+                provider=Transaction.Provider.MANUAL,
+                paid_at=timezone.now(),
             )
 
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
@@ -361,4 +372,150 @@ class AdminRecordClientPaymentView(APIView):
             "escrow": escrow_summary(campaign),
             "outstanding": outstanding - amount,
         }, status=status.HTTP_201_CREATED)
+
+
+# ------------------------------------------------------------------
+# ToyyibPay (FPX online banking) for client project fees
+# ------------------------------------------------------------------
+
+def _owned_campaign(request, campaign_id):
+    company = getattr(request.user, 'company_profile', None) if request.user.role == User.Role.COMPANY else None
+    if company is None:
+        return None, Response({"error": "Only the client who owns this project can pay for it."}, status=status.HTTP_403_FORBIDDEN)
+    return get_object_or_404(Campaign, pk=campaign_id, company=company), None
+
+
+class ToyyibPayCreateBillView(APIView):
+    """POST {campaign_id, phone}: open (or reuse) an FPX bill for what the client still owes on a project.
+    The amount always comes from the server, never from the browser."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from campaigns.utils import paid_project_fees
+
+        if not toyyibpay.is_enabled():
+            return Response({"error": "Online payment isn't available yet. Request an invoice to pay by bank transfer.",
+                             "code": "online_payments_unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        campaign, error = _owned_campaign(request, request.data.get('campaign_id'))
+        if error:
+            return error
+        # Only take money for a project that can actually start once it's paid
+        if campaign.status != Campaign.Status.MATCHED or campaign.is_match_finalized:
+            return Response({"error": "This project isn't waiting for payment."}, status=status.HTTP_400_BAD_REQUEST)
+        if campaign.has_pending_offers() or not campaign.assigned_students.exists():
+            return Response({"error": "Your student team hasn't accepted yet. You can pay once they do."}, status=status.HTTP_400_BAD_REQUEST)
+        if not campaign.milestones.exists():
+            return Response({"error": "UniPact hasn't set up a milestone plan for this project yet. Contact your account manager."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if campaign.payment_structure != Campaign.PaymentStructure.UPFRONT:
+            return Response({"error": "UniPact invoices this project separately."}, status=status.HTTP_400_BAD_REQUEST)
+
+        phone = re.sub(r'[\s-]', '', str(request.data.get('phone') or ''))
+        if not re.fullmatch(r'\+?\d{9,15}', phone):
+            return Response({"error": "Enter a phone number for your FPX receipt, e.g. 0123456789."}, status=status.HTTP_400_BAD_REQUEST)
+
+        open_bills = Transaction.objects.filter(
+            related_campaign=campaign, provider=Transaction.Provider.TOYYIBPAY, status=Transaction.Status.PENDING,
+        ).order_by('-created_at')
+        # Settle earlier bills first so a payment that already went through is never charged twice
+        for tx in open_bills:
+            try:
+                toyyibpay.settle(tx)
+            except toyyibpay.ToyyibPayError:
+                pass
+
+        outstanding = campaign.budget - paid_project_fees(campaign)
+        if outstanding <= 0:
+            return Response({"status": "paid", "outstanding": "0.00"})
+
+        # Reuse a recent unpaid bill for the same amount instead of opening a second one
+        still_valid_after = timezone.now() - timedelta(days=settings.TOYYIBPAY_BILL_EXPIRY_DAYS) + timedelta(hours=2)
+        reusable = open_bills.filter(amount=outstanding, created_at__gte=still_valid_after).exclude(provider_bill_code='').first()
+        if reusable:
+            return Response({"payment_url": toyyibpay.payment_url(reusable.provider_bill_code), "transaction_id": reusable.id, "amount": reusable.amount})
+
+        tx = Transaction.objects.create(
+            company=campaign.company, related_campaign=campaign, amount=outstanding,
+            transaction_type=Transaction.Type.PROJECT_FEE, status=Transaction.Status.PENDING,
+            provider=Transaction.Provider.TOYYIBPAY,
+        )
+        callback_path = reverse('toyyibpay_callback')
+        callback_url = f'{settings.API_PUBLIC_URL}{callback_path}' if settings.API_PUBLIC_URL else request.build_absolute_uri(callback_path)
+        try:
+            bill_code = toyyibpay.create_bill(
+                tx, payer_name=campaign.company.company_name, payer_email=request.user.email, payer_phone=phone,
+                return_url=f'{settings.FRONTEND_URL}/payment/return', callback_url=callback_url,
+            )
+        except toyyibpay.ToyyibPayError as exc:
+            tx.status = Transaction.Status.FAILED
+            tx.save(update_fields=['status'])
+            log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.WARNING, f"ToyyibPay bill for TX-{tx.id} failed: {exc}")
+            return Response({"error": "We couldn't start the online payment. Please try again, or request an invoice to pay by bank transfer."},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        tx.provider_bill_code = bill_code
+        tx.save(update_fields=['provider_bill_code'])
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO, f"ToyyibPay bill {bill_code} opened: RM {outstanding} for '{campaign.title}'")
+        return Response({"payment_url": toyyibpay.payment_url(bill_code), "transaction_id": tx.id, "amount": tx.amount},
+                        status=status.HTTP_201_CREATED)
+
+
+class ToyyibPayCallbackView(APIView):
+    """ToyyibPay's server-to-server notice that a bill changed. Treated only as a prompt: settle() asks
+    ToyyibPay directly before recording anything, so a forged or replayed callback can't mark a bill paid."""
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [FormParser, MultiPartParser, JSONParser]
+
+    def post(self, request):
+        bill_code = str(request.data.get('billcode') or '')[:40]
+        tx = None
+        if toyyibpay.is_enabled() and bill_code:
+            tx = Transaction.objects.filter(provider=Transaction.Provider.TOYYIBPAY, provider_bill_code=bill_code).first()
+        if tx is None:
+            return HttpResponse('OK')
+        if not toyyibpay.callback_signature_valid(request.data):
+            logger.warning('ToyyibPay callback for bill %s has an invalid signature; checking with ToyyibPay directly', bill_code)
+        try:
+            toyyibpay.settle(tx)
+        except toyyibpay.ToyyibPayError:
+            logger.warning('Could not confirm ToyyibPay bill %s; asking ToyyibPay to retry', bill_code)
+            return HttpResponse('RETRY', status=503)
+        return HttpResponse('OK')
+
+
+class ToyyibPayVerifyView(APIView):
+    """POST {billcode}: the client's return page asks whether their payment went through."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        tx = get_object_or_404(
+            Transaction, provider=Transaction.Provider.TOYYIBPAY,
+            provider_bill_code=str(request.data.get('billcode') or '')[:40],
+            company=getattr(request.user, 'company_profile', None) if request.user.role == User.Role.COMPANY else None,
+        )
+        try:
+            tx = toyyibpay.settle(tx)
+        except toyyibpay.ToyyibPayError:
+            pass  # reported as still pending; the callback or a later check will settle it
+        return Response({"status": tx.status, "campaign_id": tx.related_campaign_id, "amount": tx.amount, "reference": tx.reference})
+
+
+class RequestInvoiceView(APIView):
+    """POST: the client prefers to pay the project fee by bank transfer; ask UniPact's admins to invoice them."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, campaign_id):
+        from campaigns.utils import paid_project_fees
+
+        campaign, error = _owned_campaign(request, campaign_id)
+        if error:
+            return error
+        outstanding = campaign.budget - paid_project_fees(campaign)
+        if campaign.status != Campaign.Status.MATCHED or outstanding <= 0:
+            return Response({"error": "There's nothing to invoice on this project."}, status=status.HTTP_400_BAD_REQUEST)
+        notifications.project_fee_due(campaign, outstanding)
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO,
+                  f"Invoice requested: RM {outstanding} for '{campaign.title}' ({campaign.company.company_name})")
+        return Response({"outstanding": outstanding})
 

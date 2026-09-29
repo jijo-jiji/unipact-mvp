@@ -28,14 +28,24 @@ Do these in order. Each step gives you a value the next one needs. Paste secrets
 8. **Smoke test on the live site:** register a test company and a test student, verify both from the admin dashboard, post a project, match, and confirm. The client sees "Invoice on its way" and the admins get an "Invoice needed" email. Record the payment under *Billing & escrow*; the client gets a receipt and can confirm. Approve a milestone and record the payout. Finally, request a password reset to prove email works. Delete the test accounts afterwards.
 9. **Link the marketing site:** point the "Sign in"/"Get started" buttons on `www.unipact.my` to `https://app.unipact.my/login` and `https://app.unipact.my/register`.
 
-### How clients pay during the soft launch
+### Online payments (ToyyibPay FPX)
 
-There is no payment gateway yet, and the demo card checkout is **switched off in production** (`MOCK_PAYMENTS_ENABLED`; the API refuses to start if it is on). When a client confirms a match:
+Clients pay the project fee with FPX online banking (personal or corporate) through ToyyibPay. UniPact only records a payment after asking ToyyibPay directly that the bill was paid in full, so a faked callback or a tampered return link can't mark a project as paid. Student payouts stay manual: ToyyibPay has no payout API.
+
+1. **Test in the sandbox first.** Register a separate account at `https://dev.toyyibpay.com`, then create a category (*Category, Create Category*, e.g. "UniPact project fees") and copy its **Category Code**. Copy the **User Secret Key** from the dashboard.
+2. In Render, set `TOYYIBPAY_SECRET_KEY`, `TOYYIBPAY_CATEGORY_CODE`, `TOYYIBPAY_BASE_URL=https://dev.toyyibpay.com` and `API_PUBLIC_URL=https://api.unipact.my`. Online payment switches on as soon as both the key and category are set.
+3. Run a test payment: as a test client, *Confirm match*, then *Pay with FPX online banking*, and choose the sandbox bank. You should return to "Payment received and match confirmed", get a receipt email, and see the payment (reference `FPX …`) under *Billing & escrow*.
+4. **Go live** once ToyyibPay has verified your account: repeat step 1 on `https://toyyibpay.com`, then update the key, the category and `TOYYIBPAY_BASE_URL=https://toyyibpay.com` in Render. Until ToyyibPay verifies the account, money collected is held and not settled to your bank.
+
+If the key is missing or wrong, clients can still choose *Pay by bank transfer instead*, which works as below. `CRITICAL` entries in the admin System Logs mean a payment needs a human: an amount that didn't match, or a client who paid twice and needs a refund.
+
+### Paying by bank transfer
+
+The demo card checkout is **switched off in production** (`MOCK_PAYMENTS_ENABLED`; the API refuses to start if it is on). When a client picks *Pay by bank transfer instead*, or ToyyibPay isn't configured:
 1. The app tells them an invoice is coming, and every admin (plus `SUPPORT_EMAIL`) gets an *Invoice needed* email with the amount.
 2. Send the invoice with UniPact's bank details. When the transfer lands, open *Admin, Billing & escrow* for the project and record the amount with the bank/DuitNow reference.
 3. The client gets a receipt and clicks *Confirm match* again. The project starts, and milestone approvals pay out from that escrow.
 
-Replace this with ToyyibPay once the account is verified. Keep its secret key in a Render environment variable only.
 
 ---
 
@@ -159,7 +169,7 @@ Set the business details with the `VITE_LEGAL_*` variables so the pages show you
 ## 5. Still to do before real users
 
 These need decisions or third-party accounts, so they are not built yet:
-- Real payment provider (ToyyibPay). Until then clients pay by invoice and bank transfer, and admins record payments and payouts by hand.
+- ToyyibPay live keys once the account is verified (see "Online payments"). Student payouts stay manual.
 - Database backups: turn on automatic daily backups in your PostgreSQL provider's dashboard.
 - Accounts on an email provider (with your domain verified) and, optionally, Sentry.
 - Legal review of the Privacy Policy and Terms (see above).

@@ -58,6 +58,7 @@ const JoinClubPage = page(() => import('./pages/JoinClubPage'));
 const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
 const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
+const PaymentReturn = page(() => import('./pages/PaymentReturn'));
 
 function App() {
   return (
@@ -98,6 +99,15 @@ function App() {
             element={
               <ProtectedRoute allowedRole="COMPANY">
                 <CompanyDashboard />
+              </ProtectedRoute>
+            }
+          />
+          {/* ToyyibPay sends clients back here after their bank */}
+          <Route
+            path="/payment/return"
+            element={
+              <ProtectedRoute allowedRole="COMPANY">
+                <PaymentReturn />
               </ProtectedRoute>
             }
           />

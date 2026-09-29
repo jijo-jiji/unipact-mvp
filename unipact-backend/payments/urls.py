@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     CreatePaymentIntentView, MockCheckoutView, ConfirmPaymentView, TransactionHistoryView, TreasurySummaryView,
-    StudentPayoutListView, AdminPayoutListView, AdminRecordPayoutView, AdminRecordClientPaymentView
+    StudentPayoutListView, AdminPayoutListView, AdminRecordPayoutView, AdminRecordClientPaymentView,
+    ToyyibPayCreateBillView, ToyyibPayCallbackView, ToyyibPayVerifyView, RequestInvoiceView,
 )
 
 urlpatterns = [
@@ -10,6 +11,12 @@ urlpatterns = [
     path('confirm/<int:transaction_id>/', ConfirmPaymentView.as_view(), name='confirm_payment'),
     path('history/', TransactionHistoryView.as_view(), name='transaction_history'),
     path('treasury/', TreasurySummaryView.as_view(), name='treasury_summary'),
+
+    # ToyyibPay (FPX online banking) and the bank-transfer fallback
+    path('toyyibpay/bill/', ToyyibPayCreateBillView.as_view(), name='toyyibpay_create_bill'),
+    path('toyyibpay/callback/', ToyyibPayCallbackView.as_view(), name='toyyibpay_callback'),
+    path('toyyibpay/verify/', ToyyibPayVerifyView.as_view(), name='toyyibpay_verify'),
+    path('campaigns/<int:campaign_id>/request-invoice/', RequestInvoiceView.as_view(), name='request_invoice'),
     
     # Student Payout Registry & History
     path('payouts/me/', StudentPayoutListView.as_view(), name='student_payouts_me'),

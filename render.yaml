@@ -73,3 +73,12 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # ToyyibPay (FPX). Leave the key empty to keep bank-transfer-only billing
+      - key: TOYYIBPAY_SECRET_KEY
+        sync: false
+      - key: TOYYIBPAY_CATEGORY_CODE
+        sync: false
+      - key: TOYYIBPAY_BASE_URL
+        value: https://dev.toyyibpay.com
+      - key: API_PUBLIC_URL
+        value: https://api.unipact.my

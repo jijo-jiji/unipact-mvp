@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
 import PaymentModal from '../components/PaymentModal';
+import OnlinePaymentModal from '../components/OnlinePaymentModal';
 import ImpactStatementCard from '../components/ImpactStatementCard';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
@@ -71,6 +72,7 @@ const ManageCampaign = () => {
 
   const [payment, setPayment] = useState(null); // { amount, description, onPaid }
   const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
+  const [onlinePayment, setOnlinePayment] = useState(null); // amount due by FPX (ToyyibPay)
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
   const [asset, setAsset] = useState({ file: null, title: '', type: 'DOCUMENT' });
@@ -101,7 +103,9 @@ const ManageCampaign = () => {
       showToast('Match confirmed. Your student team can start work now.', 'success');
       await fetchCampaign();
     } catch (error) {
-      if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
+      if (error.response?.status === 402 && error.response.data?.payment_method === 'toyyibpay') {
+        setOnlinePayment(error.response.data.project_fee ?? campaign.budget);
+      } else if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
         // No card checkout yet: UniPact's admins were emailed to send an invoice
         setInvoiceDue(error.response.data.project_fee ?? campaign.budget);
       } else if (error.response?.status === 402) {
@@ -125,7 +129,7 @@ const ManageCampaign = () => {
         ? 'Confirming locks in the team and starts the project. UniPact will invoice you separately for this project.'
         : CARD_CHECKOUT_ENABLED
           ? `Confirming locks in the team and starts the project. This charges the full project fee of ${formatMoney(campaign.budget)}, held in escrow. UniPact keeps its ${campaign.service_fee_percent}% service fee and releases the rest to the team as each milestone is approved.`
-          : `The project starts once the full project fee of ${formatMoney(campaign.budget)} is in escrow. If it isn't paid yet, UniPact will email you an invoice to pay by bank transfer. UniPact keeps its ${campaign.service_fee_percent}% service fee and releases the rest to the team as each milestone is approved.`,
+          : `The project starts once the full project fee of ${formatMoney(campaign.budget)} is paid into escrow, by FPX online banking or by bank transfer. UniPact keeps its ${campaign.service_fee_percent}% service fee and releases the rest to the team as each milestone is approved.`,
       confirmText: isManualBilling || !CARD_CHECKOUT_ENABLED ? 'Confirm match' : 'Continue to payment',
       onConfirm: finalizeMatch,
     });
@@ -630,6 +634,21 @@ const ManageCampaign = () => {
           </div>
         </div>
       </Modal>
+
+      <OnlinePaymentModal
+        isOpen={onlinePayment !== null}
+        onClose={() => setOnlinePayment(null)}
+        campaign={campaign}
+        amount={onlinePayment}
+        onPaid={() => {
+          setOnlinePayment(null);
+          finalizeMatch();
+        }}
+        onInvoiceRequested={(amount) => {
+          setOnlinePayment(null);
+          setInvoiceDue(amount);
+        }}
+      />
 
       <PaymentModal
         isOpen={!!payment}

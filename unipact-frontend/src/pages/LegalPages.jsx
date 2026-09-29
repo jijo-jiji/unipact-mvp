@@ -82,7 +82,8 @@ export const PrivacyPolicyPage = () => {
             <li>Student profiles: university, course, skills, bio, club affiliation, an optional backup email, and verification documents such as a student ID or enrolment letter.</li>
             <li>Company profiles: company name, SSM registration number and registration documents.</li>
             <li>Project content: project briefs, files you upload, deliverables and contribution notes, team invitations, ratings and feedback.</li>
-            <li>Billing records: the amount, date and type of payments. Card details are handled by our payment provider; we only keep the card brand and last four digits so you can recognise the card.</li>
+            <li>Billing records: the amount, date, type and reference of payments. Online payments are processed by ToyyibPay through FPX online banking: we share the payer&apos;s name, email and phone number with ToyyibPay for the receipt, and we receive the payment status and reference, never your banking login or account details.</li>
+            <li>Student payout details: the bank name, account number, account holder name or DuitNow ID a student gives us, used only to pay them for approved project milestones.</li>
           </ul>
           <p><strong>Information collected automatically:</strong> sign-in records, IP address and basic device information used for security (for example to block repeated failed sign-ins), and error reports that help us fix problems.</p>
         </>

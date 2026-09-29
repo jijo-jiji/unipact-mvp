@@ -489,7 +489,9 @@ class FinalizeMatchView(APIView):
                         status=Transaction.Status.SUCCESS
                     )
                 else:
-                    payment_method = 'card' if settings.MOCK_PAYMENTS_ENABLED else 'bank_transfer'
+                    from payments import toyyibpay
+                    # ToyyibPay (FPX) when configured; the client can still ask for an invoice instead
+                    payment_method = 'toyyibpay' if toyyibpay.is_enabled() else 'card' if settings.MOCK_PAYMENTS_ENABLED else 'bank_transfer'
                     if payment_method == 'bank_transfer' and is_owner:
                         from users.models import SystemLog
                         from users.utils import log_event

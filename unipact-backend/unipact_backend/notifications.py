@@ -369,6 +369,21 @@ def project_fee_due(campaign, outstanding):
     )
 
 
+def payment_needs_attention(problem, transaction_obj):
+    """An online payment that a human must sort out, e.g. a wrong amount or a client who paid twice."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    campaign = transaction_obj.related_campaign
+    send_email(
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)) + [settings.SUPPORT_EMAIL],
+        'Payment needs attention', 'An online payment needs attention',
+        [problem],
+        details=[('Client', transaction_obj.company.company_name), ('Project', campaign.title if campaign else None),
+                 ('Transaction', f'TX-{transaction_obj.id}'), ('ToyyibPay bill', transaction_obj.provider_bill_code or None)],
+        action_label='Open admin dashboard', action_path='/admin',
+    )
+
+
 def payment_receipt(transaction_obj, outstanding=None):
     company = transaction_obj.company
     campaign = transaction_obj.related_campaign

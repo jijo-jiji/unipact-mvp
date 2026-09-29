@@ -77,7 +77,7 @@ const Treasury = () => {
               <li>When you confirm your student team, you pay the project budget into UniPact escrow.</li>
               <li>UniPact keeps {SERVICE_FEE_PERCENT}% for matching and managing the project, and releases the rest to the team as you approve each milestone.</li>
             </ol>
-            {!CARD_CHECKOUT_ENABLED && <p className="text-sm text-[#5B6478] mt-4">Project fees are paid by bank transfer against an invoice from UniPact.</p>}
+            {!CARD_CHECKOUT_ENABLED && <p className="text-sm text-[#5B6478] mt-4">Pay project fees online with FPX (personal or corporate online banking), or by bank transfer against an invoice from UniPact.</p>}
           </section>
 
           {CARD_CHECKOUT_ENABLED && (

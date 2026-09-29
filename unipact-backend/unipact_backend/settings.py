@@ -212,6 +212,19 @@ DEFAULT_PLATFORM_FEE_PERCENT = os.getenv('DEFAULT_PLATFORM_FEE_PERCENT', '10')
 MOCK_PAYMENTS_ENABLED = env_bool('MOCK_PAYMENTS_ENABLED', default=not IS_PRODUCTION)
 if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
     raise ImproperlyConfigured('MOCK_PAYMENTS_ENABLED must be false in production: the demo checkout collects no money.')
+
+# ToyyibPay (FPX online banking). Online payment is offered only when both the secret key and a category
+# code are set; otherwise clients pay by bank transfer against an invoice. Keep the key in the host's
+# environment settings only. The base URL defaults to the sandbox so a key can never charge real money
+# by accident: set it to https://toyyibpay.com to go live.
+TOYYIBPAY_SECRET_KEY = os.getenv('TOYYIBPAY_SECRET_KEY', '')
+TOYYIBPAY_CATEGORY_CODE = os.getenv('TOYYIBPAY_CATEGORY_CODE', '')
+TOYYIBPAY_BASE_URL = os.getenv('TOYYIBPAY_BASE_URL', 'https://dev.toyyibpay.com').rstrip('/')
+# Corporate FPX (B2B) lets companies pay above the RM 30,000 personal FPX limit; the fee is charged to UniPact
+TOYYIBPAY_ENABLE_FPX_B2B = env_bool('TOYYIBPAY_ENABLE_FPX_B2B', default=True)
+TOYYIBPAY_BILL_EXPIRY_DAYS = int(os.getenv('TOYYIBPAY_BILL_EXPIRY_DAYS', '3'))
+# This API's public address, for ToyyibPay's server-to-server payment callback (e.g. https://api.unipact.my)
+API_PUBLIC_URL = os.getenv('API_PUBLIC_URL', '').rstrip('/')
 # Keep large uploads on disk while processing instead of in memory
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
