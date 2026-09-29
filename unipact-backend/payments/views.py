@@ -321,7 +321,7 @@ class AdminRecordClientPaymentView(APIView):
         if request.user.role != User.Role.ADMIN:
             return Response({"error": "Only admins can record client payments."}, status=status.HTTP_403_FORBIDDEN)
 
-        from campaigns.utils import campaign_escrow, paid_project_fees
+        from campaigns.utils import escrow_summary, paid_project_fees
 
         try:
             amount = Decimal(str(request.data.get('amount')))
@@ -358,7 +358,7 @@ class AdminRecordClientPaymentView(APIView):
         return Response({
             "message": f"Recorded RM {amount} from {campaign.company.company_name}.",
             "transaction": TransactionSerializer(tx).data,
-            "escrow": campaign_escrow(campaign),
+            "escrow": escrow_summary(campaign),
             "outstanding": outstanding - amount,
         }, status=status.HTTP_201_CREATED)
 

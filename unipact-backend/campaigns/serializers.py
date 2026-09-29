@@ -175,8 +175,8 @@ class CampaignDetailSerializer(CampaignSerializer):
         request = self.context.get('request')
         if not request or not can_view_workspace(request.user, obj) or request.user.role == 'STUDENT':
             return None
-        from .utils import campaign_escrow
-        return campaign_escrow(obj)
+        from .utils import escrow_summary
+        return escrow_summary(obj)
 
     def get_report_url(self, obj):
         request = self.context.get('request')

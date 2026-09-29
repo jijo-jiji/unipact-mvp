@@ -391,7 +391,7 @@ const StudentDashboard = () => {
                     <Wallet size={16} className="text-[#00AEEF]" />
                   </div>
                   <p className="font-heading font-extrabold text-2xl text-[#0B1E63]">
-                    RM {formatMoney(payoutsData.total_earned)}
+                    {formatMoney(payoutsData.total_earned)}
                   </p>
                 </div>
                 <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1 font-medium">
@@ -406,7 +406,7 @@ const StudentDashboard = () => {
                     <Clock size={16} className="text-[#0090C6]" />
                   </div>
                   <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
-                    RM {formatMoney(payoutsData.pending_amount)}
+                    {formatMoney(payoutsData.pending_amount)}
                   </p>
                 </div>
                 <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
@@ -468,7 +468,7 @@ const StudentDashboard = () => {
                       </div>
                       <div className="flex items-center gap-3 self-end sm:self-auto">
                         <span className="font-heading font-bold text-base text-[#0A1748]">
-                          RM {formatMoney(p.amount)}
+                          {formatMoney(p.amount)}
                         </span>
                         <StatusBadge status={p.status} label={p.status === 'PENDING' ? 'Awaiting bank details' : undefined} />
                       </div>

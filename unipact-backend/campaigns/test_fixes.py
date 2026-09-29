@@ -199,7 +199,11 @@ class CampaignAccessControlTests(APITestCase):
 
         # Once an admin records the bank transfer, the client can confirm
         self.client.force_authenticate(user=self.admin)
-        self.client.post(reverse('admin_record_client_payment', kwargs={'campaign_id': self.campaign.id}), {'amount': '1000.00', 'reference': 'IBG-123'}, format='json')
+        detail = self.client.get(reverse('campaign_detail', kwargs={'pk': self.campaign.id}))
+        self.assertEqual((detail.data['escrow']['outstanding'], detail.data['escrow']['payments']), (Decimal('1000.00'), []))
+        recorded = self.client.post(reverse('admin_record_client_payment', kwargs={'campaign_id': self.campaign.id}), {'amount': '1000.00', 'reference': 'IBG-123'}, format='json')
+        self.assertEqual(recorded.data['escrow']['outstanding'], Decimal('0.00'))
+        self.assertEqual([p['reference'] for p in recorded.data['escrow']['payments']], ['IBG-123'])
         self.client.force_authenticate(user=self.company_user)
         self.assertEqual(self.client.post(url, {}, format='json').status_code, status.HTTP_200_OK)
 

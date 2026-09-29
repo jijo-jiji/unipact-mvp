@@ -45,6 +45,28 @@ def campaign_escrow(campaign):
     return {'collected': collected, 'released': released, 'available': collected - released}
 
 
+def escrow_summary(campaign):
+    """campaign_escrow plus what the client still owes and the payments recorded so far, for the
+    owner/admin billing views."""
+    from payments.models import Transaction
+
+    payments = Transaction.objects.filter(
+        related_campaign=campaign,
+        transaction_type=Transaction.Type.PROJECT_FEE,
+        status=Transaction.Status.SUCCESS,
+    ).order_by('created_at')
+    paid = sum((p.amount for p in payments), Decimal('0.00'))
+    return {
+        **campaign_escrow(campaign),
+        'client_paid': paid,
+        'outstanding': max(campaign.budget - paid, Decimal('0.00')),
+        'payments': [
+            {'id': p.id, 'amount': p.amount, 'reference': p.reference, 'created_at': p.created_at}
+            for p in payments
+        ],
+    }
+
+
 def recompute_milestone_amounts(campaign):
     """Re-derive every milestone's amount from its percentage and the campaign's current student
     pool - used when the budget or fee changes after the plan was set (only allowed pre-finalize)."""

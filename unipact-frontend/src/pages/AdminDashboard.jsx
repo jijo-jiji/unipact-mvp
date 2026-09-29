@@ -267,6 +267,7 @@ const AdminDashboard = () => {
   };
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId) || null;
+  const escrowLoaded = Boolean(selectedCampaign && selectedEscrow?.campaignId === selectedCampaign.id);
 
   const handleSelectCampaign = (camp) => {
     setSelectedCampaignId(camp.id);
@@ -830,7 +831,7 @@ const AdminDashboard = () => {
                   <div className="pt-4 border-t border-[rgba(10,23,72,0.08)] space-y-3">
                     <div className="flex flex-wrap justify-between items-center gap-2">
                       <h3 className="font-semibold flex items-center gap-2"><Wallet size={15} className="text-[#00AEEF]" /> Billing &amp; escrow</h3>
-                      {selectedEscrow?.campaignId === selectedCampaign.id && (
+                      {escrowLoaded && (
                         <span className="text-xs text-[#5B6478]">
                           Collected {formatMoney(selectedEscrow.collected)} · Released {formatMoney(selectedEscrow.released)} ·{' '}
                           <strong className="text-[#0B1E63]">Available {formatMoney(selectedEscrow.available)}</strong>
@@ -868,8 +869,33 @@ const AdminDashboard = () => {
                       {savingBilling ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save billing settings
                     </button>
 
+                    {escrowLoaded && Number(selectedEscrow.outstanding) > 0 && selectedCampaign.status === 'MATCHED' && !selectedCampaign.awaiting_student_acceptance && billing.payment_structure === 'UPFRONT' && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+                        <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Waiting for the client&apos;s payment.</strong> Invoice {selectedCampaign.company_name} for {formatMoney(selectedEscrow.outstanding)} by bank transfer.
+                          Record it below once it reaches UniPact&apos;s account; the client is emailed a receipt and can then confirm the match.
+                        </span>
+                      </div>
+                    )}
+
+                    {escrowLoaded && Number(selectedEscrow.outstanding) === 0 ? (
+                      <p className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 flex items-center gap-2">
+                        <CheckCircle2 size={15} className="shrink-0" /> Project fee paid in full ({formatMoney(selectedEscrow.client_paid)}).
+                      </p>
+                    ) : (
                     <form onSubmit={recordClientPayment} className="p-3 rounded-lg bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] space-y-2">
-                      <p className="text-sm font-medium">Record a client payment received outside the card checkout</p>
+                      <div className="flex flex-wrap justify-between items-baseline gap-2">
+                        <p className="text-sm font-medium">Record a client bank transfer</p>
+                        {escrowLoaded && (
+                          <span className="text-sm">
+                            Outstanding <strong className="text-[#0B1E63]">{formatMoney(selectedEscrow.outstanding)}</strong>
+                            <button type="button" onClick={() => setClientPayment((p) => ({ ...p, amount: String(selectedEscrow.outstanding) }))} className="ml-2 text-xs font-semibold text-[#0090C6] hover:underline">
+                              Use full amount
+                            </button>
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-[#5B6478]">Only record money that has actually reached UniPact&apos;s bank account - it immediately becomes available to release to students.</p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input
@@ -892,6 +918,23 @@ const AdminDashboard = () => {
                         </button>
                       </div>
                     </form>
+                    )}
+
+                    {escrowLoaded && selectedEscrow.payments?.length > 0 && (
+                      <div>
+                        <p className="text-xs uppercase font-semibold tracking-wider text-[#5B6478] mb-1">Payments received</p>
+                        <ul className="divide-y divide-[rgba(10,23,72,0.08)] border-y border-[rgba(10,23,72,0.08)] text-sm">
+                          {selectedEscrow.payments.map((p) => (
+                            <li key={p.id} className="py-2 flex justify-between gap-3">
+                              <span className="min-w-0">
+                                {formatDate(p.created_at)} · <span className="font-mono text-xs">{p.reference || `TX-${p.id}`}</span>
+                              </span>
+                              <strong className="text-[#0B1E63] whitespace-nowrap">{formatMoney(p.amount)}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   {/* Milestone plan (managed escrow) - required before the match can be finalized */}
@@ -1001,7 +1044,7 @@ const AdminDashboard = () => {
                     <Wallet size={16} className="text-emerald-600" />
                   </div>
                   <p className="font-heading font-extrabold text-2xl text-emerald-700">
-                    RM {formatMoney(payoutsData.total_disbursed)}
+                    {formatMoney(payoutsData.total_disbursed)}
                   </p>
                 </div>
                 <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
@@ -1016,7 +1059,7 @@ const AdminDashboard = () => {
                     <Clock size={16} className="text-[#0090C6]" />
                   </div>
                   <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
-                    RM {formatMoney(payoutsData.total_pending)}
+                    {formatMoney(payoutsData.total_pending)}
                   </p>
                 </div>
                 <p className="text-xs text-[#5B6478] mt-2 flex items-center gap-1">
@@ -1103,7 +1146,7 @@ const AdminDashboard = () => {
                               <p className="font-medium text-[#0A1748]">{p.campaign_title}</p>
                               {p.milestone_title && <p className="text-xs text-[#5B6478]">Milestone: {p.milestone_title}</p>}
                               <p className="font-heading font-extrabold text-[#0B1E63] mt-0.5">
-                                RM {formatMoney(p.amount)}
+                                {formatMoney(p.amount)}
                               </p>
                             </td>
                             <td className="px-4 py-3.5">
@@ -1247,7 +1290,7 @@ const AdminDashboard = () => {
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-[#5B6478]">Stipend Amount:</span>
-                <span className="font-heading font-extrabold text-lg text-[#0B1E63]">RM {formatMoney(selectedPayout.amount)}</span>
+                <span className="font-heading font-extrabold text-lg text-[#0B1E63]">{formatMoney(selectedPayout.amount)}</span>
               </div>
               <div className="pt-2 border-t border-[rgba(10,23,72,0.08)] text-xs text-[#5B6478]">
                 <p><strong>Bank:</strong> {selectedPayout.bank_name || 'Not specified'}</p>
