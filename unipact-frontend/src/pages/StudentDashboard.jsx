@@ -547,7 +547,7 @@ const StudentDashboard = () => {
               {[
                 { label: 'Active projects', value: activeCount, className: 'text-[#0B1E63]' },
                 { label: 'Completed', value: completedCount, className: 'text-emerald-600' },
-                { label: 'Client rating', value: `${studentProfile.rating || '5.00'} ★`, className: 'text-amber-500' },
+                { label: 'Client rating', value: studentProfile.rating ? `${studentProfile.rating} ★` : 'No ratings yet', className: studentProfile.rating ? 'text-amber-500' : 'text-[#5B6478] text-base sm:text-lg pt-1.5' },
                 { label: 'Track', value: domainLabel(studentProfile.domain_focus), className: 'text-[#0A1748] text-base sm:text-lg pt-1.5' },
               ].map((m) => (
                 <div key={m.label} className="card p-5">

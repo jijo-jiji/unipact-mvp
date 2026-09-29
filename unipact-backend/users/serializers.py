@@ -113,8 +113,12 @@ class ClubProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serial
         return validate_image_upload(value, 'Club logo')
 
 class StudentProfileSerializer(serializers.ModelSerializer):
+    """A student's full profile, including contact, ID document and bank details: only for the
+    student themselves and admins. Use StudentTeamMemberSerializer anywhere clients or other
+    students can see it."""
     email = serializers.EmailField(source='user.email', read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
+    rating = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentProfile
@@ -125,7 +129,27 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'bio', 'rating', 'email',
             'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id'
         ]
-        read_only_fields = ['verification_status', 'rating']
+        read_only_fields = ['verification_status']
+
+    def get_rating(self, obj):
+        return obj.public_rating()
+
+
+class StudentTeamMemberSerializer(serializers.ModelSerializer):
+    """What a client or teammate may see about a student on a project: no contact, ID or bank details."""
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentProfile
+        fields = [
+            'id', 'user_id', 'full_name', 'university', 'major', 'domain_focus',
+            'verification_status', 'profile_photo', 'skills', 'bio', 'rating',
+        ]
+        read_only_fields = fields
+
+    def get_rating(self, obj):
+        return obj.public_rating()
 
 
 class StudentRegistrationSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):

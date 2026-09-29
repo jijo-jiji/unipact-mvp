@@ -160,6 +160,18 @@ class StudentProfile(models.Model):
         """Enough on file for UniPact to make a bank transfer."""
         return bool(self.bank_name and self.bank_account_number)
 
+    def public_rating(self):
+        """The average client rating, or None until a client has rated one of their completed projects.
+        The stored default of 5.0 would otherwise make brand-new students look proven."""
+        from campaigns.models import Campaign, ProjectImpactReport  # campaigns imports users
+
+        rated = ProjectImpactReport.objects.filter(
+            campaign__assigned_students=self,
+            campaign__status=Campaign.Status.COMPLETED,
+            client_rating__isnull=False,
+        ).exists()
+        return str(self.rating) if rated else None
+
 
 class ShadowUser(models.Model):
     """

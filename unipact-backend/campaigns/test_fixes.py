@@ -85,6 +85,35 @@ class CampaignAccessControlTests(APITestCase):
         self.client.force_authenticate(user=self.lead_user)
         self.assertEqual(self.client.get(url).status_code, status.HTTP_200_OK)
 
+    def test_clients_and_teammates_never_see_student_bank_or_id_details(self):
+        self.lead.bank_name = 'Maybank'
+        self.lead.bank_account_number = '1234567890'
+        self.lead.duitnow_id = '0123456789'
+        self.lead.save()
+        private = {'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id',
+                   'verification_document', 'secondary_email', 'email'}
+
+        self.client.force_authenticate(user=self.company_user)
+        detail = self.client.get(reverse('campaign_detail', kwargs={'pk': self.campaign.id}))
+        member = detail.data['assigned_students_details'][0]
+        self.assertEqual(member['full_name'], 'Lead')
+        self.assertFalse(private & member.keys())
+        self.assertNotIn('1234567890', str(detail.content))
+
+        self.client.force_authenticate(user=self.lead_user)
+        team = self.client.get(reverse('project_team_list', kwargs={'campaign_id': self.campaign.id}))
+        self.assertFalse(private & team.data['team_members'][0].keys())
+
+    def test_new_student_has_no_rating_until_a_client_rates_them(self):
+        self.client.force_authenticate(user=self.company_user)
+        detail_url = reverse('campaign_detail', kwargs={'pk': self.campaign.id})
+        self.assertIsNone(self.client.get(detail_url).data['assigned_students_details'][0]['rating'])
+
+        self.client.post(reverse('campaign_complete', kwargs={'campaign_id': self.campaign.id}), {'rating': 4}, format='json')
+        self.assertEqual(self.client.get(detail_url).data['assigned_students_details'][0]['rating'], '4.00')
+        portfolio = self.client.get(reverse('student_public_profile', kwargs={'user_id': self.lead_user.id}))
+        self.assertEqual(portfolio.data['rating'], '4.00')
+
     def test_team_invite_accepts_invitee_email_and_validates_share(self):
         url = reverse('project_team_invite', kwargs={'campaign_id': self.campaign.id})
         self.client.force_authenticate(user=self.lead_user)

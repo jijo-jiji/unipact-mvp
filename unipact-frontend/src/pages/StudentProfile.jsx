@@ -118,7 +118,11 @@ const StudentProfile = () => {
               </div>
               <div className="bg-[#F5F7FC] p-3 rounded-lg">
                 <dt className="text-xs text-[#5B6478]">Client rating</dt>
-                <dd className="font-semibold text-amber-600 inline-flex items-center gap-1"><Star size={14} className="fill-amber-400 text-amber-400" /> {profile.rating}</dd>
+                {profile.rating ? (
+                  <dd className="font-semibold text-amber-600 inline-flex items-center gap-1"><Star size={14} className="fill-amber-400 text-amber-400" /> {profile.rating}</dd>
+                ) : (
+                  <dd className="font-semibold text-[#0090C6]">No ratings yet</dd>
+                )}
               </div>
               <div className="bg-[#F5F7FC] p-3 rounded-lg">
                 <dt className="text-xs text-[#5B6478]">Completed projects</dt>

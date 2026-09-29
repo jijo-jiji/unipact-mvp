@@ -4,7 +4,7 @@ from .models import (
     Campaign, Application, Deliverable, ClientAsset, StudentDeliverable, ProjectTeamInvitation, Milestone,
     ProjectImpactReport, ImpactLedger,
 )
-from users.serializers import StudentProfileSerializer, clean_skills
+from users.serializers import StudentTeamMemberSerializer, clean_skills
 from unipact_backend.validators import validate_project_file_upload, validate_image_upload
 
 
@@ -72,7 +72,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.company_name', read_only=True)
     guild = serializers.SerializerMethodField()
     applicants = serializers.IntegerField(source='applications.count', read_only=True)
-    assigned_students_details = StudentProfileSerializer(source='assigned_students', many=True, read_only=True)
+    assigned_students_details = StudentTeamMemberSerializer(source='assigned_students', many=True, read_only=True)
     client_assets = ClientAssetSerializer(many=True, read_only=True)
     student_deliverables = StudentDeliverableSerializer(many=True, read_only=True)
     team_invitations = ProjectTeamInvitationSerializer(many=True, read_only=True)

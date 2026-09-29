@@ -662,7 +662,7 @@ class StudentPublicProfileView(views.APIView):
             'domain_focus': profile.domain_focus,
             'skills': profile.skills,
             'bio': profile.bio,
-            'rating': str(profile.rating),
+            'rating': profile.public_rating(),
             'verification_status': profile.verification_status,
             'club_affiliation_name': profile.club_affiliation_name,
             'club_affiliation_role': profile.club_affiliation_role,

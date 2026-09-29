@@ -356,7 +356,11 @@ const ManageCampaign = () => {
                     <Link key={s.id} to={`/student/profile/${s.user_id}`} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] hover:border-[#00AEEF] rounded-lg p-4 text-sm group">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold group-hover:text-[#0090C6]">{s.full_name}</span>
-                        <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star size={13} className="fill-amber-400 text-amber-400" /> {s.rating}</span>
+                        {s.rating ? (
+                          <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star size={13} className="fill-amber-400 text-amber-400" /> {s.rating}</span>
+                        ) : (
+                          <span className="text-xs font-semibold text-[#0090C6]">New to UniPact</span>
+                        )}
                       </div>
                       {campaign.status === 'MATCHED' && offerStatus[s.id] && (
                         <span className={`inline-flex items-center gap-1 text-xs font-semibold mt-1 ${offerStatus[s.id] === 'ACCEPTED' ? 'text-emerald-700' : 'text-amber-700'}`}>

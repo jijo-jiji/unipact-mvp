@@ -896,10 +896,10 @@ class ProjectTeamListView(APIView):
         if not can_view_workspace(request.user, campaign):
             raise exceptions.PermissionDenied("You are not part of this project team.")
 
-        from users.serializers import StudentProfileSerializer
+        from users.serializers import StudentTeamMemberSerializer
         from .serializers import ProjectTeamInvitationSerializer
 
-        team_members = StudentProfileSerializer(campaign.assigned_students.all(), many=True).data
+        team_members = StudentTeamMemberSerializer(campaign.assigned_students.all(), many=True).data
         invitations = ProjectTeamInvitationSerializer(campaign.team_invitations.filter(status='PENDING'), many=True).data
 
         return Response({
