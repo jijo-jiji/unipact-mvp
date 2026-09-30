@@ -55,6 +55,9 @@ const ForgotPasswordPage = page(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
+const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
+const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
+const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
 const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
 const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
@@ -78,6 +81,9 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join-club" element={<JoinClubPage />} />
+          <Route path="/apply-software-developer" element={<SoftwareDeveloperApplyPage />} />
+          <Route path="/apply-digital-marketing" element={<DigitalMarketingApplyPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           {/* Verified Impact Ledger: public once published, previewable by its student/client/admin */}

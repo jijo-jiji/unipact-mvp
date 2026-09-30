@@ -11,7 +11,7 @@ User = get_user_model()
 class CampaignTests(APITestCase):
     def setUp(self):
         # Create Company
-        self.company_user = User.objects.create_user(username='comp@corp.com', email='comp@corp.com', password='pw', role=User.Role.COMPANY)
+        self.company_user = User.objects.create_user(username='comp@corp.com', email='comp@corp.com', password='pw', role=User.Role.COMPANY, email_verified=True)
         self.company_profile = CompanyProfile.objects.create(
             user=self.company_user, 
             company_name="Comp A",
@@ -21,7 +21,7 @@ class CampaignTests(APITestCase):
         self.company_user.force_authenticate = lambda: self.client.force_authenticate(user=self.company_user)
 
         # Create Club
-        self.club_user = User.objects.create_user(username='club@uni.edu', email='club@uni.edu', password='pw', role=User.Role.CLUB)
+        self.club_user = User.objects.create_user(username='club@uni.edu', email='club@uni.edu', password='pw', role=User.Role.CLUB, email_verified=True)
         self.club_profile = ClubProfile.objects.create(
             user=self.club_user, 
             club_name="Club A", 
@@ -30,7 +30,7 @@ class CampaignTests(APITestCase):
         )
 
         # Create High Risk Company
-        self.risk_user = User.objects.create_user(username='risk@gmail.com', email='risk@gmail.com', password='pw', role=User.Role.COMPANY)
+        self.risk_user = User.objects.create_user(username='risk@gmail.com', email='risk@gmail.com', password='pw', role=User.Role.COMPANY, email_verified=True)
         self.risk_profile = CompanyProfile.objects.create(
             user=self.risk_user,
             company_name="Risk Co",

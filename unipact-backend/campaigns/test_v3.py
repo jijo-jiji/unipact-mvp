@@ -20,7 +20,7 @@ class V3TalentMarketplaceTests(APITestCase):
             username='client@techventures.com',
             email='client@techventures.com',
             password='ClientPassword123!',
-            role=User.Role.COMPANY
+            role=User.Role.COMPANY, email_verified=True,
         )
         self.company_profile = CompanyProfile.objects.create(
             user=self.company_user,
@@ -71,7 +71,7 @@ class V3TalentMarketplaceTests(APITestCase):
             email='dev@siswa.um.edu.my',
             password='DevPassword123!',
             role=User.Role.STUDENT,
-            is_verified=True
+            is_verified=True, email_verified=True,
         )
         student_profile = StudentProfile.objects.create(
             user=student_user,
@@ -180,7 +180,7 @@ class V3TalentMarketplaceTests(APITestCase):
             email='lead@siswa.um.edu.my',
             password='LeadPassword123!',
             role=User.Role.STUDENT,
-            is_verified=True
+            is_verified=True, email_verified=True,
         )
         lead_profile = StudentProfile.objects.create(
             user=lead_user,
@@ -195,7 +195,7 @@ class V3TalentMarketplaceTests(APITestCase):
             email='designer@siswa.um.edu.my',
             password='DesignerPassword123!',
             role=User.Role.STUDENT,
-            is_verified=True
+            is_verified=True, email_verified=True,
         )
         peer_profile = StudentProfile.objects.create(
             user=peer_user,

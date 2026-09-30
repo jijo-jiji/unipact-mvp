@@ -1,21 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, GraduationCap, ShieldCheck, CheckCircle2, Code2, Megaphone, Users, ArrowRight,
   FolderOpen, BadgeCheck, Wallet, Sparkles, Star, ChevronDown, LayoutDashboard,
+  BookOpen, Camera, Video, Loader2, PartyPopper,
 } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 import SiteFooter from '../components/SiteFooter';
+import { submitLead } from '../utils/leads';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
 import { SERVICE_FEE_PERCENT } from '../utils/constants';
 
 const NAV_LINKS = [
+  { href: '#proof', label: 'Proof of work' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#companies', label: 'For companies' },
   { href: '#students', label: 'For students' },
   { href: '#faq', label: 'FAQ' },
 ];
+
+const PROOF_STATS = [
+  { value: '7', label: 'Days, brief to live dashboard' },
+  { value: '15 hrs', label: 'Saved per week, per agent' },
+  { value: '200', label: 'Agents on the new workflow' },
+  { value: 'RM 3,000', label: 'Saved per year on CRM licences' },
+];
+
+const PIPELINE = [
+  {
+    name: 'Tuition centre operations', icon: BookOpen,
+    text: 'A traditional tuition centre is moving off pen-and-paper — scheduling, records and day-to-day admin are being rebuilt as proper software.',
+  },
+  {
+    name: 'Interior visualisation app', icon: Camera,
+    text: 'An app where you photograph a room, then drag and drop furniture into the photo, so clients can see how a space could look before committing.',
+  },
+  {
+    name: 'Product videos for an enterprise software firm', icon: Video,
+    text: 'A Malaysian software company with a deep catalogue of business systems needs every feature explained on camera. A student team is in production now on a run of short videos for social.',
+  },
+];
+
+const SCOPES = ['Software Development', 'Digital Marketing', 'Not sure yet'];
 
 const STEPS = [
   { title: 'Post your project', text: 'Describe the work, budget, deadline and deliverables. Posting is free.', icon: Briefcase },
@@ -111,6 +138,82 @@ const HeroPreview = () => (
   </div>
 );
 
+const CompanyLeadForm = () => {
+  const [form, setForm] = useState({ company_name: '', contact_person: '', corp_email: '', scope_needed: '' });
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSending(true);
+    try {
+      await submitLead({ ...form, lead_type: 'Company_Leads' });
+      setSent(true);
+    } catch {
+      setError('We could not send your details. Please try again, or email unipact.my@gmail.com.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="card p-8 text-center">
+        <span className="w-14 h-14 rounded-full bg-[#00AEEF]/10 text-[#00AEEF] flex items-center justify-center mx-auto mb-5">
+          <PartyPopper size={28} />
+        </span>
+        <h3 className="font-heading font-bold text-xl mb-2">Thanks, we have your job</h3>
+        <p className="text-[#5B6478] text-sm mb-6">
+          We will reply at <strong className="text-[#0A1748]">{form.corp_email}</strong> to scope the work and line up a match.
+        </p>
+        <Link to="/register/company" className="btn-primary px-6 py-3">Create a client account</Link>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-6 sm:p-8 space-y-5">
+      <h3 className="font-heading font-bold text-xl">Company application</h3>
+
+      <div>
+        <label htmlFor="lead-company" className="label">Company name</label>
+        <input id="lead-company" required placeholder="Acme Corp" value={form.company_name} onChange={set('company_name')} className="input" />
+      </div>
+
+      <div>
+        <label htmlFor="lead-contact" className="label">Contact person</label>
+        <input id="lead-contact" required autoComplete="name" placeholder="Jane Doe" value={form.contact_person} onChange={set('contact_person')} className="input" />
+      </div>
+
+      <div>
+        <label htmlFor="lead-email" className="label">Email address</label>
+        <input id="lead-email" type="email" required autoComplete="email" placeholder="jane@acmecorp.com" value={form.corp_email} onChange={set('corp_email')} className="input" />
+      </div>
+
+      <div>
+        <label htmlFor="lead-scope" className="label">Scope needed</label>
+        <select id="lead-scope" required value={form.scope_needed} onChange={set('scope_needed')} className="input">
+          <option value="">Select a scope…</option>
+          {SCOPES.map((scope) => <option key={scope} value={scope}>{scope}</option>)}
+        </select>
+      </div>
+
+      {error && <p className="text-sm text-[#D14343]">{error}</p>}
+
+      <button type="submit" disabled={sending} className="btn-primary w-full py-3.5 disabled:opacity-60">
+        {sending ? <><Loader2 size={17} className="animate-spin" /> Sending…</> : <>Post a job <ArrowRight size={16} /></>}
+      </button>
+      <p className="text-xs text-[#5B6478] text-center">
+        Ready to post it yourself? <Link to="/register/company" className="text-[#0090C6] underline">Create a client account</Link>.
+      </p>
+    </form>
+  );
+};
+
 const LandingPage = () => {
   const { user } = useAuth();
   const dashboardPath = user ? homePathForRole(user.role) : null;
@@ -166,6 +269,62 @@ const LandingPage = () => {
 
         <RuleLine />
 
+        {/* PROOF OF WORK */}
+        <section id="proof" className="scroll-mt-24 py-20 sm:py-24">
+          <div className="max-w-[1160px] mx-auto px-4 sm:px-8">
+            <div className="rounded-2xl bg-[#0B1E63] text-white p-8 sm:p-12 relative overflow-hidden">
+              <div className="absolute -top-24 -right-12 w-80 h-80 bg-[#00AEEF]/20 rounded-full blur-3xl" aria-hidden="true" />
+              <div className="relative max-w-3xl">
+                <p className="eyebrow mb-4"><span className="eyebrow-dot" /> Proof of work &mdash; Bounty #UP-001</p>
+                <h2 className="font-heading font-extrabold text-3xl sm:text-4xl leading-tight mb-4 text-white">
+                  A working sales CRM. Built and verified in 7 days.
+                </h2>
+                <p className="text-white/75 leading-relaxed">
+                  A UniPact team was matched to a financial consulting agency that needed a sales CRM built from scratch.
+                  The scope was agreed upfront, and the finished work was delivered and verified against the original brief.
+                </p>
+              </div>
+              <dl className="relative mt-10 grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+                {PROOF_STATS.map(({ value, label }) => (
+                  <div key={label} className="border-t border-white/15 pt-4">
+                    <dt className="font-heading font-extrabold text-3xl sm:text-4xl text-[#00AEEF]">{value}</dt>
+                    <dd className="text-sm text-white/70 mt-1.5 leading-snug">{label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        {/* IN THE PIPELINE */}
+        <section id="pipeline" className="scroll-mt-24 pb-20 sm:pb-24">
+          <div className="max-w-[1160px] mx-auto px-4 sm:px-8">
+            <SectionHeading
+              eyebrow="Currently in the pipeline"
+              title="Real projects, underway right now"
+              text="Bounty #UP-001 is delivered and verified. These three are still in progress &mdash; no numbers yet, just work in motion."
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {PIPELINE.map(({ name, text, icon }) => (
+                <article key={name} className="card p-8">
+                  <div className="flex items-center justify-between gap-4 mb-5">
+                    <span className="w-12 h-12 rounded-lg bg-[#00AEEF]/10 text-[#00AEEF] flex items-center justify-center">
+                      {React.createElement(icon, { size: 24 })}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#5B6478] bg-[#F5F7FC] border border-[rgba(10,23,72,0.1)] rounded-full px-3 py-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#00AEEF]" /> In development
+                    </span>
+                  </div>
+                  <h3 className="font-heading font-bold text-xl mb-2">{name}</h3>
+                  <p className="text-[#5B6478] leading-relaxed">{text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <RuleLine />
+
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="scroll-mt-24 py-20 sm:py-24">
           <div className="max-w-[1160px] mx-auto px-4 sm:px-8">
@@ -214,9 +373,43 @@ const LandingPage = () => {
               <Link to={user ? dashboardPath : '/register/student'} className="btn-navy self-start mt-auto px-6 py-3">
                 {user ? 'Go to dashboard' : 'Create a student account'} <ArrowRight size={16} />
               </Link>
+              {!user && (
+                <p className="text-sm text-[#5B6478] mt-5">
+                  Or apply to the closed beta:{' '}
+                  <Link to="/apply-software-developer" className="text-[#0090C6] underline">software developer</Link>
+                  {' '}&middot;{' '}
+                  <Link to="/apply-digital-marketing" className="text-[#0090C6] underline">digital marketing / video</Link>
+                </p>
+              )}
+
             </article>
           </div>
         </section>
+
+        {/* COMPANY APPLICATION */}
+        <section id="post-a-job" className="scroll-mt-24 py-20 sm:py-24">
+          <div className="max-w-[1160px] mx-auto px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
+            <div>
+              <p className="eyebrow mb-3"><span className="eyebrow-dot" /> Post a job</p>
+              <h2 className="font-heading font-extrabold text-3xl sm:text-4xl mb-4">Tell us the scope. We match the talent.</h2>
+              <p className="text-[#5B6478] leading-relaxed mb-7">
+                Skip the applicant pile. Send us the work you need done and we will come back with verified students who fit,
+                or create a client account and post the project yourself.
+              </p>
+              <ul className="space-y-3">
+                {['Post a fixed-scope job with a fixed payout',
+                  'Get matched with verified students who fit the brief',
+                  'Share briefs and assets, and track work to handover',
+                  'Walk away with a delivery report'].map((t) => (
+                    <li key={t} className="flex items-start gap-2.5"><CheckCircle2 size={18} className="text-[#00AEEF] shrink-0 mt-0.5" /> {t}</li>
+                  ))}
+              </ul>
+            </div>
+            <CompanyLeadForm />
+          </div>
+        </section>
+
+        <RuleLine />
 
         {/* TRACKS */}
         <section className="py-20 sm:py-24">

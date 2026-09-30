@@ -4,6 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import ClubCommittee from '../components/ClubCommittee';
@@ -269,6 +270,7 @@ const StudentDashboard = () => {
       <WorkspaceNav />
 
       <main className="max-w-[1160px] w-full mx-auto px-4 sm:px-8 py-8 space-y-8 flex-1">
+        <EmailVerificationBanner />
 
         {/* Profile header */}
         <section className="card p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">

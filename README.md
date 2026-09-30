@@ -263,6 +263,8 @@ All endpoints use HttpOnly cookie authentication. Sign-in, sign-up, password res
 | `/api/campaigns/?mode=my_campaigns` | `GET` | A company's own projects (`POST /api/campaigns/` creates one) |
 | `/api/campaigns/<id>/` | `GET` | Project detail (workspace files only for owner, team and admins) |
 | `/api/campaigns/<id>/offer/respond/` | `POST` | Matched student accepts or declines the admin's offer (`action`, optional `reason` for admins) |
+| `/api/users/email/verify/` | `POST` | Confirms an email address from the signed link sent at sign-up |
+| `/api/users/email/verify/resend/` | `POST` | Sends a fresh confirmation link (rate limited) |
 | `/api/campaigns/<id>/finalize/` | `POST` | Company confirms the match once every student has accepted (finder's fee on Free plan) |
 | `/api/campaigns/<id>/assets/` | `GET` `POST` | Project files vault |
 | `/api/campaigns/student/assigned/` | `GET` | Projects assigned to the signed-in student |

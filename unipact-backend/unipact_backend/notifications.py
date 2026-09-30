@@ -76,7 +76,7 @@ def _students(campaign):
 # Accounts
 # ------------------------------------------------------------------
 
-def welcome(user):
+def welcome(user, verify_path=None):
     role = user.role
     if role == 'COMPANY':
         lines = [
@@ -98,7 +98,23 @@ def welcome(user):
             'to be matched to paid client projects. Keeping your skills and bio up to date helps us match you well.',
         ]
         action = ('Complete your profile', '/settings')
+    if verify_path:
+        days = max(1, settings.EMAIL_VERIFY_TIMEOUT // 86400)
+        lines = lines + [f'First, confirm this is your email address. The link works once and expires in {days} days.']
+        action = ('Confirm your email', verify_path)
+
     send_email(user.email, 'Welcome to UniPact', 'Your account is ready', lines, action_label=action[0], action_path=action[1])
+
+
+def confirm_email(user, verify_path):
+    days = max(1, settings.EMAIL_VERIFY_TIMEOUT // 86400)
+    send_email(
+        user.email, 'Confirm your email address', 'Confirm your email',
+        [f'Use the button below to confirm that {user.email} is your address.',
+         f'The link works once and expires in {days} days.'],
+        action_label='Confirm your email', action_path=verify_path,
+        note='If you did not create a UniPact account, you can ignore this email.',
+    )
 
 
 def verification_result(user, approved):

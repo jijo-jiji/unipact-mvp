@@ -4,6 +4,7 @@ import { Plus, Users, ArrowUpRight, ShieldCheck, CreditCard, Sparkles, Briefcase
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WorkspaceNav from '../components/WorkspaceNav';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -47,6 +48,7 @@ const CompanyDashboard = () => {
       <WorkspaceNav />
 
       <main className="max-w-[1160px] w-full mx-auto px-4 sm:px-8 py-8 space-y-8 flex-1">
+        <EmailVerificationBanner />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-4">
             {(user?.avatar_url || user?.company_profile?.logo) && (

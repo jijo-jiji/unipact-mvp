@@ -11,7 +11,8 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     email = models.EmailField(_('email address'), unique=True)
-    is_verified = models.BooleanField(default=False)  # General verification flag
+    is_verified = models.BooleanField(default=False)  # Identity verified by an admin from uploaded documents
+    email_verified = models.BooleanField(default=False)  # Owner of the address clicked the link we emailed them
     # When the user agreed to the Terms of Service and Privacy Policy at sign-up (PDPA consent record)
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
 

@@ -7,6 +7,7 @@ from .views import (
     AdminEntityListView, AdminBlockUserView, AdminStudentPoolView,
     ClaimProfileView, ClaimInvitePreviewView, ClubInviteDetailView, TransferOwnershipView,
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
+    VerifyEmailView, ResendEmailVerificationView,
 )
 
 urlpatterns = [
@@ -21,6 +22,8 @@ urlpatterns = [
     path('password/change/', PasswordChangeView.as_view(), name='password_change'),
     path('password/forgot/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password/reset/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('email/verify/', VerifyEmailView.as_view(), name='verify_email'),
+    path('email/verify/resend/', ResendEmailVerificationView.as_view(), name='resend_verify_email'),
     
     # Student Specific
     path('student/<int:user_id>/profile/', StudentPublicProfileView.as_view(), name='student_public_profile'),

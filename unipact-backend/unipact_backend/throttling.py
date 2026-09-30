@@ -34,3 +34,7 @@ class PasswordResetThrottle(ScopedIPThrottle):
 
 class PasswordChangeThrottle(ScopedIPThrottle):
     scope = 'password_change'
+
+
+class EmailVerifyThrottle(ScopedIPThrottle):
+    scope = 'email_verify'

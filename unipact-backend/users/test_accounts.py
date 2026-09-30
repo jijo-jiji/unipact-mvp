@@ -15,13 +15,13 @@ STRONG = 'Blue-Kettle-Run-88'
 
 
 def make_student(email='sam@siswa.my', **profile):
-    user = User.objects.create_user(username=email, email=email, password=STRONG, role=User.Role.STUDENT)
+    user = User.objects.create_user(username=email, email=email, password=STRONG, role=User.Role.STUDENT, email_verified=True)
     StudentProfile.objects.create(user=user, full_name=profile.pop('full_name', 'Sam Lee'), university='UM', **profile)
     return user
 
 
 def make_company(email='boss@corp.com', tier='PRO'):
-    user = User.objects.create_user(username=email, email=email, password=STRONG, role=User.Role.COMPANY)
+    user = User.objects.create_user(username=email, email=email, password=STRONG, role=User.Role.COMPANY, email_verified=True)
     CompanyProfile.objects.create(user=user, company_name='Corp Sdn Bhd', tier=tier, verification_status='VERIFIED')
     return user
 

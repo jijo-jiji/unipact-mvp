@@ -4,8 +4,9 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import status, generics, views, permissions
 from rest_framework.response import Response
-from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle, PasswordResetThrottle, PasswordChangeThrottle
+from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle, PasswordResetThrottle, PasswordChangeThrottle, EmailVerifyThrottle
 from unipact_backend import notifications
+from .utils import email_verification_path
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, logout
 from django.db import transaction
@@ -117,6 +118,7 @@ def account_payload(user):
         "role": user.role,
         "name": name,
         "avatar_url": avatar_url,
+        "email_verified": user.email_verified,
         "verification_status": ver_status,
         "tier": tier,
         "card_last_4": card_last_4,
@@ -284,6 +286,50 @@ class PasswordResetRequestView(views.APIView):
         return Response({"message": "If an account exists for that email, we've sent a link to reset the password."})
 
 
+class VerifyEmailView(views.APIView):
+    """Confirms the address behind a signed link. Visiting it twice is fine."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [EmailVerifyThrottle]
+
+    def post(self, request):
+        from .utils import log_event, read_email_verification_token
+
+        user = read_email_verification_token(str(request.data.get('token', '')))
+        if not user:
+            return Response(
+                {"error": "This confirmation link is invalid or has expired. Please ask for a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not user.email_verified:
+            user.email_verified = True
+            user.save(update_fields=['email_verified'])
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Email confirmed: {user.email}")
+
+        return Response({"message": "Thanks, your email address is confirmed.", "email": user.email})
+
+
+class ResendEmailVerificationView(views.APIView):
+    """Sends a fresh link, either to the signed-in user or to an address given by someone locked out."""
+    permission_classes = [AllowAny]
+    throttle_classes = [EmailVerifyThrottle]
+
+    def post(self, request):
+        from .utils import email_verification_path
+
+        user = request.user if request.user.is_authenticated else None
+        if user is None:
+            email = str(request.data.get('email', '')).strip()
+            user = User.objects.filter(email__iexact=email, is_active=True).first() if email else None
+
+        if user and not user.email_verified:
+            notifications.confirm_email(user, email_verification_path(user))
+
+        # Always the same answer, so this cannot be used to find out who has an account
+        return Response({"message": "If that address needs confirming, we've sent a new link to it."})
+
+
 class PasswordResetConfirmView(views.APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -336,41 +382,15 @@ class LoginView(views.APIView):
 
         if user:
             tokens = get_tokens_for_user(user)
-            
-            # Determine verification status and name based on role
-            ver_status = None
-            company_profile_data = None
-            club_profile_data = None
-            student_profile_data = None
-            name = user.username
 
-            if user.role == User.Role.COMPANY and hasattr(user, 'company_profile'):
-                ver_status = user.company_profile.verification_status
-                name = user.company_profile.company_name
-                company_profile_data = CompanyProfileSerializer(user.company_profile).data
-            elif user.role == User.Role.CLUB and hasattr(user, 'club_profile'):
-                ver_status = user.club_profile.verification_status
-                name = user.club_profile.club_name
-                club_profile_data = ClubProfileSerializer(user.club_profile).data
-            elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
-                ver_status = user.student_profile.verification_status
-                name = user.student_profile.full_name
-                student_profile_data = StudentProfileSerializer(user.student_profile).data
+            # Same shape as /users/me/, so the app knows as much right after signing in as it does on a reload
+            account = account_payload(user)
 
             response = Response({
                 "message": "Login successful",
                 "role": user.role,
-                "verification_status": ver_status,
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "role": user.role,
-                    "name": name,
-                    "verification_status": ver_status,
-                    "company_profile": company_profile_data,
-                    "club_profile": club_profile_data,
-                    "student_profile": student_profile_data
-                }
+                "verification_status": account["verification_status"],
+                "user": account,
             }, status=status.HTTP_200_OK)
 
             set_auth_cookies(response, tokens)
@@ -772,7 +792,7 @@ class RegisterCompanyView(generics.CreateAPIView):
             log_event(SystemLog.Category.SECURITY, SystemLog.Level.CRITICAL, f"High Risk Reg: {email} (Public Domain)")
         else:
             log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Company Joined: {company_name}")
-        notifications.welcome(user)
+        notifications.welcome(user, email_verification_path(user))
 
         response = Response({
             "message": "Company registered successfully.",
@@ -836,7 +856,7 @@ class RegisterClubView(generics.CreateAPIView):
         from .models import SystemLog
         from .utils import log_event
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Club Joined: {club_name} ({university})")
-        notifications.welcome(user)
+        notifications.welcome(user, email_verification_path(user))
 
         response = Response({
             "message": "Club registered successfully. Please wait for admin verification.",
@@ -910,7 +930,7 @@ class RegisterStudentView(generics.CreateAPIView):
         from .models import SystemLog
         from .utils import log_event
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Student Talent Joined: {full_name} ({university})")
-        notifications.welcome(user)
+        notifications.welcome(user, email_verification_path(user))
 
         response = Response({
             "message": "Student talent registered successfully. Account pending Admin verification.",

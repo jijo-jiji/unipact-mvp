@@ -45,8 +45,8 @@ class TermsConsentMixin:
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'role', 'is_verified']
-        read_only_fields = ['role', 'is_verified']
+        fields = ['id', 'email', 'username', 'role', 'is_verified', 'email_verified']
+        read_only_fields = ['role', 'is_verified', 'email_verified']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

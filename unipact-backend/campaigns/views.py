@@ -57,6 +57,9 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         if self.request.user.role != User.Role.COMPANY:
             raise exceptions.PermissionDenied("Only companies can create campaigns.")
         
+        if not self.request.user.email_verified:
+            raise exceptions.PermissionDenied("Please confirm your email address before posting a project. Check your inbox for the link.")
+
         # Check if company is verified enough to post
         company_profile = self.request.user.company_profile
         if company_profile.verification_status == CompanyProfile.VerificationStatus.HIGH_RISK:
@@ -399,6 +402,8 @@ class RespondMatchOfferView(APIView):
         action = str(request.data.get('action', '')).lower()
         if action not in ('accept', 'decline'):
             return Response({"error": "Choose 'accept' or 'decline'."}, status=status.HTTP_400_BAD_REQUEST)
+        if action == 'accept' and not request.user.email_verified:
+            raise exceptions.PermissionDenied("Please confirm your email address before accepting a project. Check your inbox for the link.")
 
         from users.models import SystemLog
         from users.utils import log_event

@@ -121,12 +121,15 @@ class Command(BaseCommand):
                         "username": username,
                         "role": User.Role.STUDENT,
                         "is_verified": True,
+                        # The admin collected this address from the participant directly
+                        "email_verified": True,
                         "terms_accepted_at": now,
                     },
                 )
                 if not user_created:
                     user.role = User.Role.STUDENT
                     user.is_verified = True
+                    user.email_verified = True
                     if not user.terms_accepted_at:
                         user.terms_accepted_at = now
 
@@ -187,12 +190,15 @@ class Command(BaseCommand):
                         "username": username,
                         "role": User.Role.COMPANY,
                         "is_verified": True,
+                        # The admin collected this address from the participant directly
+                        "email_verified": True,
                         "terms_accepted_at": now,
                     },
                 )
                 if not user_created:
                     user.role = User.Role.COMPANY
                     user.is_verified = True
+                    user.email_verified = True
                     if not user.terms_accepted_at:
                         user.terms_accepted_at = now
 

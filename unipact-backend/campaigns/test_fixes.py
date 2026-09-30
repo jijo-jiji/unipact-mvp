@@ -11,7 +11,7 @@ from payments.models import Transaction
 
 
 def make_student(email, name, **extra):
-    user = User.objects.create_user(username=email, email=email, password='StudentPass123!', role=User.Role.STUDENT, is_verified=True)
+    user = User.objects.create_user(username=email, email=email, password='StudentPass123!', role=User.Role.STUDENT, is_verified=True, email_verified=True)
     profile = StudentProfile.objects.create(user=user, full_name=name, university='UM', verification_status='VERIFIED', **extra)
     return user, profile
 
@@ -19,7 +19,7 @@ def make_student(email, name, **extra):
 class CampaignAccessControlTests(APITestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(username='admin@x.my', email='admin@x.my', password='AdminPass123!', role=User.Role.ADMIN)
-        self.company_user = User.objects.create_user(username='co@x.com', email='co@x.com', password='CoPass123!', role=User.Role.COMPANY)
+        self.company_user = User.objects.create_user(username='co@x.com', email='co@x.com', password='CoPass123!', role=User.Role.COMPANY, email_verified=True)
         self.company = CompanyProfile.objects.create(user=self.company_user, company_name='Co', tier=CompanyProfile.Tier.FREE, verification_status='VERIFIED')
         self.lead_user, self.lead = make_student('lead@x.my', 'Lead')
         self.outsider_user, self.outsider = make_student('out@x.my', 'Outsider')

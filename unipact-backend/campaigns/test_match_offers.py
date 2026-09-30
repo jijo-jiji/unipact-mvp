@@ -8,7 +8,7 @@ from users.models import User, CompanyProfile, StudentProfile
 
 
 def make_student(email, name):
-    user = User.objects.create_user(username=email, email=email, password='Blue-Kettle-Run-88', role=User.Role.STUDENT)
+    user = User.objects.create_user(username=email, email=email, password='Blue-Kettle-Run-88', role=User.Role.STUDENT, email_verified=True)
     profile = StudentProfile.objects.create(user=user, full_name=name, university='UM', verification_status='VERIFIED')
     return user, profile
 
@@ -18,7 +18,7 @@ class MatchOfferFlowTests(APITestCase):
 
     def setUp(self):
         self.admin = User.objects.create_superuser(username='admin@x.my', email='admin@x.my', password='AdminPass123!', role=User.Role.ADMIN)
-        self.company_user = User.objects.create_user(username='co@x.com', email='co@x.com', password='CoPass123!', role=User.Role.COMPANY)
+        self.company_user = User.objects.create_user(username='co@x.com', email='co@x.com', password='CoPass123!', role=User.Role.COMPANY, email_verified=True)
         self.company = CompanyProfile.objects.create(user=self.company_user, company_name='Co', tier=CompanyProfile.Tier.PRO, verification_status='VERIFIED')
         self.ali_user, self.ali = make_student('ali@x.my', 'Ali')
         self.mei_user, self.mei = make_student('mei@x.my', 'Mei')

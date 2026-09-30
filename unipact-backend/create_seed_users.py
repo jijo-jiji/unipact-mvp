@@ -24,7 +24,8 @@ def create_users():
             email=admin_email,
             password="adminpass123",
             role=User.Role.ADMIN,
-            is_verified=True
+            is_verified=True,
+            email_verified=True,
         )
         print(f"[OK] Admin created: {admin_email} / adminpass123")
     else:
@@ -38,7 +39,8 @@ def create_users():
         defaults={
             'username': 'testcompany',
             'role': User.Role.COMPANY,
-            'is_verified': True
+            'is_verified': True,
+            'email_verified': True,
         }
     )
     if c_created:
@@ -61,7 +63,8 @@ def create_users():
         defaults={
             'username': 'student_talent',
             'role': User.Role.STUDENT,
-            'is_verified': True
+            'is_verified': True,
+            'email_verified': True,
         }
     )
     if s1_created:
@@ -89,7 +92,8 @@ def create_users():
         defaults={
             'username': 'marketing_talent',
             'role': User.Role.STUDENT,
-            'is_verified': True
+            'is_verified': True,
+            'email_verified': True,
         }
     )
     if s2_created:
@@ -117,7 +121,8 @@ def create_users():
         defaults={
             'username': 'peer_collaborator',
             'role': User.Role.STUDENT,
-            'is_verified': True
+            'is_verified': True,
+            'email_verified': True,
         }
     )
     if s3_created:
@@ -145,7 +150,8 @@ def create_users():
         defaults={
             'username': 'codingclub',
             'role': User.Role.CLUB,
-            'is_verified': True
+            'is_verified': True,
+            'email_verified': True,
         }
     )
     if club_created:

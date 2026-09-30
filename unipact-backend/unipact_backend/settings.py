@@ -269,6 +269,8 @@ REST_FRAMEWORK = {
         # Stops "forgot password" being used to spam someone's inbox
         'password_reset': os.getenv('THROTTLE_PASSWORD_RESET', '5/hour'),
         'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
+        # Same reasoning for "resend my confirmation link"
+        'email_verify': os.getenv('THROTTLE_EMAIL_VERIFY', '5/hour'),
     },
     # Don't leak the browsable API in production
     'DEFAULT_RENDERER_CLASSES': (
@@ -282,7 +284,7 @@ if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = ()
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({
         'login': '10000/min', 'register': '10000/min', 'token_refresh': '10000/min',
-        'password_reset': '10000/min', 'password_change': '10000/min',
+        'password_reset': '10000/min', 'password_change': '10000/min', 'email_verify': '10000/min',
     })
 
 # Throttle counters: set REDIS_URL when running more than one server process so limits are shared
@@ -363,6 +365,8 @@ if IS_PRODUCTION and not EMAIL_HOST and not env_bool('ALLOW_CONSOLE_EMAIL', defa
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
 # Club committee invitation links stop working after this many days (the club can resend)
 CLUB_INVITE_TTL_DAYS = int(os.getenv('CLUB_INVITE_TTL_DAYS', '14'))
+# Seconds an "confirm your email" link stays valid (default 3 days)
+EMAIL_VERIFY_TIMEOUT = int(os.getenv('EMAIL_VERIFY_TIMEOUT', str(3 * 24 * 3600)))
 
 
 # ------------------------------------------------------------------

@@ -143,6 +143,8 @@ class OnboardCohortCommandTests(TestCase):
         student_user = User.objects.get(email='student.test@um.edu.my')
         self.assertEqual(student_user.role, User.Role.STUDENT)
         self.assertTrue(student_user.is_verified)
+        # Admin-collected addresses need no confirmation link, or the cohort couldn't accept offers
+        self.assertTrue(student_user.email_verified)
         self.assertIsNotNone(student_user.terms_accepted_at)
         self.assertEqual(student_user.student_profile.full_name, 'Test Student')
         self.assertEqual(student_user.student_profile.verification_status, 'VERIFIED')
@@ -151,6 +153,7 @@ class OnboardCohortCommandTests(TestCase):
         company_user = User.objects.get(email='client.test@startup.my')
         self.assertEqual(company_user.role, User.Role.COMPANY)
         self.assertTrue(company_user.is_verified)
+        self.assertTrue(company_user.email_verified)
         self.assertEqual(company_user.company_profile.company_name, 'Test Startup Sdn Bhd')
         self.assertEqual(company_user.company_profile.verification_status, 'VERIFIED')
 
