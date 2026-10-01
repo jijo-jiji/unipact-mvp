@@ -410,9 +410,12 @@ class ToyyibPayCreateBillView(APIView):
         if campaign.payment_structure != Campaign.PaymentStructure.UPFRONT:
             return Response({"error": "UniPact invoices this project separately."}, status=status.HTTP_400_BAD_REQUEST)
 
-        phone = re.sub(r'[\s-]', '', str(request.data.get('phone') or ''))
-        if not re.fullmatch(r'\+?\d{9,15}', phone):
+        phone = re.sub(r'[\s()+-]', '', str(request.data.get('phone') or ''))
+        if not re.fullmatch(r'\d{9,15}', phone):
             return Response({"error": "Enter a phone number for your FPX receipt, e.g. 0123456789."}, status=status.HTTP_400_BAD_REQUEST)
+        # ToyyibPay expects local digits only: +60 13-347 4009 becomes 0133474009
+        if phone.startswith('60') and len(phone) >= 11:
+            phone = '0' + phone[2:]
 
         open_bills = Transaction.objects.filter(
             related_campaign=campaign, provider=Transaction.Provider.TOYYIBPAY, status=Transaction.Status.PENDING,

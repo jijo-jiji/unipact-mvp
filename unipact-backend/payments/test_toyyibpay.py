@@ -131,6 +131,10 @@ class ToyyibPayProjectFeeTests(APITestCase):
         self.assertEqual(res.data['status'], 'FAILED')
         self.assertEqual(self.open_bill().data['payment_url'], 'https://dev.toyyibpay.com/BILL2')
 
+    def test_international_phone_format_is_sent_as_local_digits(self):
+        self.open_bill(phone='+60 13-347 4009')
+        self.assertEqual(self.gateway.last_bill_data['billPhone'], '0133474009')
+
     def test_second_click_reuses_the_open_bill(self):
         first, second = self.open_bill(), self.open_bill()
         self.assertEqual(first.data['payment_url'], second.data['payment_url'])
