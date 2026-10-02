@@ -195,3 +195,36 @@ class UnconfirmedAccountTests(APITestCase):
         self.student_user.email_verified = True
         self.student_user.save(update_fields=['email_verified'])
         self.assertTrue(self.client.get(reverse('me')).data['email_verified'])
+
+
+@override_settings(DEFAULT_FROM_EMAIL='UniPact <support@unipact.com.my>', FRONTEND_URL='https://app.unipact.my')
+class ConfirmationEmailContentTests(APITestCase):
+    """What a new company actually finds in their inbox."""
+
+    def sign_up_company(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(reverse('register_company'), {
+                'email': 'hr@acme.com.my', 'password': STRONG, 'company_name': 'Acme',
+                'ssm_number': '202501001234', 'accept_terms': 'true',
+            }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        return next(m for m in mail.outbox if m.to == ['hr@acme.com.my'])
+
+    def test_subject_and_preview_ask_for_the_confirmation(self):
+        email = self.sign_up_company()
+        self.assertIn('Confirm your email', email.subject)
+        self.assertIn('confirm your email address so you can post your first project', email.body)
+
+    def test_it_never_says_they_can_already_post(self):
+        """Posting is blocked until the address is confirmed, so the email must not promise otherwise."""
+        email = self.sign_up_company()
+        self.assertNotIn('can already post', email.body)
+
+    def test_link_points_at_the_live_site_over_https(self):
+        email = self.sign_up_company()
+        self.assertRegex(email.body, r'https://app\.unipact\.my/verify-email\?token=\S+')
+
+    def test_message_id_uses_the_sender_domain(self):
+        """A Message-ID naming the bare server host is a small spam signal."""
+        email = self.sign_up_company()
+        self.assertTrue(email.message()['Message-ID'].rstrip('>').endswith('@unipact.com.my'))

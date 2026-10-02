@@ -6,6 +6,7 @@ here in plain Python. Emails are sent after the database transaction commits, an
 server never breaks the request that triggered it: the error is logged instead.
 """
 import logging
+from email.utils import make_msgid, parseaddr
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -26,6 +27,11 @@ def display_name(user):
         if profile and getattr(profile, field, ''):
             return getattr(profile, field)
     return user.get_full_name() or user.email
+
+
+def sender_domain():
+    """The domain of the From address, or None to let Python fall back to the machine's name."""
+    return parseaddr(settings.DEFAULT_FROM_EMAIL)[1].rpartition('@')[2] or None
 
 
 def send_email(to, subject, heading, lines=(), details=(), action_label=None, action_path=None, note=None, preheader=None):
@@ -59,6 +65,8 @@ def send_email(to, subject, heading, lines=(), details=(), action_label=None, ac
                 to=recipients[:1],
                 bcc=recipients[1:],
                 reply_to=[settings.SUPPORT_EMAIL] if settings.SUPPORT_EMAIL else None,
+                # Spam filters distrust a Message-ID that names a bare host (e.g. the Render machine)
+                headers={'Message-ID': make_msgid(domain=sender_domain())},
             )
             message.attach_alternative(html_body, 'text/html')
             message.send()
@@ -78,32 +86,41 @@ def _students(campaign):
 
 def welcome(user, verify_path=None):
     role = user.role
+    name = display_name(user)
     if role == 'COMPANY':
-        lines = [
-            f'Thanks for joining UniPact, {display_name(user)}.',
-            'Our team is reviewing your company details. You can already post your first project: it\'s free, '
-            'and a UniPact admin will propose a team of verified university students for you to confirm.',
-        ]
+        intro = f'Thanks for joining UniPact, {name}.'
+        about = ('Posting a project is free, and a UniPact admin will propose a team of verified university students '
+                 'for you to confirm. Our team is also reviewing your company details.')
+        unlocks = 'post your first project'
         action = ('Post a project', '/campaign/new')
     elif role == 'CLUB':
-        lines = [
-            f'Welcome to UniPact, {display_name(user)}.',
-            'We\'re reviewing your club\'s details. In the meantime you can browse open quests from companies.',
-        ]
+        intro = f'Welcome to UniPact, {name}.'
+        about = "We're reviewing your club's details. In the meantime you can browse open quests from companies."
+        unlocks = 'finish setting up your account'
         action = ('Browse quests', '/quests')
     else:
-        lines = [
-            f'Welcome to UniPact, {display_name(user)}.',
-            'A UniPact admin will verify your student status shortly. Once you\'re verified you become eligible '
-            'to be matched to paid client projects. Keeping your skills and bio up to date helps us match you well.',
-        ]
+        intro = f'Welcome to UniPact, {name}.'
+        about = ("A UniPact admin will verify your student status shortly. Once you're verified you become eligible "
+                 'to be matched to paid client projects. Keeping your skills and bio up to date helps us match you well.')
+        unlocks = 'accept project offers'
         action = ('Complete your profile', '/settings')
-    if verify_path:
-        days = max(1, settings.EMAIL_VERIFY_TIMEOUT // 86400)
-        lines = lines + [f'First, confirm this is your email address. The link works once and expires in {days} days.']
-        action = ('Confirm your email', verify_path)
 
-    send_email(user.email, 'Welcome to UniPact', 'Your account is ready', lines, action_label=action[0], action_path=action[1])
+    if not verify_path:
+        send_email(user.email, 'Welcome to UniPact', 'Your account is ready', [intro, about],
+                   action_label=action[0], action_path=action[1])
+        return
+
+    # Lead with the confirmation: it is the one thing the person must do, and the subject and inbox
+    # preview should say so rather than read like a greeting that can wait.
+    days = max(1, settings.EMAIL_VERIFY_TIMEOUT // 86400)
+    send_email(
+        user.email, 'Confirm your email to get started', 'Confirm your email',
+        [f'{intro} Please confirm your email address so you can {unlocks}.',
+         about,
+         f'The button works once and expires in {days} days.'],
+        action_label='Confirm your email', action_path=verify_path,
+        note='If you did not create a UniPact account, you can ignore this email.',
+    )
 
 
 def confirm_email(user, verify_path):

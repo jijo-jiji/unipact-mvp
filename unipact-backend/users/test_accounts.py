@@ -271,7 +271,8 @@ class NotificationEmailTests(APITestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.client.post(reverse('register_student'), {'accept_terms': True, 'email': 'new@siswa.my', 'password': STRONG, 'full_name': 'New', 'university': 'UM'}, format='json')
         self.assertEqual(mail.outbox[0].to, ['new@siswa.my'])
-        self.assertIn('Welcome', mail.outbox[0].subject)
+        self.assertIn('Confirm your email', mail.outbox[0].subject)
+        self.assertIn('Welcome to UniPact', mail.outbox[0].body)
 
     def test_verification_email(self):
         pending = make_student('pending@siswa.my')
