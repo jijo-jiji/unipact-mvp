@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Subscription, Transaction, Payout
+from .models import Invoice, Subscription, Transaction, Payout
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -33,3 +33,13 @@ class PayoutSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'campaign', 'student', 'milestone', 'bank_details_changed_at', 'created_at', 'updated_at']
 
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    campaign_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = ['id', 'number', 'campaign_id', 'project_title', 'amount', 'status', 'issued_at', 'due_date', 'paid_at',
+                  'bank_name', 'bank_account_name', 'bank_account_number']
+        read_only_fields = fields

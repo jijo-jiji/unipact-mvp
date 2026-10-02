@@ -34,7 +34,8 @@ def sender_domain():
     return parseaddr(settings.DEFAULT_FROM_EMAIL)[1].rpartition('@')[2] or None
 
 
-def send_email(to, subject, heading, lines=(), details=(), action_label=None, action_path=None, note=None, preheader=None):
+def send_email(to, subject, heading, lines=(), details=(), action_label=None, action_path=None, note=None, preheader=None,
+               attachments=()):
     recipients = sorted({email for email in ([to] if isinstance(to, str) else to) if email})
     if not recipients:
         return
@@ -69,6 +70,8 @@ def send_email(to, subject, heading, lines=(), details=(), action_label=None, ac
                 headers={'Message-ID': make_msgid(domain=sender_domain())},
             )
             message.attach_alternative(html_body, 'text/html')
+            for filename, content, mimetype in attachments:
+                message.attach(filename, content, mimetype)
             message.send()
         except Exception:  # noqa: BLE001 - email problems must never break the user's action
             logger.exception('Failed to send "%s" email to %s', subject, ', '.join(recipients))
@@ -402,6 +405,45 @@ def project_fee_due(campaign, outstanding):
     )
 
 
+def project_invoice(invoice, pdf):
+    """The client chose bank transfer: their invoice, with UniPact's bank details and the PDF attached."""
+    send_email(
+        invoice.bill_to_email, f'Invoice {invoice.number} for "{invoice.project_title}"', 'Your invoice',
+        [f'Thanks for confirming your student team for "{invoice.project_title}". Here is the invoice for the '
+         'project fee; the PDF is attached for your records.',
+         'Pay by bank transfer to the account below and quote the invoice number as your reference. '
+         "Your project starts as soon as we record the payment, and we'll email you a receipt."],
+        details=[
+            ('Invoice', invoice.number),
+            ('Amount due', f'RM {invoice.amount}'),
+            ('Pay by', invoice.due_date.strftime('%d %b %Y')),
+            ('Bank', invoice.bank_name),
+            ('Account name', invoice.bank_account_name),
+            ('Account number', invoice.bank_account_number),
+            ('Payment reference', invoice.number),
+        ],
+        action_label='View your project', action_path=f'/manage-campaign/{invoice.campaign_id}',
+        attachments=[(f'{invoice.number}.pdf', pdf, 'application/pdf')],
+    )
+
+
+def project_invoice_sent(invoice):
+    """Tell the admins which transfer to watch for, now that nobody has to write the invoice by hand."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    send_email(
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)) + [settings.SUPPORT_EMAIL],
+        f'Invoice {invoice.number} sent: "{invoice.project_title}"', 'A client is paying by bank transfer',
+        [f'{invoice.bill_to_name} chose to pay by bank transfer, so they were emailed invoice {invoice.number}. '
+         'When the transfer arrives, record it under Billing & escrow. The project starts automatically once '
+         'it is paid in full.'],
+        details=[('Project', invoice.project_title), ('Client', invoice.bill_to_name),
+                 ('Client email', invoice.bill_to_email), ('Amount due', f'RM {invoice.amount}'),
+                 ('Their reference', invoice.number), ('Due', invoice.due_date.strftime('%d %b %Y'))],
+        action_label='Open admin dashboard', action_path='/admin',
+    )
+
+
 def payment_needs_attention(problem, transaction_obj):
     """An online payment that a human must sort out, e.g. a wrong amount or a client who paid twice."""
     from users.models import User  # local import: notifications is imported by the users app
@@ -433,6 +475,8 @@ def payment_receipt(transaction_obj, outstanding=None):
         lines.append(f'RM {outstanding} of the project fee is still outstanding.')
     elif campaign and campaign.status == 'MATCHED' and not campaign.is_match_finalized:
         lines.append('Your project fee is paid in full. Confirm the match to start the project.')
+    elif campaign and campaign.status == 'IN_PROGRESS' and outstanding is not None and outstanding <= 0:
+        lines.append('Your project fee is paid in full, and your student team can start work.')
     send_email(
         company.user.email, 'Payment receipt', 'Payment received',
         lines,

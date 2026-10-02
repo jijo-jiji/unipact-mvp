@@ -100,3 +100,36 @@ class Payout(models.Model):
     def __str__(self):
         return f"Payout RM {self.amount} to {self.student.full_name} ({self.status})"
 
+
+
+class Invoice(models.Model):
+    """A bank-transfer invoice for a project fee. What was printed is copied onto the row, so the PDF
+    can be produced again later and still match the one the client received."""
+
+    class Status(models.TextChoices):
+        ISSUED = 'ISSUED', 'Awaiting payment'
+        PAID = 'PAID', 'Paid'
+        VOID = 'VOID', 'Replaced'
+
+    number = models.CharField(max_length=30, unique=True, blank=True)
+    company = models.ForeignKey(CompanyProfile, on_delete=models.PROTECT, related_name='invoices')
+    campaign = models.ForeignKey(Campaign, on_delete=models.PROTECT, related_name='invoices')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ISSUED)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    bill_to_name = models.CharField(max_length=255)
+    bill_to_email = models.EmailField()
+    project_title = models.CharField(max_length=255)
+    service_fee_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    bank_name = models.CharField(max_length=100)
+    bank_account_name = models.CharField(max_length=255)
+    bank_account_number = models.CharField(max_length=50)
+
+    class Meta:
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return f"{self.number} - RM {self.amount} - {self.status}"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, FileText, CheckCircle2, CreditCard } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, FileText, CheckCircle2, CreditCard, Download, Loader2 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,6 +10,7 @@ import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { formatDate, formatMoney, getErrorMessage, transactionTypeLabel } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { downloadInvoice } from '../utils/invoices';
 import { CARD_CHECKOUT_ENABLED, SERVICE_FEE_PERCENT } from '../utils/constants';
 
 const PRO_PRICE = 499;
@@ -27,12 +28,17 @@ const Treasury = () => {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [payment, setPayment] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [historyRes, userRes] = await Promise.all([api.get('/payments/history/'), api.get('/users/me/')]);
+      const [historyRes, userRes, invoicesRes] = await Promise.all([
+        api.get('/payments/history/'), api.get('/users/me/'), api.get('/payments/invoices/'),
+      ]);
       setHistory(historyRes.data);
       setAccount(userRes.data);
+      setInvoices(invoicesRes.data);
     } catch (error) {
       showToast(getErrorMessage(error, 'Could not load billing details.'), 'error');
     } finally {
@@ -100,6 +106,44 @@ const Treasury = () => {
           </section>
           )}
         </div>
+
+        {invoices.length > 0 && (
+          <section className="card p-6 sm:p-8">
+            <h2 className="font-heading font-bold text-lg mb-1 flex items-center gap-2"><FileText size={18} className="text-[#00AEEF]" /> Invoices</h2>
+            <p className="text-sm text-[#5B6478] mb-4">For project fees paid by bank transfer. Quote the invoice number as your transfer reference.</p>
+            <ul className="divide-y divide-[rgba(10,23,72,0.08)] border-y border-[rgba(10,23,72,0.08)]">
+              {invoices.map((inv) => (
+                <li key={inv.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold">{inv.number} <span className="font-normal text-[#5B6478]">· {inv.project_title}</span></div>
+                    <div className="text-xs text-[#5B6478] mt-0.5">
+                      Issued {formatDate(inv.issued_at)} · {inv.status === 'PAID' ? `Paid ${formatDate(inv.paid_at)}` : `Due ${formatDate(inv.due_date)}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-semibold text-[#0B1E63] whitespace-nowrap">{formatMoney(inv.amount)}</span>
+                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${inv.status === 'PAID' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {inv.status === 'PAID' ? 'Paid' : 'Awaiting payment'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setDownloadingId(inv.id);
+                        try { await downloadInvoice(inv); } catch (error) { showToast(getErrorMessage(error, 'Could not download the invoice.'), 'error'); }
+                        finally { setDownloadingId(null); }
+                      }}
+                      disabled={downloadingId === inv.id}
+                      className="btn-secondary btn-sm whitespace-nowrap"
+                      aria-label={`Download ${inv.number}`}
+                    >
+                      {downloadingId === inv.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} PDF
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="card p-6 sm:p-8">
           <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2"><FileText size={18} className="text-[#00AEEF]" /> Payment history</h2>

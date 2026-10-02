@@ -230,6 +230,20 @@ TOYYIBPAY_SANDBOX_TESTERS = [email.lower() for email in env_list('TOYYIBPAY_SAND
 # Corporate FPX (B2B) lets companies pay above the RM 30,000 personal FPX limit; the fee is charged to UniPact
 TOYYIBPAY_ENABLE_FPX_B2B = env_bool('TOYYIBPAY_ENABLE_FPX_B2B', default=True)
 TOYYIBPAY_BILL_EXPIRY_DAYS = int(os.getenv('TOYYIBPAY_BILL_EXPIRY_DAYS', '3'))
+# Bank-transfer invoices. When all three bank settings are set, a client who pays by bank transfer is
+# emailed a numbered PDF invoice straight away; without them, admins are asked to invoice by hand.
+UNIPACT_BANK_NAME = os.getenv('UNIPACT_BANK_NAME', '').strip()
+UNIPACT_BANK_ACCOUNT_NAME = os.getenv('UNIPACT_BANK_ACCOUNT_NAME', '').strip()
+UNIPACT_BANK_ACCOUNT_NUMBER = os.getenv('UNIPACT_BANK_ACCOUNT_NUMBER', '').strip()
+INVOICE_DUE_DAYS = int(os.getenv('INVOICE_DUE_DAYS', '7'))
+# The business printed at the top of every invoice: as registered with SSM
+INVOICE_ISSUER_NAME = os.getenv('INVOICE_ISSUER_NAME', 'UNIPACT DIGITAL SOLUTIONS')
+INVOICE_ISSUER_REGISTRATION_NO = os.getenv('INVOICE_ISSUER_REGISTRATION_NO', '202603205508 (JR0194048-V)')
+INVOICE_ISSUER_ADDRESS = os.getenv(
+    'INVOICE_ISSUER_ADDRESS',
+    'Unit 21-7, 16 Jalan Raja Ali, Off Jalan Raja Abdullah, Kampung Baru, 50300 Kuala Lumpur, Wilayah Persekutuan',
+)
+
 # This API's public address, for ToyyibPay's server-to-server payment callback (e.g. https://api.unipact.my)
 API_PUBLIC_URL = os.getenv('API_PUBLIC_URL', '').rstrip('/')
 # Keep large uploads on disk while processing instead of in memory

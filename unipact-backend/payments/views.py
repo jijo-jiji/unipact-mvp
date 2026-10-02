@@ -9,8 +9,9 @@ from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
 from campaigns.models import Campaign
-from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer
-from .models import Transaction, Subscription, Payout
+from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer, InvoiceSerializer
+from .models import Transaction, Subscription, Payout, Invoice
+from .invoices import request_bank_transfer, settle_invoices, render_invoice_pdf
 from .services import MockStripeService
 from unipact_backend import notifications
 from django.conf import settings
@@ -361,9 +362,29 @@ class AdminRecordClientPaymentView(APIView):
                 provider=Transaction.Provider.MANUAL,
                 paid_at=timezone.now(),
             )
+            settle_invoices(campaign)
+            # The client already confirmed their team when they asked to pay by bank transfer (that is what
+            # issued the invoice), so start the project now instead of making them come back and click again.
+            # FPX payments already work this way.
+            started = (
+                outstanding - amount <= 0
+                and campaign.status == Campaign.Status.MATCHED
+                and campaign.invoices.exists()
+                and campaign.assigned_students.exists()
+                and not campaign.has_pending_offers()
+            )
+            if started:
+                campaign.is_match_finalized = True
+                campaign.status = Campaign.Status.IN_PROGRESS
+                campaign.started_at = campaign.started_at or timezone.now()
+                campaign.save(update_fields=['is_match_finalized', 'status', 'started_at'])
 
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
                   f"Admin {request.user.email} recorded client payment RM {amount} for '{campaign.title}' (Ref: {reference})")
+        if started:
+            log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
+                      f"Match Finalized for '{campaign.title}': invoice paid in full by bank transfer")
+            notifications.match_confirmed(campaign)
         notifications.payment_receipt(tx, outstanding=outstanding - amount)
 
         return Response({
@@ -371,6 +392,7 @@ class AdminRecordClientPaymentView(APIView):
             "transaction": TransactionSerializer(tx).data,
             "escrow": escrow_summary(campaign),
             "outstanding": outstanding - amount,
+            "project_started": started,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -520,8 +542,41 @@ class RequestInvoiceView(APIView):
         outstanding = campaign.budget - paid_project_fees(campaign)
         if campaign.status != Campaign.Status.MATCHED or outstanding <= 0:
             return Response({"error": "There's nothing to invoice on this project."}, status=status.HTTP_400_BAD_REQUEST)
-        notifications.project_fee_due(campaign, outstanding)
+        invoice = request_bank_transfer(campaign, outstanding)
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO,
                   f"Invoice requested: RM {outstanding} for '{campaign.title}' ({campaign.company.company_name})")
-        return Response({"outstanding": outstanding})
+        return Response({"outstanding": outstanding, "invoice": InvoiceSerializer(invoice).data if invoice else None})
 
+
+
+# ------------------------------------------------------------------
+# Bank-transfer invoices
+# ------------------------------------------------------------------
+
+class InvoiceListView(APIView):
+    """GET: the signed-in client's invoices, newest first (replaced ones are left out)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        company = getattr(request.user, 'company_profile', None) if request.user.role == User.Role.COMPANY else None
+        if company is None:
+            return Response({"error": "Only clients have invoices."}, status=status.HTTP_403_FORBIDDEN)
+        invoices = Invoice.objects.filter(company=company).exclude(status=Invoice.Status.VOID)
+        return Response(InvoiceSerializer(invoices, many=True).data)
+
+
+class InvoicePdfView(APIView):
+    """GET: the invoice as a PDF, for the client it was issued to or an admin."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, invoice_id):
+        from django.http import HttpResponse
+
+        invoice = get_object_or_404(Invoice.objects.select_related('company'), pk=invoice_id)
+        is_owner = request.user.role == User.Role.COMPANY and invoice.company == getattr(request.user, 'company_profile', None)
+        if not (is_owner or request.user.role == User.Role.ADMIN):
+            # 404, not 403: don't confirm that another client's invoice exists
+            return Response({"error": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
+        response = HttpResponse(render_invoice_pdf(invoice), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{invoice.number}.pdf"'
+        return response

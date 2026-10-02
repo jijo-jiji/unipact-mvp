@@ -39,7 +39,7 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, onPai
     setBusy('invoice');
     try {
       const res = await api.post(`/payments/campaigns/${campaign.id}/request-invoice/`);
-      onInvoiceRequested?.(res.data.outstanding ?? amount);
+      onInvoiceRequested?.({ amount: res.data.outstanding ?? amount, invoice: res.data.invoice });
     } catch (err) {
       setError(getErrorMessage(err, 'Could not request an invoice. Please try again.'));
     } finally {
@@ -84,7 +84,7 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, onPai
           <button type="button" onClick={requestInvoice} disabled={!!busy} className="btn-secondary btn-sm">
             {busy === 'invoice' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Pay by bank transfer instead
           </button>
-          <p className="text-xs text-[#5B6478] mt-2">We&apos;ll email you an invoice, usually within one business day.</p>
+          <p className="text-xs text-[#5B6478] mt-2">We&apos;ll email you an invoice with UniPact&apos;s bank details.</p>
         </div>
       </form>
     </Modal>

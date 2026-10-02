@@ -166,9 +166,20 @@ class CampaignDetailSerializer(CampaignSerializer):
     my_application = serializers.SerializerMethodField()
     report_url = serializers.SerializerMethodField()
     escrow = serializers.SerializerMethodField()
+    invoice = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
-        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow']
+        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow', 'invoice']
+
+    def get_invoice(self, obj):
+        # The bank-transfer invoice still awaiting payment, for the owning client and admins only
+        request = self.context.get('request')
+        if not request or not can_view_workspace(request.user, obj) or request.user.role == 'STUDENT':
+            return None
+        from payments.invoices import open_invoice
+        from payments.serializers import InvoiceSerializer
+        invoice = open_invoice(obj)
+        return InvoiceSerializer(invoice).data if invoice else None
 
     def get_escrow(self, obj):
         # Only the owning company or an admin needs to see the money behind the milestones

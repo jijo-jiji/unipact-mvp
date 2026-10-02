@@ -497,15 +497,19 @@ class FinalizeMatchView(APIView):
                     from payments import toyyibpay
                     # ToyyibPay (FPX) when configured; the client can still ask for an invoice instead
                     payment_method = 'toyyibpay' if toyyibpay.is_available_to(request.user) else 'card' if settings.MOCK_PAYMENTS_ENABLED else 'bank_transfer'
+                    invoice = None
                     if payment_method == 'bank_transfer' and is_owner:
                         from users.models import SystemLog
                         from users.utils import log_event
-                        notifications.project_fee_due(campaign, outstanding)
+                        from payments.invoices import request_bank_transfer
+                        invoice = request_bank_transfer(campaign, outstanding)
                         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO, f"Invoice requested: RM {outstanding} for '{campaign.title}' ({company_profile.company_name})")
+                    from payments.serializers import InvoiceSerializer
                     return Response({
                         "error": f"RM {outstanding} of the project fee is still outstanding. The full fee is required to finalize the match.",
                         "status": "payment_required",
                         "project_fee": outstanding,
+                        "invoice": InvoiceSerializer(invoice).data if invoice else None,
                         "payment_method": payment_method,
                         "test_mode": payment_method == 'toyyibpay' and toyyibpay.is_sandbox(),
                         "message": "Full project fee payment required to finalize match."
@@ -515,6 +519,9 @@ class FinalizeMatchView(APIView):
         campaign.status = Campaign.Status.IN_PROGRESS
         campaign.started_at = campaign.started_at or timezone.now()
         campaign.save()
+        # However the fee arrived (FPX, card, bank transfer), its invoice is now settled
+        from payments.invoices import settle_invoices
+        settle_invoices(campaign)
 
         from users.models import SystemLog
         from users.utils import log_event

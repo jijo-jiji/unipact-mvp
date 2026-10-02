@@ -53,9 +53,9 @@ If the key is missing or wrong, clients can still choose *Pay by bank transfer i
 ### Paying by bank transfer
 
 The demo card checkout is **switched off in production** (`MOCK_PAYMENTS_ENABLED`; the API refuses to start if it is on). When a client picks *Pay by bank transfer instead*, or ToyyibPay isn't configured:
-1. The app tells them an invoice is coming, and every admin (plus `SUPPORT_EMAIL`) gets an *Invoice needed* email with the amount.
-2. Send the invoice with UniPact's bank details. When the transfer lands, open *Admin, Billing & escrow* for the project and record the amount with the bank/DuitNow reference.
-3. The client gets a receipt and clicks *Confirm match* again. The project starts, and milestone approvals pay out from that escrow.
+1. **With UniPact's bank details set** (`UNIPACT_BANK_NAME`, `UNIPACT_BANK_ACCOUNT_NAME`, `UNIPACT_BANK_ACCOUNT_NUMBER`), the client is emailed a numbered PDF invoice (`INV-YYYY-NNNNN`) straight away, sees it on the project page and under *Billing*, and the admins get an *Invoice … sent* email naming the reference to look for. Asking again reuses the same invoice; a part payment replaces it with one for the remainder. **Without them**, admins get an *Invoice needed* email and invoice by hand.
+2. When the transfer lands, open *Admin, Billing & escrow* for the project and record the amount with the bank/DuitNow reference.
+3. Once it is paid in full, the invoice is marked paid and the project **starts automatically** (the client already confirmed their team when the invoice was issued), the students are told it has started, and the client gets a receipt. Milestone approvals then pay out from that escrow.
 
 
 ---

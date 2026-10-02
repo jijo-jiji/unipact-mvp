@@ -292,7 +292,7 @@ const AdminDashboard = () => {
   const loadEscrow = async (campaignId) => {
     try {
       const res = await api.get(`/campaigns/${campaignId}/`);
-      setSelectedEscrow({ campaignId, ...res.data.escrow });
+      setSelectedEscrow({ campaignId, ...res.data.escrow, invoice: res.data.invoice });
     } catch {
       // Escrow is informational here; the record-payment and approval endpoints enforce it server-side
     }
@@ -327,9 +327,15 @@ const AdminDashboard = () => {
         amount: clientPayment.amount.trim(),
         reference: clientPayment.reference.trim(),
       });
-      showToast(res.data.message || 'Client payment recorded.', 'success');
-      setSelectedEscrow({ campaignId: selectedCampaign.id, ...res.data.escrow });
       setClientPayment({ amount: '', reference: '' });
+      if (res.data.project_started) {
+        // Paid in full against the client's invoice: the project started without them clicking again
+        showToast(`${res.data.message} The invoice is paid and the project has started.`, 'success');
+        await fetchMatchmakingData();
+      } else {
+        showToast(res.data.message || 'Client payment recorded.', 'success');
+      }
+      await loadEscrow(selectedCampaign.id);
     } catch (err) {
       showToast(getErrorMessage(err, 'Could not record the payment.'), 'error');
     } finally {
@@ -873,8 +879,18 @@ const AdminDashboard = () => {
                       <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
                         <AlertCircle size={15} className="shrink-0 mt-0.5" />
                         <span>
-                          <strong>Waiting for the client&apos;s payment.</strong> Invoice {selectedCampaign.company_name} for {formatMoney(selectedEscrow.outstanding)} by bank transfer.
-                          Record it below once it reaches UniPact&apos;s account; the client is emailed a receipt and can then confirm the match.
+                          <strong>Waiting for the client&apos;s payment.</strong>{' '}
+                          {selectedEscrow.invoice ? (
+                            <>
+                              {selectedCampaign.company_name} was emailed invoice <strong>{selectedEscrow.invoice.number}</strong> for {formatMoney(selectedEscrow.invoice.amount)},
+                              due {formatDate(selectedEscrow.invoice.due_date)}. Look for that number as the transfer reference and record the payment below; the project starts automatically once it is paid in full.
+                            </>
+                          ) : (
+                            <>
+                              Invoice {selectedCampaign.company_name} for {formatMoney(selectedEscrow.outstanding)} by bank transfer.
+                              Record it below once it reaches UniPact&apos;s account; the client is emailed a receipt and can then confirm the match.
+                            </>
+                          )}
                         </span>
                       </div>
                     )}

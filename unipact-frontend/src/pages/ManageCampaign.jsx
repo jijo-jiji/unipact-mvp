@@ -9,6 +9,7 @@ import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
 import PaymentModal from '../components/PaymentModal';
 import OnlinePaymentModal from '../components/OnlinePaymentModal';
+import { downloadInvoice } from '../utils/invoices';
 import ImpactStatementCard from '../components/ImpactStatementCard';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
@@ -72,6 +73,8 @@ const ManageCampaign = () => {
 
   const [payment, setPayment] = useState(null); // { amount, description, onPaid }
   const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
+  const [issuedInvoice, setIssuedInvoice] = useState(null); // emailed automatically when bank details are configured
+  const [downloading, setDownloading] = useState(false);
   const [onlinePayment, setOnlinePayment] = useState(null); // { amount, testMode } due by FPX (ToyyibPay)
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
@@ -106,8 +109,9 @@ const ManageCampaign = () => {
       if (error.response?.status === 402 && error.response.data?.payment_method === 'toyyibpay') {
         setOnlinePayment({ amount: error.response.data.project_fee ?? campaign.budget, testMode: Boolean(error.response.data.test_mode) });
       } else if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
-        // No card checkout yet: UniPact's admins were emailed to send an invoice
-        setInvoiceDue(error.response.data.project_fee ?? campaign.budget);
+        // Bank transfer: the invoice is emailed straight away, or (without bank details set up) by an admin
+        if (error.response.data.invoice) setIssuedInvoice(error.response.data.invoice);
+        else setInvoiceDue(error.response.data.project_fee ?? campaign.budget);
       } else if (error.response?.status === 402) {
         // The server reports what's still outstanding, so a partially-paid project only asks for the rest
         setPayment({ amount: error.response.data?.project_fee ?? campaign.budget, description: `Project fee · ${campaign.title}`, type: 'PROJECT_FEE', onPaid: finalizeMatch });
@@ -242,6 +246,8 @@ const ManageCampaign = () => {
   const milestonesOutstanding = milestones.length > 0 && milestones.some((m) => m.status !== 'APPROVED');
   const canComplete = campaign.status === 'IN_PROGRESS' && (deliverables.length > 0 || clubAwaitingReview) && !milestonesOutstanding;
   const isCompleted = campaign.status === 'COMPLETED';
+  // The invoice sent during this visit, or the open one the API returns when the page loads
+  const invoice = issuedInvoice || campaign.invoice || null;
 
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex flex-col">
@@ -291,7 +297,48 @@ const ManageCampaign = () => {
             </div>
           </div>
         )}
-        {campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance && (
+        {campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance && invoice && (
+          <div className="p-5 rounded-xl bg-white border-2 border-[#00AEEF] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="flex items-start gap-3 text-sm">
+                <FileText size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block text-base">Invoice {invoice.number} sent to your email</strong>
+                  <span className="text-[#5B6478]">
+                    Pay {formatMoney(invoice.amount)} by bank transfer by {formatDate(invoice.due_date)}, quoting the invoice number.
+                    Your project starts automatically once we record the payment, and we&apos;ll email you a receipt.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDownloading(true);
+                  try { await downloadInvoice(invoice); } catch (error) { showToast(getErrorMessage(error, 'Could not download the invoice.'), 'error'); }
+                  finally { setDownloading(false); }
+                }}
+                disabled={downloading}
+                className="btn-primary self-start shrink-0 whitespace-nowrap"
+              >
+                {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Download invoice
+              </button>
+            </div>
+            <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm bg-[#F5F7FC] rounded-lg p-4">
+              {[
+                ['Bank', invoice.bank_name],
+                ['Account name', invoice.bank_account_name],
+                ['Account number', invoice.bank_account_number],
+                ['Payment reference', invoice.number],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between sm:block gap-3">
+                  <dt className="text-[#5B6478]">{label}</dt>
+                  <dd className="font-semibold break-all">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+        {campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance && !invoice && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border-2 border-[#00AEEF] shadow-sm">
             <div className="flex items-start gap-3 text-sm">
               <Sparkles size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
@@ -645,9 +692,10 @@ const ManageCampaign = () => {
           setOnlinePayment(null);
           finalizeMatch();
         }}
-        onInvoiceRequested={(amount) => {
+        onInvoiceRequested={({ amount, invoice: issued }) => {
           setOnlinePayment(null);
-          setInvoiceDue(amount);
+          if (issued) setIssuedInvoice(issued);
+          else setInvoiceDue(amount);
         }}
       />
 

@@ -3,6 +3,7 @@ from .views import (
     CreatePaymentIntentView, MockCheckoutView, ConfirmPaymentView, TransactionHistoryView, TreasurySummaryView,
     StudentPayoutListView, AdminPayoutListView, AdminRecordPayoutView, AdminRecordClientPaymentView,
     ToyyibPayCreateBillView, ToyyibPayCallbackView, ToyyibPayVerifyView, RequestInvoiceView,
+    InvoiceListView, InvoicePdfView,
 )
 
 urlpatterns = [
@@ -17,6 +18,8 @@ urlpatterns = [
     path('toyyibpay/callback/', ToyyibPayCallbackView.as_view(), name='toyyibpay_callback'),
     path('toyyibpay/verify/', ToyyibPayVerifyView.as_view(), name='toyyibpay_verify'),
     path('campaigns/<int:campaign_id>/request-invoice/', RequestInvoiceView.as_view(), name='request_invoice'),
+    path('invoices/', InvoiceListView.as_view(), name='invoice_list'),
+    path('invoices/<int:invoice_id>/pdf/', InvoicePdfView.as_view(), name='invoice_pdf'),
     
     # Student Payout Registry & History
     path('payouts/me/', StudentPayoutListView.as_view(), name='student_payouts_me'),
