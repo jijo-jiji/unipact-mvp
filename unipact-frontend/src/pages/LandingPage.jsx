@@ -373,15 +373,6 @@ const LandingPage = () => {
               <Link to={user ? dashboardPath : '/register/student'} className="btn-navy self-start mt-auto px-6 py-3">
                 {user ? 'Go to dashboard' : 'Create a student account'} <ArrowRight size={16} />
               </Link>
-              {!user && (
-                <p className="text-sm text-[#5B6478] mt-5">
-                  Or apply to the closed beta:{' '}
-                  <Link to="/apply-software-developer" className="text-[#0090C6] underline">software developer</Link>
-                  {' '}&middot;{' '}
-                  <Link to="/apply-digital-marketing" className="text-[#0090C6] underline">digital marketing / video</Link>
-                </p>
-              )}
-
             </article>
           </div>
         </section>

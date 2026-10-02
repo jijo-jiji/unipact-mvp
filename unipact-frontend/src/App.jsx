@@ -55,8 +55,6 @@ const ForgotPasswordPage = page(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
-const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
-const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
 const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
@@ -81,8 +79,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join-club" element={<JoinClubPage />} />
-          <Route path="/apply-software-developer" element={<SoftwareDeveloperApplyPage />} />
-          <Route path="/apply-digital-marketing" element={<DigitalMarketingApplyPage />} />
+          {/* The closed-beta application forms lived here and on unipact.my. Marketing now sits on
+              unipact.my alone, and students register directly, so these paths keep working for anyone
+              holding an old link rather than dropping them on the catch-all. */}
+          <Route path="/apply-software-developer" element={<Navigate to="/register/student" replace />} />
+          <Route path="/apply-digital-marketing" element={<Navigate to="/register/student" replace />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
