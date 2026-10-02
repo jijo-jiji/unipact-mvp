@@ -183,8 +183,11 @@ def settle(transaction_obj):
             tx.save(update_fields=['status', 'paid_at', 'reference'])
 
             from campaigns.utils import paid_project_fees
+            from .invoices import settle_invoices
             campaign = tx.related_campaign
             outstanding = campaign.budget - paid_project_fees(campaign) if campaign else None
+            if campaign:
+                settle_invoices(campaign)  # an open bank-transfer invoice is no longer owed once FPX covers it
             log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
                       f"ToyyibPay payment received: RM {tx.amount} from {tx.company.company_name} ({tx.reference})")
             if outstanding is not None and outstanding < 0:

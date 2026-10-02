@@ -75,7 +75,7 @@ const ManageCampaign = () => {
   const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
   const [issuedInvoice, setIssuedInvoice] = useState(null); // emailed automatically when bank details are configured
   const [downloading, setDownloading] = useState(false);
-  const [onlinePayment, setOnlinePayment] = useState(null); // { amount, testMode } due by FPX (ToyyibPay)
+  const [onlinePayment, setOnlinePayment] = useState(null); // { amount, testMode, partial, online } due by FPX (ToyyibPay)
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
   const [asset, setAsset] = useState({ file: null, title: '', type: 'DOCUMENT' });
@@ -139,6 +139,16 @@ const ManageCampaign = () => {
     });
   };
 
+  // ---- Paying the balance on a project that has already started (e.g. a client who pays monthly) ----
+  const balance = Number(campaign?.escrow?.outstanding || 0);
+  const balancePayable = Boolean(campaign?.is_match_finalized) && ['IN_PROGRESS', 'COMPLETED'].includes(campaign?.status) && balance > 0;
+  const openBalancePayment = () => setOnlinePayment({
+    amount: balance,
+    partial: true,
+    online: Boolean(campaign.escrow?.pay_online),
+    testMode: Boolean(campaign.escrow?.pay_online && campaign.escrow?.pay_online_test),
+  });
+
   // ---- Milestones (managed escrow) ----
   const reviewMilestone = async (milestoneId, action, feedback) => {
     setMilestoneBusy(milestoneId);
@@ -148,7 +158,13 @@ const ManageCampaign = () => {
       setRevisionModal({ isOpen: false, milestoneId: null, feedback: '' });
       await fetchCampaign();
     } catch (error) {
-      showToast(getErrorMessage(error, 'Could not update this milestone.'), 'error');
+      const data = error.response?.data;
+      if (error.response?.status === 402 && data?.code === 'escrow_insufficient' && balancePayable) {
+        showToast(`This milestone releases ${formatMoney(data.required)} to the team, but only ${formatMoney(data.available)} is in escrow. Pay towards the balance to approve it.`, 'info');
+        openBalancePayment();
+      } else {
+        showToast(getErrorMessage(error, 'Could not update this milestone.'), 'error');
+      }
     } finally {
       setMilestoneBusy(null);
     }
@@ -297,7 +313,7 @@ const ManageCampaign = () => {
             </div>
           </div>
         )}
-        {campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance && invoice && (
+        {((campaign.status === 'MATCHED' && !campaign.awaiting_student_acceptance) || balancePayable) && invoice && (
           <div className="p-5 rounded-xl bg-white border-2 border-[#00AEEF] shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               <div className="flex items-start gap-3 text-sm">
@@ -306,7 +322,7 @@ const ManageCampaign = () => {
                   <strong className="block text-base">Invoice {invoice.number} sent to your email</strong>
                   <span className="text-[#5B6478]">
                     Pay {formatMoney(invoice.amount)} by bank transfer by {formatDate(invoice.due_date)}, quoting the invoice number.
-                    Your project starts automatically once we record the payment, and we&apos;ll email you a receipt.
+                    {campaign.status === 'MATCHED' ? 'Your project starts automatically once we record the payment, and we\'ll email you a receipt.' : 'We\'ll email you a receipt once we record the payment.'}
                   </span>
                 </div>
               </div>
@@ -353,6 +369,23 @@ const ManageCampaign = () => {
             </div>
             <button onClick={handleConfirmMatch} disabled={busy} className="btn-primary self-start sm:self-auto">
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Confirm match
+            </button>
+          </div>
+        )}
+        {balancePayable && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border-2 border-[#00AEEF] shadow-sm">
+            <div className="flex items-start gap-3 text-sm">
+              <Wallet size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-base">{formatMoney(balance)} still to pay</strong>
+                <span className="text-[#5B6478]">
+                  You&apos;ve paid {formatMoney(campaign.escrow.client_paid)} of the {formatMoney(campaign.budget)} project fee.
+                  Your team is paid from what&apos;s in escrow, so a milestone can be approved once enough has been paid in.
+                </span>
+              </div>
+            </div>
+            <button onClick={openBalancePayment} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
+              <Wallet size={15} /> Pay now
             </button>
           </div>
         )}
@@ -688,14 +721,25 @@ const ManageCampaign = () => {
         campaign={campaign}
         amount={onlinePayment?.amount}
         testMode={onlinePayment?.testMode}
+        allowPartial={Boolean(onlinePayment?.partial)}
+        onlineAvailable={onlinePayment?.online !== false}
         onPaid={() => {
+          const wasBalance = onlinePayment?.partial;
           setOnlinePayment(null);
-          finalizeMatch();
+          if (wasBalance) fetchCampaign();
+          else finalizeMatch();
         }}
         onInvoiceRequested={({ amount, invoice: issued }) => {
+          const wasBalance = onlinePayment?.partial;
           setOnlinePayment(null);
-          if (issued) setIssuedInvoice(issued);
-          else setInvoiceDue(amount);
+          if (issued) {
+            setIssuedInvoice(issued);
+            if (wasBalance) showToast(`Invoice ${issued.number} is on its way to your email.`, 'success');
+          } else if (wasBalance) {
+            showToast(`UniPact will email you an invoice for ${formatMoney(amount)}, usually within one business day.`, 'success');
+          } else {
+            setInvoiceDue(amount);
+          }
         }}
       />
 

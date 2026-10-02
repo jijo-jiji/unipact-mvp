@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest import mock
 
 from django.core import mail
@@ -141,6 +142,51 @@ class ToyyibPayProjectFeeTests(APITestCase):
         res = self.client.post(reverse('toyyibpay_verify'), {'billcode': 'BILL1'}, format='json')
         self.assertEqual((res.data['status'], res.data['campaign_id']), ('SUCCESS', self.campaign.id))
         self.assertEqual(self.client.post(finalize_url, {}, format='json').status_code, status.HTTP_200_OK)
+
+    def start_on_manual_billing(self):
+        """A client who pays monthly: the project starts without any payment."""
+        self.campaign.payment_structure = Campaign.PaymentStructure.MANUAL
+        self.campaign.save()
+        res = self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_monthly_client_pays_part_of_the_balance_online_after_the_project_started(self):
+        self.start_on_manual_billing()
+        detail_url = reverse('campaign_detail', kwargs={'pk': self.campaign.id})
+        escrow = self.client.get(detail_url).data['escrow']
+        self.assertEqual((escrow['outstanding'], escrow['pay_online'], escrow['pay_online_test']), (Decimal('1000.00'), True, True))
+
+        # The amount is the client's choice here, but never more than is owed and never nonsense
+        for bad in ('1000.01', '0.50', '-5', 'abc', '12.345'):
+            self.assertEqual(self.open_bill(amount=bad).status_code, status.HTTP_400_BAD_REQUEST, bad)
+        self.assertEqual(self.gateway.bills, 0)
+
+        res = self.open_bill(amount='400.00')
+        self.assertEqual((res.status_code, res.data['amount']), (status.HTTP_201_CREATED, Decimal('400.00')))
+        self.assertEqual(self.gateway.last_bill_data['billAmount'], 40000)
+
+        self.gateway.payment_status, self.gateway.paid_amount = '1', '400.00'
+        self.callback()
+        verify = self.client.post(reverse('toyyibpay_verify'), {'billcode': 'BILL1'}, format='json')
+        self.assertEqual((verify.data['status'], verify.data['needs_confirmation']), ('SUCCESS', False))
+        escrow = self.client.get(detail_url).data['escrow']
+        self.assertEqual((escrow['client_paid'], escrow['outstanding'], escrow['collected']), (Decimal('400.00'), Decimal('600.00'), Decimal('360.00')))
+        self.assertIn('RM 600.00 of the project fee is still outstanding', mail.outbox[-1].body)
+
+        # No amount given: the rest of what's owed
+        self.gateway.payment_status = '2'
+        self.assertEqual(self.open_bill().data['amount'], Decimal('600.00'))
+
+    def test_upfront_project_cannot_be_part_paid_to_start_it(self):
+        res = self.open_bill(amount='10.00')
+        self.assertEqual(self.gateway.last_bill_data['billAmount'], 100000)
+        self.assertEqual(res.data['amount'], Decimal('1000.00'))
+
+    def test_started_project_can_be_invoiced_for_its_balance(self):
+        self.start_on_manual_billing()
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(reverse('request_invoice', kwargs={'campaign_id': self.campaign.id}))
+        self.assertEqual((res.status_code, res.data['outstanding']), (status.HTTP_200_OK, Decimal('1000.00')))
 
     def test_payment_for_the_wrong_amount_is_not_counted(self):
         self.open_bill()

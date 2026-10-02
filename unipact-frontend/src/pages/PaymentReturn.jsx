@@ -41,11 +41,17 @@ const PaymentReturn = () => {
       setResult(data);
 
       if (data?.status === 'SUCCESS') {
-        try {
-          await api.post(`/campaigns/${data.campaign_id}/finalize/`, { mock_pay: false });
-          showToast(`${data.test_mode ? 'Test payment' : 'Payment'} received and match confirmed. Your student team can start work now.`, 'success');
-        } catch {
-          showToast('Payment received. Open the project to confirm your match.', 'success');
+        const received = `${data.test_mode ? 'Test payment' : 'Payment'} of ${formatMoney(data.amount)} received`;
+        if (data.needs_confirmation) {
+          try {
+            await api.post(`/campaigns/${data.campaign_id}/finalize/`, { mock_pay: false });
+            showToast(`${received} and match confirmed. Your student team can start work now.`, 'success');
+          } catch {
+            showToast(`${received}. Open the project to confirm your match.`, 'success');
+          }
+        } else {
+          // A payment towards a project that has already started: nothing to confirm
+          showToast(`${received}. Thank you!`, 'success');
         }
         navigate(`/manage-campaign/${data.campaign_id}`, { replace: true });
       } else {

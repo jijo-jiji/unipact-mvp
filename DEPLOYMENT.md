@@ -50,6 +50,14 @@ A sandbox payment is fake money but still marks its project as paid. That is why
 
 If the key is missing or wrong, clients can still choose *Pay by bank transfer instead*, which works as below. `CRITICAL` entries in the admin System Logs mean a payment needs a human: an amount that didn't match, or a client who paid twice and needs a refund.
 
+### Clients who pay later or monthly
+
+Some clients can't pay the whole fee before work starts, for example a company that pays its suppliers on the 30th.
+
+1. As admin, open *Matchmaking*, select the project, and under *Billing & escrow* set **Payment structure** to *Manual - UniPact invoices and records payments* **before** the client confirms. They can then confirm the match without paying, and the project starts.
+2. The client's project page shows **"RM … still to pay"** with a **Pay now** button. They can pay the whole balance or any part of it by FPX, as often as they like, or ask for a bank-transfer invoice for the balance. Each payment is receipted and listed under *Billing & escrow*.
+3. Students are only ever paid from money UniPact has received: a milestone can't be approved until enough has been paid in. If the client tries, they are told how much is missing and offered *Pay now*.
+
 ### Paying by bank transfer
 
 The demo card checkout is **switched off in production** (`MOCK_PAYMENTS_ENABLED`; the API refuses to start if it is on). When a client picks *Pay by bank transfer instead*, or ToyyibPay isn't configured:

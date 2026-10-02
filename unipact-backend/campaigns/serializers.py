@@ -187,7 +187,13 @@ class CampaignDetailSerializer(CampaignSerializer):
         if not request or not can_view_workspace(request.user, obj) or request.user.role == 'STUDENT':
             return None
         from .utils import escrow_summary
-        return escrow_summary(obj)
+        from payments import toyyibpay
+        return {
+            **escrow_summary(obj),
+            # Whether this viewer can pay the balance online right now, so the page knows to offer "Pay now"
+            'pay_online': toyyibpay.is_available_to(request.user),
+            'pay_online_test': toyyibpay.is_sandbox(),
+        }
 
     def get_report_url(self, obj):
         request = self.context.get('request')

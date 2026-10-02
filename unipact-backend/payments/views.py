@@ -25,6 +25,8 @@ from . import toyyibpay
 
 logger = logging.getLogger(__name__)
 
+MIN_ONLINE_PAYMENT = Decimal('1.00')  # FPX's minimum
+
 
 def online_payments_unavailable():
     return Response({
@@ -407,9 +409,17 @@ def _owned_campaign(request, campaign_id):
     return get_object_or_404(Campaign, pk=campaign_id, company=company), None
 
 
+def _balance_payable(campaign):
+    """A project that has already started (billed manually, e.g. a client who pays monthly) can be paid
+    towards at any time, in full or in part, until nothing is outstanding."""
+    return campaign.is_match_finalized and campaign.status in (Campaign.Status.IN_PROGRESS, Campaign.Status.COMPLETED)
+
+
 class ToyyibPayCreateBillView(APIView):
-    """POST {campaign_id, phone}: open (or reuse) an FPX bill for what the client still owes on a project.
-    The amount always comes from the server, never from the browser."""
+    """POST {campaign_id, phone, amount?}: open (or reuse) an FPX bill for what the client still owes.
+
+    To confirm a match the bill is always for the full outstanding fee. On a project that has already
+    started the client may choose a part payment; the server caps it at what is outstanding."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -421,16 +431,18 @@ class ToyyibPayCreateBillView(APIView):
         campaign, error = _owned_campaign(request, request.data.get('campaign_id'))
         if error:
             return error
-        # Only take money for a project that can actually start once it's paid
-        if campaign.status != Campaign.Status.MATCHED or campaign.is_match_finalized:
-            return Response({"error": "This project isn't waiting for payment."}, status=status.HTTP_400_BAD_REQUEST)
-        if campaign.has_pending_offers() or not campaign.assigned_students.exists():
-            return Response({"error": "Your student team hasn't accepted yet. You can pay once they do."}, status=status.HTTP_400_BAD_REQUEST)
-        if not campaign.milestones.exists():
-            return Response({"error": "UniPact hasn't set up a milestone plan for this project yet. Contact your account manager."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        if campaign.payment_structure != Campaign.PaymentStructure.UPFRONT:
-            return Response({"error": "UniPact invoices this project separately."}, status=status.HTTP_400_BAD_REQUEST)
+        balance_payment = _balance_payable(campaign)
+        if not balance_payment:
+            # Only take money for a project that can actually start once it's paid
+            if campaign.status != Campaign.Status.MATCHED or campaign.is_match_finalized:
+                return Response({"error": "This project isn't waiting for payment."}, status=status.HTTP_400_BAD_REQUEST)
+            if campaign.has_pending_offers() or not campaign.assigned_students.exists():
+                return Response({"error": "Your student team hasn't accepted yet. You can pay once they do."}, status=status.HTTP_400_BAD_REQUEST)
+            if not campaign.milestones.exists():
+                return Response({"error": "UniPact hasn't set up a milestone plan for this project yet. Contact your account manager."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if campaign.payment_structure != Campaign.PaymentStructure.UPFRONT:
+                return Response({"error": "UniPact invoices this project separately."}, status=status.HTTP_400_BAD_REQUEST)
 
         phone = re.sub(r'[\s()+-]', '', str(request.data.get('phone') or ''))
         if not re.fullmatch(r'\d{9,15}', phone):
@@ -453,16 +465,27 @@ class ToyyibPayCreateBillView(APIView):
         if outstanding <= 0:
             return Response({"status": "paid", "outstanding": "0.00"})
 
+        amount = outstanding
+        if balance_payment and request.data.get('amount') not in (None, ''):
+            try:
+                amount = Decimal(str(request.data.get('amount')))
+            except (InvalidOperation, TypeError):
+                amount = None
+            if amount is None or not amount.is_finite() or amount != amount.quantize(Decimal('0.01')) or amount < MIN_ONLINE_PAYMENT:
+                return Response({"error": f"Enter an amount of at least RM {MIN_ONLINE_PAYMENT}, e.g. 1500.00."}, status=status.HTTP_400_BAD_REQUEST)
+            if amount > outstanding:
+                return Response({"error": f"Only RM {outstanding} is outstanding on this project."}, status=status.HTTP_400_BAD_REQUEST)
+
         # Reuse a recent unpaid bill for the same amount instead of opening a second one
         still_valid_after = timezone.now() - timedelta(days=settings.TOYYIBPAY_BILL_EXPIRY_DAYS) + timedelta(hours=2)
         reusable = open_bills.filter(
-            amount=outstanding, created_at__gte=still_valid_after, is_test=toyyibpay.is_sandbox(),
+            amount=amount, created_at__gte=still_valid_after, is_test=toyyibpay.is_sandbox(),
         ).exclude(provider_bill_code='').first()
         if reusable:
             return Response({"payment_url": toyyibpay.payment_url(reusable.provider_bill_code, reusable.is_test), "transaction_id": reusable.id, "amount": reusable.amount})
 
         tx = Transaction.objects.create(
-            company=campaign.company, related_campaign=campaign, amount=outstanding,
+            company=campaign.company, related_campaign=campaign, amount=amount,
             transaction_type=Transaction.Type.PROJECT_FEE, status=Transaction.Status.PENDING,
             provider=Transaction.Provider.TOYYIBPAY, is_test=toyyibpay.is_sandbox(),
         )
@@ -482,7 +505,7 @@ class ToyyibPayCreateBillView(APIView):
 
         tx.provider_bill_code = bill_code
         tx.save(update_fields=['provider_bill_code'])
-        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO, f"ToyyibPay bill {bill_code} opened: RM {outstanding} for '{campaign.title}'")
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO, f"ToyyibPay bill {bill_code} opened: RM {amount} for '{campaign.title}'")
         return Response({"payment_url": toyyibpay.payment_url(bill_code, tx.is_test), "transaction_id": tx.id, "amount": tx.amount},
                         status=status.HTTP_201_CREATED)
 
@@ -525,8 +548,11 @@ class ToyyibPayVerifyView(APIView):
             tx = toyyibpay.settle(tx)
         except toyyibpay.ToyyibPayError:
             pass  # reported as still pending; the callback or a later check will settle it
+        campaign = tx.related_campaign
         return Response({"status": tx.status, "campaign_id": tx.related_campaign_id, "amount": tx.amount,
-                         "reference": tx.reference, "test_mode": tx.is_test})
+                         "reference": tx.reference, "test_mode": tx.is_test,
+                         # False for a payment towards a project that has already started
+                         "needs_confirmation": bool(campaign and campaign.status == Campaign.Status.MATCHED and not campaign.is_match_finalized)})
 
 
 class RequestInvoiceView(APIView):
@@ -540,7 +566,7 @@ class RequestInvoiceView(APIView):
         if error:
             return error
         outstanding = campaign.budget - paid_project_fees(campaign)
-        if campaign.status != Campaign.Status.MATCHED or outstanding <= 0:
+        if outstanding <= 0 or not (campaign.status == Campaign.Status.MATCHED or _balance_payable(campaign)):
             return Response({"error": "There's nothing to invoice on this project."}, status=status.HTTP_400_BAD_REQUEST)
         invoice = request_bank_transfer(campaign, outstanding)
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO,
