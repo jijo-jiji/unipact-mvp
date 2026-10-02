@@ -134,6 +134,15 @@ def callback_signature_valid(data, test=None):
     return hmac.compare_digest(expected, str(data.get('hash', '')))
 
 
+def locked_transactions():
+    """Transactions locked for update, with the related rows settle() needs. The lock must name only the
+    transaction (of='self'): related_campaign is nullable, so it is a LEFT OUTER JOIN, and PostgreSQL
+    refuses a plain FOR UPDATE across one. SQLite ignores row locks, so only PostgreSQL shows the difference."""
+    from .models import Transaction
+
+    return Transaction.objects.select_for_update(of=('self',)).select_related('company__user', 'related_campaign')
+
+
 def settle(transaction_obj):
     """Ask ToyyibPay what happened to this transaction's bill and record the outcome. Idempotent: safe to
     call from the callback, the return page and a retry at the same time. Returns the fresh transaction."""
@@ -150,7 +159,7 @@ def settle(transaction_obj):
             if str(r.get('billExternalReferenceNo', '')) == order_reference(transaction_obj)]
 
     with db_transaction.atomic():
-        tx = Transaction.objects.select_for_update().select_related('company__user', 'related_campaign').get(pk=transaction_obj.pk)
+        tx = locked_transactions().get(pk=transaction_obj.pk)
         if tx.status != Transaction.Status.PENDING:
             return tx
 

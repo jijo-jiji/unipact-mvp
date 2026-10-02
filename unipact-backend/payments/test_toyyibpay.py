@@ -50,6 +50,29 @@ class FakeToyyibPay:
         return [data for endpoint, data in self.calls if endpoint == 'createBill'][-1]
 
 
+class PostgresLockingTests(APITestCase):
+    """Tests run on SQLite, which ignores row locks, so compile the locking queries as PostgreSQL would see
+    them. A plain FOR UPDATE across a nullable relation is an error there, and it once stopped every online
+    payment from being recorded in production."""
+
+    def postgres_sql(self, queryset):
+        from django.db.backends.postgresql.base import DatabaseWrapper
+
+        postgres = DatabaseWrapper({
+            'NAME': 'x', 'USER': '', 'PASSWORD': '', 'HOST': '', 'PORT': '', 'OPTIONS': {}, 'TIME_ZONE': None,
+            'CONN_MAX_AGE': 0, 'CONN_HEALTH_CHECKS': False, 'AUTOCOMMIT': True, 'ATOMIC_REQUESTS': False, 'TEST': {},
+        }, alias='postgres-sql-only')
+        postgres.get_autocommit = lambda: False  # compile as if inside a transaction; nothing connects
+        return queryset.query.get_compiler(connection=postgres).as_sql()[0]
+
+    def test_settling_a_payment_locks_only_the_transaction_row(self):
+        from payments import toyyibpay
+
+        sql = self.postgres_sql(toyyibpay.locked_transactions().filter(pk=1))
+        self.assertIn('LEFT OUTER JOIN', sql)  # the nullable project relation that a bare FOR UPDATE can't cover
+        self.assertTrue(sql.endswith('FOR UPDATE OF "payments_transaction"'), sql[-80:])
+
+
 @override_settings(**TOYYIBPAY)
 class ToyyibPayProjectFeeTests(APITestCase):
     def setUp(self):
