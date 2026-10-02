@@ -43,7 +43,7 @@ const PaymentReturn = () => {
       if (data?.status === 'SUCCESS') {
         try {
           await api.post(`/campaigns/${data.campaign_id}/finalize/`, { mock_pay: false });
-          showToast('Payment received and match confirmed. Your student team can start work now.', 'success');
+          showToast(`${data.test_mode ? 'Test payment' : 'Payment'} received and match confirmed. Your student team can start work now.`, 'success');
         } catch {
           showToast('Payment received. Open the project to confirm your match.', 'success');
         }

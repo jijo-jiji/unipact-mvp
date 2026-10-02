@@ -10,8 +10,8 @@ from campaigns.models import Campaign
 from payments.models import Transaction
 from users.models import CompanyProfile, StudentProfile, User
 
-TOYYIBPAY = dict(TOYYIBPAY_SECRET_KEY='sk-test', TOYYIBPAY_CATEGORY_CODE='cat123', MOCK_PAYMENTS_ENABLED=False,
-                 TOYYIBPAY_BASE_URL='https://dev.toyyibpay.com')
+TOYYIBPAY = dict(TOYYIBPAY_MODE='sandbox', TOYYIBPAY_SANDBOX_SECRET_KEY='sk-test', TOYYIBPAY_SANDBOX_CATEGORY_CODE='cat123',
+                 TOYYIBPAY_LIVE_SECRET_KEY='sk-live', TOYYIBPAY_LIVE_CATEGORY_CODE='catlive', MOCK_PAYMENTS_ENABLED=False)
 
 
 class FakeToyyibPay:
@@ -19,6 +19,7 @@ class FakeToyyibPay:
 
     def __init__(self):
         self.calls = []
+        self.urls = []
         self.bills = 0
         self.payment_status = '2'  # pending until a test says otherwise
         self.paid_amount = '1000.00'
@@ -27,6 +28,7 @@ class FakeToyyibPay:
     def __call__(self, url, data=None, timeout=None):
         endpoint = url.rsplit('/', 1)[-1]
         self.calls.append((endpoint, dict(data)))
+        self.urls.append(url)
         response = mock.Mock()
         if endpoint == 'createBill':
             if self.create_error:
@@ -107,7 +109,8 @@ class ToyyibPayProjectFeeTests(APITestCase):
         self.callback()
         self.callback()  # ToyyibPay may call more than once
         tx.refresh_from_db()
-        self.assertEqual((tx.status, tx.reference), (Transaction.Status.SUCCESS, 'FPX TP2609300001'))
+        self.assertEqual((tx.status, tx.reference, tx.is_test), (Transaction.Status.SUCCESS, 'TEST FPX TP2609300001', True))
+        self.assertIn('TEST payment', mail.outbox[0].body)
         self.assertIsNotNone(tx.paid_at)
         self.assertEqual(Transaction.objects.filter(related_campaign=self.campaign, status='SUCCESS').count(), 1)
         self.assertEqual([m.subject for m in mail.outbox], ['Payment receipt | UniPact'])
@@ -168,7 +171,40 @@ class ToyyibPayProjectFeeTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn('admin@x.my', mail.outbox[0].to + mail.outbox[0].bcc)
 
-    @override_settings(TOYYIBPAY_SECRET_KEY='')
+    @override_settings(TOYYIBPAY_MODE='live')
+    def test_live_mode_uses_the_live_account(self):
+        res = self.open_bill()
+        self.assertEqual(res.data['payment_url'], 'https://toyyibpay.com/BILL1')
+        self.assertEqual(self.gateway.urls[-1], 'https://toyyibpay.com/index.php/api/createBill')
+        self.assertEqual((self.gateway.last_bill_data['userSecretKey'], self.gateway.last_bill_data['categoryCode']), ('sk-live', 'catlive'))
+        self.gateway.payment_status = '1'
+        self.callback()
+        tx = Transaction.objects.get(provider_bill_code='BILL1')
+        self.assertEqual((tx.status, tx.reference, tx.is_test), (Transaction.Status.SUCCESS, 'FPX TP2609300001', False))
+
+    def test_sandbox_bill_is_still_checked_on_the_sandbox_after_going_live(self):
+        self.open_bill()
+        self.gateway.payment_status = '1'
+        with override_settings(TOYYIBPAY_MODE='live'):
+            self.callback()
+        self.assertEqual(self.gateway.urls[-1], 'https://dev.toyyibpay.com/index.php/api/getBillTransactions')
+        self.assertTrue(Transaction.objects.get(provider_bill_code='BILL1').is_test)
+
+    @override_settings(IS_PRODUCTION=True, TOYYIBPAY_SANDBOX_TESTERS=['tester@x.com'])
+    def test_on_the_live_site_only_named_testers_can_make_sandbox_payments(self):
+        finalize_url = reverse('finalize_match', kwargs={'campaign_id': self.campaign.id})
+        self.assertEqual(self.client.post(finalize_url, {}, format='json').data['payment_method'], 'bank_transfer')
+        self.assertEqual(self.open_bill().status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(self.gateway.bills, 0)
+
+        with override_settings(TOYYIBPAY_SANDBOX_TESTERS=['co@x.com']):
+            res = self.client.post(finalize_url, {}, format='json')
+            self.assertEqual((res.data['payment_method'], res.data['test_mode']), ('toyyibpay', True))
+            self.assertEqual(self.open_bill().status_code, status.HTTP_201_CREATED)
+        with override_settings(TOYYIBPAY_MODE='live'):  # real money: open to every client
+            self.assertEqual(self.client.post(finalize_url, {}, format='json').data['payment_method'], 'toyyibpay')
+
+    @override_settings(TOYYIBPAY_SANDBOX_SECRET_KEY='')
     def test_without_toyyibpay_keys_online_payment_is_off(self):
         self.assertEqual(self.open_bill().status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         res = self.client.post(reverse('finalize_match', kwargs={'campaign_id': self.campaign.id}), {}, format='json')

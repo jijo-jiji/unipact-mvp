@@ -928,6 +928,7 @@ const AdminDashboard = () => {
                             <li key={p.id} className="py-2 flex justify-between gap-3">
                               <span className="min-w-0">
                                 {formatDate(p.created_at)} · <span className="font-mono text-xs">{p.reference || `TX-${p.id}`}</span>
+                                {p.is_test && <span className="ml-2 badge bg-amber-50 border-amber-200 text-amber-800 text-[10px]">Test, no real money</span>}
                               </span>
                               <strong className="text-[#0B1E63] whitespace-nowrap">{formatMoney(p.amount)}</strong>
                             </li>

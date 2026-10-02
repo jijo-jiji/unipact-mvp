@@ -393,7 +393,7 @@ class ToyyibPayCreateBillView(APIView):
     def post(self, request):
         from campaigns.utils import paid_project_fees
 
-        if not toyyibpay.is_enabled():
+        if not toyyibpay.is_available_to(request.user):
             return Response({"error": "Online payment isn't available yet. Request an invoice to pay by bank transfer.",
                              "code": "online_payments_unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         campaign, error = _owned_campaign(request, request.data.get('campaign_id'))
@@ -433,14 +433,16 @@ class ToyyibPayCreateBillView(APIView):
 
         # Reuse a recent unpaid bill for the same amount instead of opening a second one
         still_valid_after = timezone.now() - timedelta(days=settings.TOYYIBPAY_BILL_EXPIRY_DAYS) + timedelta(hours=2)
-        reusable = open_bills.filter(amount=outstanding, created_at__gte=still_valid_after).exclude(provider_bill_code='').first()
+        reusable = open_bills.filter(
+            amount=outstanding, created_at__gte=still_valid_after, is_test=toyyibpay.is_sandbox(),
+        ).exclude(provider_bill_code='').first()
         if reusable:
-            return Response({"payment_url": toyyibpay.payment_url(reusable.provider_bill_code), "transaction_id": reusable.id, "amount": reusable.amount})
+            return Response({"payment_url": toyyibpay.payment_url(reusable.provider_bill_code, reusable.is_test), "transaction_id": reusable.id, "amount": reusable.amount})
 
         tx = Transaction.objects.create(
             company=campaign.company, related_campaign=campaign, amount=outstanding,
             transaction_type=Transaction.Type.PROJECT_FEE, status=Transaction.Status.PENDING,
-            provider=Transaction.Provider.TOYYIBPAY,
+            provider=Transaction.Provider.TOYYIBPAY, is_test=toyyibpay.is_sandbox(),
         )
         callback_path = reverse('toyyibpay_callback')
         callback_url = f'{settings.API_PUBLIC_URL}{callback_path}' if settings.API_PUBLIC_URL else request.build_absolute_uri(callback_path)
@@ -459,7 +461,7 @@ class ToyyibPayCreateBillView(APIView):
         tx.provider_bill_code = bill_code
         tx.save(update_fields=['provider_bill_code'])
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO, f"ToyyibPay bill {bill_code} opened: RM {outstanding} for '{campaign.title}'")
-        return Response({"payment_url": toyyibpay.payment_url(bill_code), "transaction_id": tx.id, "amount": tx.amount},
+        return Response({"payment_url": toyyibpay.payment_url(bill_code, tx.is_test), "transaction_id": tx.id, "amount": tx.amount},
                         status=status.HTTP_201_CREATED)
 
 
@@ -473,11 +475,11 @@ class ToyyibPayCallbackView(APIView):
     def post(self, request):
         bill_code = str(request.data.get('billcode') or '')[:40]
         tx = None
-        if toyyibpay.is_enabled() and bill_code:
+        if bill_code:
             tx = Transaction.objects.filter(provider=Transaction.Provider.TOYYIBPAY, provider_bill_code=bill_code).first()
         if tx is None:
             return HttpResponse('OK')
-        if not toyyibpay.callback_signature_valid(request.data):
+        if not toyyibpay.callback_signature_valid(request.data, test=tx.is_test):
             logger.warning('ToyyibPay callback for bill %s has an invalid signature; checking with ToyyibPay directly', bill_code)
         try:
             toyyibpay.settle(tx)
@@ -501,7 +503,8 @@ class ToyyibPayVerifyView(APIView):
             tx = toyyibpay.settle(tx)
         except toyyibpay.ToyyibPayError:
             pass  # reported as still pending; the callback or a later check will settle it
-        return Response({"status": tx.status, "campaign_id": tx.related_campaign_id, "amount": tx.amount, "reference": tx.reference})
+        return Response({"status": tx.status, "campaign_id": tx.related_campaign_id, "amount": tx.amount,
+                         "reference": tx.reference, "test_mode": tx.is_test})
 
 
 class RequestInvoiceView(APIView):

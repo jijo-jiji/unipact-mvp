@@ -491,7 +491,7 @@ class FinalizeMatchView(APIView):
                 else:
                     from payments import toyyibpay
                     # ToyyibPay (FPX) when configured; the client can still ask for an invoice instead
-                    payment_method = 'toyyibpay' if toyyibpay.is_enabled() else 'card' if settings.MOCK_PAYMENTS_ENABLED else 'bank_transfer'
+                    payment_method = 'toyyibpay' if toyyibpay.is_available_to(request.user) else 'card' if settings.MOCK_PAYMENTS_ENABLED else 'bank_transfer'
                     if payment_method == 'bank_transfer' and is_owner:
                         from users.models import SystemLog
                         from users.utils import log_event
@@ -502,6 +502,7 @@ class FinalizeMatchView(APIView):
                         "status": "payment_required",
                         "project_fee": outstanding,
                         "payment_method": payment_method,
+                        "test_mode": payment_method == 'toyyibpay' and toyyibpay.is_sandbox(),
                         "message": "Full project fee payment required to finalize match."
                     }, status=status.HTTP_402_PAYMENT_REQUIRED)
 

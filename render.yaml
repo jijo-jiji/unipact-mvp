@@ -73,12 +73,19 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
-      # ToyyibPay (FPX). Leave the key empty to keep bank-transfer-only billing
-      - key: TOYYIBPAY_SECRET_KEY
+      # ToyyibPay (FPX). Both accounts' keys are kept; TOYYIBPAY_MODE (sandbox | live) picks one.
+      # Leave the keys empty to keep bank-transfer-only billing
+      - key: TOYYIBPAY_MODE
+        value: sandbox
+      - key: TOYYIBPAY_SANDBOX_SECRET_KEY
         sync: false
-      - key: TOYYIBPAY_CATEGORY_CODE
+      - key: TOYYIBPAY_SANDBOX_CATEGORY_CODE
         sync: false
-      - key: TOYYIBPAY_BASE_URL
-        value: https://dev.toyyibpay.com
+      - key: TOYYIBPAY_LIVE_SECRET_KEY
+        sync: false
+      - key: TOYYIBPAY_LIVE_CATEGORY_CODE
+        sync: false
+      - key: TOYYIBPAY_SANDBOX_TESTERS
+        sync: false
       - key: API_PUBLIC_URL
         value: https://api.unipact.my

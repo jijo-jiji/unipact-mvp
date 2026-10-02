@@ -6,7 +6,7 @@ import { formatMoney, getErrorMessage } from '../utils/format';
 
 // Pays a project fee through ToyyibPay (FPX online banking). The server works out the amount and opens
 // the bill; this only collects a phone number for the FPX receipt and sends the client to their bank.
-const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, onPaid, onInvoiceRequested }) => {
+const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, onPaid, onInvoiceRequested }) => {
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(null); // 'pay' | 'invoice'
   const [error, setError] = useState('');
@@ -52,6 +52,11 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, onPaid, onInvoi
       title="Pay the project fee" subtitle={campaign?.title} icon={<Landmark size={20} />}>
       <form onSubmit={pay} className="space-y-5">
         {error && <div className="alert-error"><span>{error}</span></div>}
+        {testMode && (
+          <p className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+            <strong>Test mode.</strong> This uses ToyyibPay&apos;s sandbox bank: no real money moves, and the payment is marked TEST.
+          </p>
+        )}
 
         <div className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex items-center justify-between gap-4">
           <span className="text-sm text-[#5B6478]">Amount due</span>

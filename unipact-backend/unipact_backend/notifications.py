@@ -394,6 +394,8 @@ def payment_receipt(transaction_obj, outstanding=None):
     else:
         kind = "Finder's fee"
     lines = [f'Thanks, {company.company_name}. We received your payment.']
+    if transaction_obj.is_test:
+        lines = ['This was a TEST payment through the ToyyibPay sandbox. No real money was received.']
     if outstanding is not None and outstanding > 0:
         lines.append(f'RM {outstanding} of the project fee is still outstanding.')
     elif campaign and campaign.status == 'MATCHED' and not campaign.is_match_finalized:

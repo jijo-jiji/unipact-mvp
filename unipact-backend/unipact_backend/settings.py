@@ -213,13 +213,20 @@ MOCK_PAYMENTS_ENABLED = env_bool('MOCK_PAYMENTS_ENABLED', default=not IS_PRODUCT
 if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
     raise ImproperlyConfigured('MOCK_PAYMENTS_ENABLED must be false in production: the demo checkout collects no money.')
 
-# ToyyibPay (FPX online banking). Online payment is offered only when both the secret key and a category
-# code are set; otherwise clients pay by bank transfer against an invoice. Keep the key in the host's
-# environment settings only. The base URL defaults to the sandbox so a key can never charge real money
-# by accident: set it to https://toyyibpay.com to go live.
-TOYYIBPAY_SECRET_KEY = os.getenv('TOYYIBPAY_SECRET_KEY', '')
-TOYYIBPAY_CATEGORY_CODE = os.getenv('TOYYIBPAY_CATEGORY_CODE', '')
-TOYYIBPAY_BASE_URL = os.getenv('TOYYIBPAY_BASE_URL', 'https://dev.toyyibpay.com').rstrip('/')
+# ToyyibPay (FPX online banking). The sandbox (dev.toyyibpay.com) and live (toyyibpay.com) accounts each
+# have their own key and category; keep both pairs in the host's environment settings and switch with
+# TOYYIBPAY_MODE. It defaults to "sandbox" so nothing charges real money until you choose "live".
+# Online payment is offered only when the active pair is set; otherwise clients pay by bank transfer.
+TOYYIBPAY_MODE = os.getenv('TOYYIBPAY_MODE', 'sandbox').strip().lower()
+if TOYYIBPAY_MODE not in ('sandbox', 'live'):
+    raise ImproperlyConfigured('TOYYIBPAY_MODE must be "sandbox" or "live".')
+TOYYIBPAY_SANDBOX_SECRET_KEY = os.getenv('TOYYIBPAY_SANDBOX_SECRET_KEY', '').strip()
+TOYYIBPAY_SANDBOX_CATEGORY_CODE = os.getenv('TOYYIBPAY_SANDBOX_CATEGORY_CODE', '').strip()
+# TOYYIBPAY_SECRET_KEY / TOYYIBPAY_CATEGORY_CODE are the original names and are treated as the live pair
+TOYYIBPAY_LIVE_SECRET_KEY = (os.getenv('TOYYIBPAY_LIVE_SECRET_KEY') or os.getenv('TOYYIBPAY_SECRET_KEY', '')).strip()
+TOYYIBPAY_LIVE_CATEGORY_CODE = (os.getenv('TOYYIBPAY_LIVE_CATEGORY_CODE') or os.getenv('TOYYIBPAY_CATEGORY_CODE', '')).strip()
+# Sandbox payments are fake money, so in production only these accounts (emails, comma separated) may make them
+TOYYIBPAY_SANDBOX_TESTERS = [email.lower() for email in env_list('TOYYIBPAY_SANDBOX_TESTERS')]
 # Corporate FPX (B2B) lets companies pay above the RM 30,000 personal FPX limit; the fee is charged to UniPact
 TOYYIBPAY_ENABLE_FPX_B2B = env_bool('TOYYIBPAY_ENABLE_FPX_B2B', default=True)
 TOYYIBPAY_BILL_EXPIRY_DAYS = int(os.getenv('TOYYIBPAY_BILL_EXPIRY_DAYS', '3'))

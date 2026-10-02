@@ -61,7 +61,7 @@ def escrow_summary(campaign):
         'client_paid': paid,
         'outstanding': max(campaign.budget - paid, Decimal('0.00')),
         'payments': [
-            {'id': p.id, 'amount': p.amount, 'reference': p.reference, 'created_at': p.created_at}
+            {'id': p.id, 'amount': p.amount, 'reference': p.reference, 'created_at': p.created_at, 'is_test': p.is_test}
             for p in payments
         ],
     }

@@ -45,6 +45,8 @@ class Transaction(models.Model):
     provider = models.CharField(max_length=20, choices=Provider.choices, blank=True)
     # The payment gateway's id for this payment (a ToyyibPay BillCode)
     provider_bill_code = models.CharField(max_length=40, blank=True, db_index=True)
+    # Paid through the gateway's sandbox: no real money was received
+    is_test = models.BooleanField(default=False)
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

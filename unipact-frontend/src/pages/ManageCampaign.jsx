@@ -72,7 +72,7 @@ const ManageCampaign = () => {
 
   const [payment, setPayment] = useState(null); // { amount, description, onPaid }
   const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
-  const [onlinePayment, setOnlinePayment] = useState(null); // amount due by FPX (ToyyibPay)
+  const [onlinePayment, setOnlinePayment] = useState(null); // { amount, testMode } due by FPX (ToyyibPay)
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
   const [asset, setAsset] = useState({ file: null, title: '', type: 'DOCUMENT' });
@@ -104,7 +104,7 @@ const ManageCampaign = () => {
       await fetchCampaign();
     } catch (error) {
       if (error.response?.status === 402 && error.response.data?.payment_method === 'toyyibpay') {
-        setOnlinePayment(error.response.data.project_fee ?? campaign.budget);
+        setOnlinePayment({ amount: error.response.data.project_fee ?? campaign.budget, testMode: Boolean(error.response.data.test_mode) });
       } else if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
         // No card checkout yet: UniPact's admins were emailed to send an invoice
         setInvoiceDue(error.response.data.project_fee ?? campaign.budget);
@@ -639,7 +639,8 @@ const ManageCampaign = () => {
         isOpen={onlinePayment !== null}
         onClose={() => setOnlinePayment(null)}
         campaign={campaign}
-        amount={onlinePayment}
+        amount={onlinePayment?.amount}
+        testMode={onlinePayment?.testMode}
         onPaid={() => {
           setOnlinePayment(null);
           finalizeMatch();

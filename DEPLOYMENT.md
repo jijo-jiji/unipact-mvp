@@ -32,10 +32,21 @@ Do these in order. Each step gives you a value the next one needs. Paste secrets
 
 Clients pay the project fee with FPX online banking (personal or corporate) through ToyyibPay. UniPact only records a payment after asking ToyyibPay directly that the bill was paid in full, so a faked callback or a tampered return link can't mark a project as paid. Student payouts stay manual: ToyyibPay has no payout API.
 
-1. **Test in the sandbox first.** Register a separate account at `https://dev.toyyibpay.com`, then create a category (*Category, Create Category*, e.g. "UniPact project fees") and copy its **Category Code**. Copy the **User Secret Key** from the dashboard.
-2. In Render, set `TOYYIBPAY_SECRET_KEY`, `TOYYIBPAY_CATEGORY_CODE`, `TOYYIBPAY_BASE_URL=https://dev.toyyibpay.com` and `API_PUBLIC_URL=https://api.unipact.my`. Online payment switches on as soon as both the key and category are set.
-3. Run a test payment: as a test client, *Confirm match*, then *Pay with FPX online banking*, and choose the sandbox bank. You should return to "Payment received and match confirmed", get a receipt email, and see the payment (reference `FPX …`) under *Billing & escrow*.
-4. **Go live** once ToyyibPay has verified your account: repeat step 1 on `https://toyyibpay.com`, then update the key, the category and `TOYYIBPAY_BASE_URL=https://toyyibpay.com` in Render. Until ToyyibPay verifies the account, money collected is held and not settled to your bank.
+The sandbox (`dev.toyyibpay.com`, fake money) and live (`toyyibpay.com`, real money) are separate ToyyibPay accounts, each with its own key and category. Both pairs stay in Render and `TOYYIBPAY_MODE` picks one, so switching never means re-pasting a key:
+
+| Variable | Value |
+|---|---|
+| `TOYYIBPAY_MODE` | `sandbox` (default) or `live` |
+| `TOYYIBPAY_SANDBOX_SECRET_KEY`, `TOYYIBPAY_SANDBOX_CATEGORY_CODE` | From the account you register at `https://dev.toyyibpay.com` |
+| `TOYYIBPAY_LIVE_SECRET_KEY`, `TOYYIBPAY_LIVE_CATEGORY_CODE` | From `https://toyyibpay.com` (the older names `TOYYIBPAY_SECRET_KEY` / `TOYYIBPAY_CATEGORY_CODE` still work as the live pair) |
+| `TOYYIBPAY_SANDBOX_TESTERS` | Emails of your test client accounts, comma separated |
+| `API_PUBLIC_URL` | `https://api.unipact.my` |
+
+1. **Sandbox:** register at `https://dev.toyyibpay.com`, create a category (*Category, Create Category*, e.g. "UniPact project fees"), and copy the **Category Code** and the **User Secret Key** into the two `SANDBOX` variables. Put your test client's email in `TOYYIBPAY_SANDBOX_TESTERS`.
+2. **Test payment:** as that test client, *Confirm match*, then *Pay with FPX online banking* (the dialog says "Test mode"), and choose the sandbox bank. You should return to "Test payment received and match confirmed", get a receipt marked TEST, and see the payment tagged *Test, no real money* under *Billing & escrow*.
+3. **Go live** once ToyyibPay has verified your account: set `TOYYIBPAY_MODE=live`. Until ToyyibPay verifies the account, money collected is held and not settled to your bank.
+
+A sandbox payment is fake money but still marks its project as paid. That is why, in sandbox mode on the live site, **only the accounts in `TOYYIBPAY_SANDBOX_TESTERS` are offered online payment**; every real client is offered bank transfer instead. Delete the test projects afterwards so nobody pays a student out of a fake payment.
 
 If the key is missing or wrong, clients can still choose *Pay by bank transfer instead*, which works as below. `CRITICAL` entries in the admin System Logs mean a payment needs a human: an amount that didn't match, or a client who paid twice and needs a refund.
 
