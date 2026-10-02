@@ -1,13 +1,15 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 
-// Public pages search engines may list. Signed-in areas are kept out via robots.txt.
-const PUBLIC_PATHS = ['/', '/register', '/register/company', '/register/student', '/login',
-  '/apply-software-developer', '/apply-digital-marketing', '/privacy', '/terms']
+// Search marketing lives on unipact.my; this app is the product and stays out of the index.
+// That is enforced by an `X-Robots-Tag: noindex, follow` header (see vercel.json), not by a
+// blanket robots.txt Disallow: a Disallow stops crawlers fetching the page at all, so Google
+// would never read the noindex and could still list these URLs from the links on unipact.my.
+// Crawling therefore stays allowed, `follow` lets link equity pass, and no sitemap is published.
 const PRIVATE_PATHS = ['/company/', '/campaign/', '/manage-campaign/', '/student/dashboard', '/quest', '/admin', '/settings', '/reset-password', '/join-club', '/verify-email', '/payment/return']
 
 // Link previews (WhatsApp, LinkedIn, Facebook) need absolute URLs, so the public site address is
-// injected at build time from VITE_SITE_URL, and robots.txt + sitemap.xml are generated to match.
+// injected at build time from VITE_SITE_URL.
 const seo = (siteUrl) => ({
   name: 'unipact-seo',
   transformIndexHtml: (html) => html.replaceAll('%SITE_URL%', siteUrl),
@@ -16,18 +18,8 @@ const seo = (siteUrl) => ({
       'User-agent: *',
       ...PRIVATE_PATHS.map((p) => `Disallow: ${p}`),
       'Allow: /',
-      siteUrl ? `Sitemap: ${siteUrl}/sitemap.xml` : '',
-    ].filter(Boolean).join('\n')
+    ].join('\n')
     this.emitFile({ type: 'asset', fileName: 'robots.txt', source: `${robots}\n` })
-
-    if (siteUrl) {
-      const urls = PUBLIC_PATHS.map((p) => `  <url><loc>${siteUrl}${p === '/' ? '/' : p}</loc></url>`).join('\n')
-      this.emitFile({
-        type: 'asset',
-        fileName: 'sitemap.xml',
-        source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
-      })
-    }
   },
 })
 
