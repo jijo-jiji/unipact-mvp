@@ -8,6 +8,7 @@ from .views import (
     ClaimProfileView, ClaimInvitePreviewView, ClubInviteDetailView, TransferOwnershipView,
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
     VerifyEmailView, ResendEmailVerificationView,
+    AgreementStatusView, AgreementAcceptView,
 )
 
 urlpatterns = [
@@ -18,6 +19,8 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
     path('me/', UserView.as_view(), name='me'),
+    path('agreements/', AgreementStatusView.as_view(), name='agreements'),
+    path('agreements/accept/', AgreementAcceptView.as_view(), name='agreement_accept'),
     path('me/settings/', AccountSettingsView.as_view(), name='account_settings'),
     path('password/change/', PasswordChangeView.as_view(), name='password_change'),
     path('password/forgot/', PasswordResetRequestView.as_view(), name='password_reset_request'),

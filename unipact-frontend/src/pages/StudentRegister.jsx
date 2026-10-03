@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
 import { MALAYSIAN_UNIVERSITIES } from '../utils/constants';
 import TermsConsent from '../components/TermsConsent';
+import { AGREEMENTS } from '../utils/agreements';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const StudentRegister = () => {
@@ -58,6 +59,8 @@ const StudentRegister = () => {
       payload.append('skills', JSON.stringify(skillsArray));
       if (docFile) payload.append('verification_doc', docFile);
       payload.append('accept_terms', acceptTerms ? 'true' : 'false');
+      // The consent box names the Talent Agreement; tell the server which version was on screen
+      if (acceptTerms) payload.append('talent_agreement_version', AGREEMENTS.TALENT.version);
 
       // Registration signs the user in (HttpOnly cookies) and updates auth state
       await registerStudent(payload);
@@ -169,7 +172,7 @@ const StudentRegister = () => {
             <p className="field-hint">PDF, PNG or JPG.</p>
           </div>
 
-          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} />
+          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} agreement={AGREEMENTS.TALENT} />
 
           <button type="submit" disabled={loading} className="btn-primary w-full py-3">
             {loading ? <><Loader2 size={16} className="animate-spin" /> Creating your account…</> : <>Create student account <ArrowRight size={16} /></>}

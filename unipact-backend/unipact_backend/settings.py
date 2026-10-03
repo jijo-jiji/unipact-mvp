@@ -213,6 +213,11 @@ MOCK_PAYMENTS_ENABLED = env_bool('MOCK_PAYMENTS_ENABLED', default=not IS_PRODUCT
 if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
     raise ImproperlyConfigured('MOCK_PAYMENTS_ENABLED must be false in production: the demo checkout collects no money.')
 
+# Whether students must have accepted the Talent Agreement before taking a job, and clients the Client
+# Service Agreement before confirming a team or paying (users/agreements.py). Off under the test runner
+# so unrelated tests don't each have to accept one; the agreement tests switch it on.
+AGREEMENTS_ENFORCED = env_bool('AGREEMENTS_ENFORCED', default=not TESTING)
+
 # ToyyibPay (FPX online banking). The sandbox (dev.toyyibpay.com) and live (toyyibpay.com) accounts each
 # have their own key and category; keep both pairs in the host's environment settings and switch with
 # TOYYIBPAY_MODE. It defaults to "sandbox" so nothing charges real money until you choose "live".

@@ -6,7 +6,8 @@ from rest_framework import status, generics, views, permissions
 from rest_framework.response import Response
 from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle, PasswordResetThrottle, PasswordChangeThrottle, EmailVerifyThrottle
 from unipact_backend import notifications
-from .utils import email_verification_path
+from .utils import email_verification_path, log_event
+from . import agreements
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, logout
 from django.db import transaction
@@ -126,6 +127,8 @@ def account_payload(user):
         "company_profile": company_profile_data,
         "club_profile": club_profile_data,
         "student_profile": student_profile_data,
+        # The Talent or Client Service Agreement, with whether this user has accepted the current version
+        "agreements": agreements.status_for(user),
         "club_membership": club_membership,
         "has_verification_document": bool(
             getattr(getattr(user, 'student_profile', None), 'verification_document', None)
@@ -933,10 +936,13 @@ class RegisterStudentView(generics.CreateAPIView):
                 profile.verification_document = doc
                 profile.save()
 
+            # The sign-up form names the Talent Agreement beside its consent box and sends the version it
+            # showed. An older cached form sends nothing, and that student is asked before their first job.
+            if str(request.data.get('talent_agreement_version') or '') == agreements.CURRENT_VERSIONS[agreements.TALENT]:
+                agreements.record_acceptance(user, agreements.TALENT)
+
         tokens = get_tokens_for_user(user)
 
-        from .models import SystemLog
-        from .utils import log_event
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Student Talent Joined: {full_name} ({university})")
         notifications.welcome(user, email_verification_path(user))
 
@@ -1148,3 +1154,29 @@ class AdminBlockUserView(views.APIView):
             return Response({"message": f"User {status_str} successfully", "is_active": user.is_active})
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AgreementStatusView(views.APIView):
+    """GET: the agreement that applies to the signed-in user and whether they have accepted the current version."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(agreements.status_for(request.user))
+
+
+class AgreementAcceptView(views.APIView):
+    """POST {agreement, version}: record that the signed-in user accepts the agreement they were shown."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        agreement = str(request.data.get('agreement') or '').upper()
+        if agreement != agreements.agreement_for(request.user):
+            return Response({"error": "That agreement doesn't apply to your account."}, status=status.HTTP_400_BAD_REQUEST)
+        # The version the user actually read must be the current one, so nobody accepts wording they weren't shown
+        if str(request.data.get('version') or '') != agreements.CURRENT_VERSIONS[agreement]:
+            return Response({"error": "This agreement has been updated. Please refresh the page and read the latest version.",
+                             "code": "agreement_outdated"}, status=status.HTTP_409_CONFLICT)
+        agreements.record_acceptance(request.user, agreement)
+        log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO,
+                  f"{request.user.email} accepted the {agreements.TITLES[agreement]} ({agreements.CURRENT_VERSIONS[agreement]})")
+        return Response(agreements.status_for(request.user))

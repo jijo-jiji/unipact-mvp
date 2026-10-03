@@ -62,6 +62,8 @@ const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.Priv
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
 const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
 const PaymentReturn = page(() => import('./pages/PaymentReturn'));
+const TalentAgreementPage = page(() => import('./pages/AgreementPages'), (m) => m.TalentAgreementPage);
+const ClientAgreementPage = page(() => import('./pages/AgreementPages'), (m) => m.ClientAgreementPage);
 
 function App() {
   return (
@@ -86,6 +88,8 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/agreements/talent" element={<TalentAgreementPage />} />
+          <Route path="/agreements/client" element={<ClientAgreementPage />} />
           {/* Verified Impact Ledger: public once published, previewable by its student/client/admin */}
           <Route path="/ledger/:slug" element={<ImpactLedgerPage />} />
 

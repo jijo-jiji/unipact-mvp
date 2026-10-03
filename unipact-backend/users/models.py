@@ -219,3 +219,24 @@ class SystemLog(models.Model):
 
     def __str__(self):
         return f"[{self.category}] {self.message}"
+
+
+class AgreementAcceptance(models.Model):
+    """A user's in-app acceptance of one version of the Talent or Client Service Agreement."""
+    class Agreement(models.TextChoices):
+        TALENT = 'TALENT', 'Talent Agreement'
+        CLIENT = 'CLIENT', 'Client Service Agreement'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agreement_acceptances')
+    agreement = models.CharField(max_length=20, choices=Agreement.choices)
+    version = models.CharField(max_length=40)
+    accepted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'agreement', 'version'], name='unique_agreement_acceptance'),
+        ]
+        ordering = ['-accepted_at']
+
+    def __str__(self):
+        return f"{self.user.email} accepted {self.agreement} {self.version}"

@@ -172,6 +172,18 @@ After deploying, paste your site link into the [LinkedIn Post Inspector](https:/
 
 ## 4. Legal pages: review before launch
 
+### Agreements accepted in the app
+
+Students accept the **Talent Agreement** (`/agreements/talent`) when they sign up, and clients accept the **Client Service Agreement** (`/agreements/client`) before they confirm a team, pay, or ask for an invoice. Anyone who hasn't accepted the current version (including accounts created before this existed) is shown it at that point and cannot continue until they accept. Each acceptance is stored with the account, the version and the time, and is listed read-only in the Django admin under *Agreement acceptances*.
+
+The wording on the site is the **draft of 29 September 2026**, still to be reviewed by a lawyer. To publish new wording:
+
+1. Edit the text in `unipact-frontend/src/pages/AgreementPages.jsx` (and the summary points in `src/utils/agreements.js`).
+2. Change the `version` and `versionLabel` in `src/utils/agreements.js`, and the matching entry in `CURRENT_VERSIONS` in `unipact-backend/users/agreements.py`. The two must be identical.
+3. Deploy. Everyone is then asked to accept the new version before their next job or payment; earlier acceptances stay on record.
+
+`AGREEMENTS_ENFORCED=false` in Render switches the requirement off without removing the pages (for example while wording is being corrected).
+
 `/privacy` and `/terms` are a **plain-language draft**, written for a Malaysian marketplace under the PDPA 2010. They are not legal advice. Before launch, have a lawyer review them and confirm these business decisions, which the draft assumes:
 
 - **Ownership of deliverables** passes to the client once the project is completed and paid for, unless agreed otherwise in writing.

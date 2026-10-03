@@ -31,6 +31,8 @@ const SiteFooter = () => (
         <ul className="space-y-1">
           <li><Link to="/privacy" className="inline-block py-1.5 hover:text-[#0A1748]">Privacy Policy</Link></li>
           <li><Link to="/terms" className="inline-block py-1.5 hover:text-[#0A1748]">Terms of Service</Link></li>
+          <li><Link to="/agreements/client" className="inline-block py-1.5 hover:text-[#0A1748]">Client Service Agreement</Link></li>
+          <li><Link to="/agreements/talent" className="inline-block py-1.5 hover:text-[#0A1748]">Talent Agreement</Link></li>
           <li><a href={`mailto:${LEGAL.contactEmail}`} className="inline-block py-1.5 hover:text-[#0A1748] break-all">Contact us</a></li>
         </ul>
       </nav>
