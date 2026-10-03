@@ -9,6 +9,8 @@ import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
 import PaymentModal from '../components/PaymentModal';
 import OnlinePaymentModal from '../components/OnlinePaymentModal';
+import AgreementModal from '../components/AgreementModal';
+import { agreementRequiredBy } from '../utils/agreements';
 import { downloadInvoice } from '../utils/invoices';
 import ImpactStatementCard from '../components/ImpactStatementCard';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -75,6 +77,7 @@ const ManageCampaign = () => {
   const [invoiceDue, setInvoiceDue] = useState(null); // amount UniPact will invoice for by bank transfer
   const [issuedInvoice, setIssuedInvoice] = useState(null); // emailed automatically when bank details are configured
   const [downloading, setDownloading] = useState(false);
+  const [agreementGate, setAgreementGate] = useState(null); // { agreement, retry }: accept it, then carry on
   const [onlinePayment, setOnlinePayment] = useState(null); // { amount, testMode, partial, online } due by FPX (ToyyibPay)
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [review, setReview] = useState({ isOpen: false, rating: 5, comment: '' });
@@ -106,7 +109,9 @@ const ManageCampaign = () => {
       showToast('Match confirmed. Your student team can start work now.', 'success');
       await fetchCampaign();
     } catch (error) {
-      if (error.response?.status === 402 && error.response.data?.payment_method === 'toyyibpay') {
+      if (agreementRequiredBy(error)) {
+        setAgreementGate({ agreement: agreementRequiredBy(error), retry: finalizeMatch });
+      } else if (error.response?.status === 402 && error.response.data?.payment_method === 'toyyibpay') {
         setOnlinePayment({ amount: error.response.data.project_fee ?? campaign.budget, testMode: Boolean(error.response.data.test_mode) });
       } else if (error.response?.status === 402 && error.response.data?.payment_method === 'bank_transfer') {
         // Bank transfer: the invoice is emailed straight away, or (without bank details set up) by an admin
@@ -735,6 +740,7 @@ const ManageCampaign = () => {
         testMode={onlinePayment?.testMode}
         allowPartial={Boolean(onlinePayment?.partial)}
         onlineAvailable={onlinePayment?.online !== false}
+        onAgreementRequired={(agreement) => setAgreementGate({ agreement })}
         onPaid={() => {
           const wasBalance = onlinePayment?.partial;
           setOnlinePayment(null);
@@ -754,6 +760,18 @@ const ManageCampaign = () => {
           }
         }}
       />
+
+      {agreementGate && (
+        <AgreementModal
+          agreement={agreementGate.agreement}
+          onClose={() => setAgreementGate(null)}
+          onAccepted={() => {
+            const { retry } = agreementGate;
+            setAgreementGate(null);
+            retry?.();
+          }}
+        />
+      )}
 
       <PaymentModal
         isOpen={!!payment}

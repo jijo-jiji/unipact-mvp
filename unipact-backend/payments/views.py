@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
+from users import agreements
 from campaigns.models import Campaign
 from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer, InvoiceSerializer
 from .models import Transaction, Subscription, Payout, Invoice
@@ -406,7 +407,10 @@ def _owned_campaign(request, campaign_id):
     company = getattr(request.user, 'company_profile', None) if request.user.role == User.Role.COMPANY else None
     if company is None:
         return None, Response({"error": "Only the client who owns this project can pay for it."}, status=status.HTTP_403_FORBIDDEN)
-    return get_object_or_404(Campaign, pk=campaign_id, company=company), None
+    campaign = get_object_or_404(Campaign, pk=campaign_id, company=company)
+    # No money goes into escrow, and no invoice goes out, before the client has accepted the agreement
+    agreements.require(request.user, agreements.CLIENT)
+    return campaign, None
 
 
 def _balance_payable(campaign):

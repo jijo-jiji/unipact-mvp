@@ -3,12 +3,13 @@ import { Landmark, Loader2, Lock, FileText } from 'lucide-react';
 import api from '../api/client';
 import Modal from './Modal';
 import { formatMoney, getErrorMessage } from '../utils/format';
+import { agreementRequiredBy } from '../utils/agreements';
 
 // Pays a project fee through ToyyibPay (FPX online banking). The server works out what is owed and opens
 // the bill; this collects a phone number for the FPX receipt and sends the client to their bank.
 // With allowPartial (a project that has already started, e.g. a client who pays monthly) the client may
 // pay part of the balance; the server caps the amount at what is outstanding.
-const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, allowPartial = false, onlineAvailable = true, onPaid, onInvoiceRequested }) => {
+const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, allowPartial = false, onlineAvailable = true, onPaid, onInvoiceRequested, onAgreementRequired }) => {
   const [phone, setPhone] = useState('');
   const [customAmount, setCustomAmount] = useState(null); // null = pay the whole balance
   const [busy, setBusy] = useState(null); // 'pay' | 'invoice'
@@ -40,7 +41,9 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, allow
       }
       onPaid?.(); // an earlier payment already covered it
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not start the payment. Please try again.'));
+      // The Client Service Agreement comes first: the page asks for it, then the client can pay
+      if (agreementRequiredBy(err) && onAgreementRequired) onAgreementRequired(agreementRequiredBy(err));
+      else setError(getErrorMessage(err, 'Could not start the payment. Please try again.'));
     }
     setBusy(null);
   };
@@ -52,7 +55,8 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, allow
       const res = await api.post(`/payments/campaigns/${campaign.id}/request-invoice/`);
       onInvoiceRequested?.({ amount: res.data.outstanding ?? amount, invoice: res.data.invoice });
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not request an invoice. Please try again.'));
+      if (agreementRequiredBy(err) && onAgreementRequired) onAgreementRequired(agreementRequiredBy(err));
+      else setError(getErrorMessage(err, 'Could not request an invoice. Please try again.'));
     } finally {
       setBusy(null);
     }

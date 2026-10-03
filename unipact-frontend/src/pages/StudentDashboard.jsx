@@ -9,6 +9,8 @@ import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import ClubCommittee from '../components/ClubCommittee';
 import ImpactLedgerPanel from '../components/ImpactLedgerPanel';
+import AgreementModal from '../components/AgreementModal';
+import { agreementRequiredBy } from '../utils/agreements';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
 import {
   GraduationCap,
@@ -85,6 +87,7 @@ const StudentDashboard = () => {
   const [declineJob, setDeclineJob] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
 
+  const [agreementGate, setAgreementGate] = useState(null); // { agreement, retry }: accept it, then carry on
   // Milestone submission modal state (managed escrow)
   const [milestoneTarget, setMilestoneTarget] = useState(null); // { job, milestone }
   const [milestoneForm, setMilestoneForm] = useState({ url: '', notes: '', file: null });
@@ -141,7 +144,8 @@ const StudentDashboard = () => {
       showToast(res.data?.message || (action === 'accept' ? 'You joined the team.' : 'Invitation declined.'), 'success');
       await fetchDashboard();
     } catch (err) {
-      showToast(getErrorMessage(err, 'Could not update the invitation.'), 'error');
+      if (agreementRequiredBy(err)) setAgreementGate({ agreement: agreementRequiredBy(err), retry: () => handleRespondInvitation(inv, action) });
+      else showToast(getErrorMessage(err, 'Could not update the invitation.'), 'error');
     } finally {
       setActionLoading(null);
     }
@@ -257,8 +261,13 @@ const StudentDashboard = () => {
       setDeclineJob(null);
       await fetchDashboard();
     } catch (err) {
-      showToast(getErrorMessage(err, 'Could not update the offer.'), 'error');
-      await fetchDashboard();
+      if (agreementRequiredBy(err)) {
+        // The Talent Agreement comes before a first job: accept it, then the offer is accepted
+        setAgreementGate({ agreement: agreementRequiredBy(err), retry: () => respondToOffer(job, action, reason) });
+      } else {
+        showToast(getErrorMessage(err, 'Could not update the offer.'), 'error');
+        await fetchDashboard();
+      }
     } finally {
       setActionLoading(null);
     }
@@ -634,6 +643,18 @@ const StudentDashboard = () => {
           </div>
         </form>
       </Modal>
+
+      {agreementGate && (
+        <AgreementModal
+          agreement={agreementGate.agreement}
+          onClose={() => setAgreementGate(null)}
+          onAccepted={() => {
+            const { retry } = agreementGate;
+            setAgreementGate(null);
+            retry?.();
+          }}
+        />
+      )}
 
       {/* Milestone submission modal (managed escrow) */}
       <Modal

@@ -12,14 +12,21 @@ import { usePageTitle } from '../hooks/usePageTitle';
  * lawyer before launch, and confirm the business decisions marked "confirm" in DEPLOYMENT.md.
  */
 
-const LegalLayout = ({ title, intro, sections }) => (
+// Sections are numbered in order; one marked `unnumbered` (an agreement's parties or acceptance block)
+// is skipped, so clause numbers match the signed document.
+const numberSections = (sections) => {
+  let count = 0;
+  return sections.map((s) => ({ ...s, label: s.unnumbered ? s.title : `${(count += 1)}. ${s.title}` }));
+};
+
+export const LegalLayout = ({ title, intro, sections, updated }) => (
   <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex flex-col">
     <PublicNav />
     <main className="flex-1 max-w-[1160px] w-full mx-auto px-4 sm:px-8 py-10 sm:py-14">
       <div className="max-w-3xl mb-10">
         <p className="eyebrow mb-3"><span className="eyebrow-dot" /> Legal</p>
         <h1 className="font-heading font-extrabold tracking-tight text-[clamp(2rem,4vw,2.75rem)]">{title}</h1>
-        <p className="text-sm text-[#5B6478] mt-2">Last updated {LEGAL.lastUpdated}</p>
+        <p className="text-sm text-[#5B6478] mt-2">{updated || `Last updated ${LEGAL.lastUpdated}`}</p>
         <p className="text-base sm:text-lg text-[#5B6478] mt-4">{intro}</p>
       </div>
 
@@ -27,18 +34,18 @@ const LegalLayout = ({ title, intro, sections }) => (
         <nav aria-label="On this page" className="hidden lg:block sticky top-28">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#5B6478] mb-3">On this page</p>
           <ol className="space-y-1 text-sm">
-            {sections.map((s, i) => (
+            {numberSections(sections).map((s) => (
               <li key={s.id}>
-                <a href={`#${s.id}`} className="block py-1.5 text-[#5B6478] hover:text-[#0A1748]">{i + 1}. {s.title}</a>
+                <a href={`#${s.id}`} className="block py-1.5 text-[#5B6478] hover:text-[#0A1748]">{s.label}</a>
               </li>
             ))}
           </ol>
         </nav>
 
         <article className="card p-6 sm:p-10 max-w-3xl space-y-10">
-          {sections.map((s, i) => (
+          {numberSections(sections).map((s) => (
             <section key={s.id} id={s.id} className="scroll-mt-28">
-              <h2 className="font-heading font-bold text-xl mb-3">{i + 1}. {s.title}</h2>
+              <h2 className="font-heading font-bold text-xl mb-3">{s.label}</h2>
               <div className="space-y-3 text-[0.95rem] leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_a]:text-[#0090C6] [&_a]:underline">
                 {s.body}
               </div>
@@ -185,7 +192,7 @@ export const TermsPage = () => {
       body: (
         <>
           <p>These Terms of Service (&quot;Terms&quot;) are an agreement between you and {LEGAL.entityName} (&quot;UniPact&quot;) for use of the UniPact website and services. By creating an account or using UniPact you agree to these Terms and to our <Link to="/privacy">Privacy Policy</Link>.</p>
-          <p>Clients also work with UniPact under a Client Service Agreement, and students under a Talent Agreement. If you have signed or accepted one of those, it applies together with these Terms, and it takes priority wherever the two differ.</p>
+          <p>Clients also work with UniPact under the <Link to="/agreements/client">Client Service Agreement</Link>, and students under the <Link to="/agreements/talent">Talent Agreement</Link>. If you have signed or accepted one of those, it applies together with these Terms, and it takes priority wherever the two differ.</p>
           <p>In these Terms, a <strong>Client</strong> is a company or brand that buys work through UniPact, <strong>Talent</strong> is a verified university student who does that work, and a <strong>Job Order</strong> is a project set out on UniPact or in writing: its deliverables, milestones, deadlines and price.</p>
         </>
       ),

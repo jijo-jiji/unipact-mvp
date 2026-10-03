@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import Campaign, Application, MatchOffer, Milestone, ImpactLedger
 from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer, MilestoneSerializer, can_view_workspace
 from users.models import User, CompanyProfile, StudentProfile
+from users import agreements
 from payments.models import Transaction, Subscription, Payout
 from payments.serializers import PayoutSerializer
 from .utils import (
@@ -404,6 +405,8 @@ class RespondMatchOfferView(APIView):
             return Response({"error": "Choose 'accept' or 'decline'."}, status=status.HTTP_400_BAD_REQUEST)
         if action == 'accept' and not request.user.email_verified:
             raise exceptions.PermissionDenied("Please confirm your email address before accepting a project. Check your inbox for the link.")
+        if action == 'accept':
+            agreements.require(request.user, agreements.TALENT)
 
         from users.models import SystemLog
         from users.utils import log_event
@@ -454,6 +457,8 @@ class FinalizeMatchView(APIView):
         is_owner = request.user.role == User.Role.COMPANY and campaign.company == getattr(request.user, 'company_profile', None)
         if not (is_owner or is_admin):
             return Response({"error": "You do not own this campaign."}, status=status.HTTP_403_FORBIDDEN)
+        if is_owner:
+            agreements.require(request.user, agreements.CLIENT)
 
         if campaign.status != Campaign.Status.MATCHED:
             return Response({"error": "Campaign must be in MATCHED status to finalize."}, status=status.HTTP_400_BAD_REQUEST)
@@ -968,6 +973,7 @@ class RespondTeamInvitationView(APIView):
         student_profile = request.user.student_profile
 
         if action == 'accept':
+            agreements.require(request.user, agreements.TALENT)
             invitation.invitee_student = student_profile
             invitation.status = ProjectTeamInvitation.Status.ACCEPTED
             invitation.save()
