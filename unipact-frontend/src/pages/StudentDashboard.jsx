@@ -470,6 +470,7 @@ const StudentDashboard = () => {
                         <p className="text-xs text-[#5B6478] mt-0.5">
                           {p.bank_name ? `${p.bank_name} (****${p.bank_account_number?.slice(-4)})` : 'Bank Transfer'}
                           {p.paid_at && ` • Disbursed ${formatDate(p.paid_at)}`}
+                          {!p.paid_at && p.due_at && ` • Expected by ${formatDate(p.due_at)}`}
                           {p.transfer_reference && (
                             <span className="font-mono text-[#0B1E63] font-medium ml-1.5 bg-[#0B1E63]/5 px-1.5 py-0.5 rounded">
                               Ref: {p.transfer_reference}
@@ -972,8 +973,14 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }
                 </div>
                 {m.status === 'REVISION_REQUESTED' && m.deliverable_notes && (
                   <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-                    <strong>Client feedback:</strong> {m.deliverable_notes}
+                    <strong>Client feedback</strong> (revision {m.revisions_used} of {m.max_revisions}): {m.deliverable_notes}
                   </p>
+                )}
+                {m.status === 'SUBMITTED' && m.review_due_at && (
+                  <p className="mt-2 text-xs text-[#5B6478]">With the client for review. If they don&apos;t respond by {formatDate(m.review_due_at)}, it is accepted automatically.</p>
+                )}
+                {m.status === 'APPROVED' && (
+                  <p className="mt-2 text-xs text-[#5B6478]">Accepted{m.auto_approved ? ' automatically' : ''}. UniPact pays you within 7 working days.</p>
                 )}
                 {canSubmitMilestone(m) && (
                   <button onClick={() => onSubmitMilestone(m)} className="btn-secondary btn-sm mt-2">

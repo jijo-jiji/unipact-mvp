@@ -182,6 +182,18 @@ The wording on the site is the **draft of 29 September 2026**, still to be revie
 2. Change the `version` and `versionLabel` in `src/utils/agreements.js`, and the matching entry in `CURRENT_VERSIONS` in `unipact-backend/users/agreements.py`. The two must be identical.
 3. Deploy. Everyone is then asked to accept the new version before their next job or payment; earlier acceptances stay on record.
 
+### Time limits the platform applies
+
+These come from the Client Service Agreement and the Talent Agreement. A working day is Monday to Friday in Malaysian time; public holidays are not excluded.
+
+| Rule | What happens | Setting |
+|---|---|---|
+| Client reviews a submitted milestone within 5 working days | The project page shows the review-by date. After it, the milestone is **accepted automatically**, its payouts are queued, and the client and team are emailed. A milestone the client hasn't paid enough to cover is left alone. Only submissions made after this went live are counted. | `ACCEPTANCE_WORKING_DAYS` (5) |
+| 2 rounds of minor revisions per deliverable | The third request is refused and the client is told further changes are a new Job Order. An admin can still send a milestone back. | per milestone, default 2 |
+| Talent paid within 7 working days of acceptance | Each unpaid payout shows *Pay by* a date, and *Overdue* in red after it. Admins get one reminder email 2 working days before. | `PAYOUT_WORKING_DAYS` (7) |
+
+There is no scheduler on Render's free plan, so these checks run as people use the site (opening a project, a student's jobs or the payout list), at most every 5 minutes. On a host with a scheduler, also run `python manage.py run_deadlines` once a day so nothing waits for a visitor.
+
 `AGREEMENTS_ENFORCED=false` in Render switches the requirement off without removing the pages (for example while wording is being corrected).
 
 `/privacy` and `/terms` are a **plain-language draft**, written for a Malaysian marketplace under the PDPA 2010. They are not legal advice. Before launch, have a lawyer review them and confirm these business decisions, which the draft assumes:

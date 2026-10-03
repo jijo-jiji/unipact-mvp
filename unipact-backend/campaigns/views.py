@@ -12,6 +12,8 @@ from .models import Campaign, Application, MatchOffer, Milestone, ImpactLedger
 from .serializers import CampaignSerializer, CampaignDetailSerializer, ApplicationSerializer, DeliverableSerializer, MilestoneSerializer, can_view_workspace
 from users.models import User, CompanyProfile, StudentProfile
 from users import agreements
+from .milestones import approve_milestone, EscrowShort, NotAwaitingReview
+from .deadlines import run_deadlines_if_due
 from payments.models import Transaction, Subscription, Payout
 from payments.serializers import PayoutSerializer
 from .utils import (
@@ -87,6 +89,7 @@ class CampaignDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        run_deadlines_if_due()  # e.g. accept a milestone whose review period has ended
         # Companies can only view and edit their own
         if self.request.user.role == User.Role.COMPANY:
             return Campaign.objects.filter(company=self.request.user.company_profile).prefetch_related('applications__club__user')
@@ -623,6 +626,7 @@ class StudentSubmitMilestoneView(APIView):
             milestone.deliverable_url = url
         milestone.deliverable_notes = notes
         milestone.status = Milestone.Status.SUBMITTED
+        milestone.submitted_at = timezone.now()  # the client's review period counts from here
         milestone.save()
 
         notifications.work_submitted(campaign, request.user.student_profile.full_name, milestone.title)
@@ -646,67 +650,46 @@ class ReviewMilestoneView(APIView):
         if action not in ('approve', 'request_revision'):
             return Response({"error": "Choose 'approve' or 'request_revision'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        from users.models import SystemLog
-        from users.utils import log_event
+        if action == 'request_revision':
+            from users.models import SystemLog
+            from users.utils import log_event
 
-        with db_transaction.atomic():
-            # Lock the campaign (serialises every approval that draws on this project's escrow) and
-            # the milestone, then re-check under the lock - so a double-click or two reviewers acting
-            # at once can't both pass the status and escrow checks and each release the same money.
-            Campaign.objects.select_for_update().get(pk=campaign.pk)
-            milestone = Milestone.objects.select_for_update().get(pk=milestone_id)
-            if milestone.status != Milestone.Status.SUBMITTED:
-                return Response({"error": f"This milestone is {milestone.get_status_display()}, not awaiting review."}, status=status.HTTP_400_BAD_REQUEST)
-
-            if action == 'request_revision':
+            with db_transaction.atomic():
+                milestone = Milestone.objects.select_for_update().get(pk=milestone_id)
+                if milestone.status != Milestone.Status.SUBMITTED:
+                    return Response({"error": f"This milestone is {milestone.get_status_display()}, not awaiting review."}, status=status.HTTP_400_BAD_REQUEST)
+                # Each deliverable includes 2 rounds of minor revisions (Client Service Agreement 4.1)
                 if milestone.revisions_used >= milestone.max_revisions and not is_admin:
-                    return Response({"error": "The revision limit has been reached for this milestone. Contact UniPact support."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({
+                        "error": f"The {milestone.max_revisions} included revision rounds have been used. Approve the milestone, "
+                                 "or contact UniPact to scope further changes as a new Job Order.",
+                        "code": "revision_limit_reached",
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 milestone.revisions_used += 1
                 milestone.status = Milestone.Status.REVISION_REQUESTED
                 feedback = str(request.data.get('feedback') or '').strip()
                 if feedback:
                     milestone.deliverable_notes = feedback
                 milestone.save()
-                log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Revision requested on milestone '{milestone.title}' for '{campaign.title}'")
-                return Response(MilestoneSerializer(milestone).data)
+            log_event(SystemLog.Category.MARKETPLACE, SystemLog.Level.INFO, f"Revision requested on milestone '{milestone.title}' for '{campaign.title}'")
+            return Response(MilestoneSerializer(milestone).data)
 
-            escrow = campaign_escrow(campaign)
-            if escrow['available'] < milestone.amount:
-                return Response({
-                    "error": (
-                        f"Only RM {escrow['available']} of the client's escrow is available, but this "
-                        f"milestone needs RM {milestone.amount}. Confirm the client's payment has cleared "
-                        f"before approving."
-                    ),
-                    "code": "escrow_insufficient",
-                    "available": escrow['available'],
-                    "required": milestone.amount,
-                }, status=status.HTTP_402_PAYMENT_REQUIRED)
-
-            shares = campaign_student_shares(campaign)
-            recipients = [s for s in campaign.assigned_students.order_by('id') if shares.get(s.id, Decimal('0')) > 0]
-            amounts = split_by_percent(milestone.amount, [shares[s.id] for s in recipients]) if recipients else []
-            payouts = []
-            for student, amount in zip(recipients, amounts):
-                has_bank = student.has_bank_details
-                payout, _created = Payout.objects.get_or_create(
-                    campaign=campaign, student=student, milestone=milestone,
-                    defaults={
-                        'amount': amount,
-                        'status': Payout.Status.PROCESSING if has_bank else Payout.Status.PENDING,
-                        'bank_name': student.bank_name or '',
-                        'bank_account_number': student.bank_account_number or '',
-                        'bank_account_holder_name': student.bank_account_holder_name or student.full_name,
-                        'duitnow_id': student.duitnow_id or '',
-                        'notes': 'Ready for disbursement.' if has_bank else 'Awaiting student bank details.',
-                    }
-                )
-                payouts.append(payout)
-
-            milestone.status = Milestone.Status.APPROVED
-            milestone.save()
-
-        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS, f"Milestone '{milestone.title}' approved for '{campaign.title}' - RM {milestone.amount} released to escrow-pending payouts")
+        # Approval releases money; the same function runs when the client's review period ends
+        try:
+            milestone, payouts = approve_milestone(campaign, milestone_id)
+        except NotAwaitingReview as exc:
+            return Response({"error": f"This milestone is {exc.milestone.get_status_display()}, not awaiting review."}, status=status.HTTP_400_BAD_REQUEST)
+        except EscrowShort as exc:
+            return Response({
+                "error": (
+                    f"Only RM {exc.available} of the client's escrow is available, but this "
+                    f"milestone needs RM {exc.required}. Confirm the client's payment has cleared "
+                    f"before approving."
+                ),
+                "code": "escrow_insufficient",
+                "available": exc.available,
+                "required": exc.required,
+            }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
         return Response({
             "milestone": MilestoneSerializer(milestone).data,
@@ -721,6 +704,7 @@ class StudentAssignedJobsView(generics.ListAPIView):
     def get_queryset(self):
         if self.request.user.role != User.Role.STUDENT or not hasattr(self.request.user, 'student_profile'):
             return Campaign.objects.none()
+        run_deadlines_if_due()  # e.g. accept a milestone whose review period has ended
         return Campaign.objects.filter(assigned_students=self.request.user.student_profile).distinct()
 
 

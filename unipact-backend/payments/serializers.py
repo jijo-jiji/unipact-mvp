@@ -22,12 +22,23 @@ class PayoutSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.full_name', read_only=True)
     student_email = serializers.EmailField(source='student.user.email', read_only=True)
     milestone_title = serializers.CharField(source='milestone.title', read_only=True, default=None)
+    # Talent are paid within 7 working days of the client accepting the work
+    due_at = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+
+    def get_due_at(self, obj):
+        from .payouts import due_at
+        return due_at(obj)
+
+    def get_is_overdue(self, obj):
+        from .payouts import is_overdue
+        return is_overdue(obj)
 
     class Meta:
         model = Payout
         fields = [
             'id', 'campaign', 'campaign_title', 'student', 'student_name', 'student_email',
-            'milestone', 'milestone_title',
+            'milestone', 'milestone_title', 'due_at', 'is_overdue',
             'amount', 'status', 'bank_name', 'bank_account_number', 'bank_account_holder_name',
             'duitnow_id', 'bank_details_changed_at', 'transfer_reference', 'notes', 'paid_at', 'created_at', 'updated_at'
         ]

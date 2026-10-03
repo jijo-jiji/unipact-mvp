@@ -198,6 +198,12 @@ class Milestone(models.Model):
     deliverable_url = models.URLField(blank=True, null=True)
     deliverable_file = models.FileField(upload_to='milestone_deliverables/', blank=True, null=True)
     deliverable_notes = models.TextField(blank=True)
+
+    # When the team last submitted it: the client's review period (5 working days) counts from here
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    # Accepted by the review period running out, not by the client or an admin
+    auto_approved = models.BooleanField(default=False)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

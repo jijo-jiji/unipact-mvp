@@ -213,6 +213,10 @@ MOCK_PAYMENTS_ENABLED = env_bool('MOCK_PAYMENTS_ENABLED', default=not IS_PRODUCT
 if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
     raise ImproperlyConfigured('MOCK_PAYMENTS_ENABLED must be false in production: the demo checkout collects no money.')
 
+# Time limits from the agreements, in working days (Monday to Friday, Malaysian time)
+ACCEPTANCE_WORKING_DAYS = int(os.getenv('ACCEPTANCE_WORKING_DAYS', '5'))  # client reviews a milestone, else it is accepted
+PAYOUT_WORKING_DAYS = int(os.getenv('PAYOUT_WORKING_DAYS', '7'))  # UniPact pays the talent after acceptance
+
 # Whether students must have accepted the Talent Agreement before taking a job, and clients the Client
 # Service Agreement before confirming a team or paying (users/agreements.py). Off under the test runner
 # so unrelated tests don't each have to accept one; the agreement tests switch it on.

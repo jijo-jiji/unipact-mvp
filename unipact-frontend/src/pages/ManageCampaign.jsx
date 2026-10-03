@@ -516,14 +516,28 @@ const ManageCampaign = () => {
                         </div>
                       )}
                       {m.status === 'SUBMITTED' && (
-                        <div className="flex gap-2 pt-1">
-                          <button onClick={() => reviewMilestone(m.id, 'approve')} disabled={milestoneBusy === m.id} className="btn-primary btn-sm">
-                            {milestoneBusy === m.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Approve & release
-                          </button>
-                          <button onClick={() => setRevisionModal({ isOpen: true, milestoneId: m.id, feedback: '' })} disabled={milestoneBusy === m.id} className="btn-secondary btn-sm">
-                            <RotateCcw size={13} /> Request revision
-                          </button>
-                        </div>
+                        <>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button onClick={() => reviewMilestone(m.id, 'approve')} disabled={milestoneBusy === m.id} className="btn-primary btn-sm">
+                              {milestoneBusy === m.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Approve & release
+                            </button>
+                            {m.revisions_used < m.max_revisions && (
+                              <button onClick={() => setRevisionModal({ isOpen: true, milestoneId: m.id, feedback: '' })} disabled={milestoneBusy === m.id} className="btn-secondary btn-sm">
+                                <RotateCcw size={13} /> Request revision
+                              </button>
+                            )}
+                          </div>
+                          {/* Client Service Agreement 4.1-4.3: 2 minor revision rounds; 5 working days to review */}
+                          <p className="text-xs text-[#5B6478] mt-2">
+                            {m.review_due_at && <>Please review by <strong className="text-[#0A1748]">{formatDate(m.review_due_at)}</strong>. After that it is treated as accepted and its payment is released to the team. </>}
+                            {m.revisions_used < m.max_revisions
+                              ? `Revision rounds used: ${m.revisions_used} of ${m.max_revisions}.`
+                              : `Both included revision rounds have been used. Further changes are a new Job Order; contact UniPact if the work still doesn't match the brief.`}
+                          </p>
+                        </>
+                      )}
+                      {m.status === 'APPROVED' && m.auto_approved && (
+                        <p className="text-xs text-[#5B6478]">Accepted automatically when the 5-working-day review period ended.</p>
                       )}
                     </div>
                   ))}

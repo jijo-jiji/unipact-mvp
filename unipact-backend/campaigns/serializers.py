@@ -57,15 +57,24 @@ class ProjectTeamInvitationSerializer(serializers.ModelSerializer):
         read_only_fields = ['campaign', 'invited_by', 'invitee_student', 'status', 'created_at', 'updated_at']
 
 class MilestoneSerializer(serializers.ModelSerializer):
+    # While submitted: when it is treated as accepted if the client neither approves nor asks for a revision
+    review_due_at = serializers.SerializerMethodField()
+
     class Meta:
         model = Milestone
         fields = [
             'id', 'campaign', 'step_number', 'title', 'description', 'percentage', 'amount',
             'max_revisions', 'revisions_used', 'status',
             'deliverable_url', 'deliverable_file', 'deliverable_notes',
+            'submitted_at', 'review_due_at', 'approved_at', 'auto_approved',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'campaign', 'amount', 'revisions_used', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'campaign', 'amount', 'revisions_used', 'status', 'submitted_at', 'approved_at',
+                            'auto_approved', 'created_at', 'updated_at']
+
+    def get_review_due_at(self, obj):
+        from .milestones import review_due_at
+        return review_due_at(obj)
 
 
 class CampaignSerializer(serializers.ModelSerializer):
