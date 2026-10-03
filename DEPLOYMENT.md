@@ -115,9 +115,23 @@ python manage.py check --deploy
    ```
 4. Send yourself a password reset from the live site to confirm email delivery works.
 
-### Sending email from Gmail (quick start)
+### Setting up Email Delivery
 
-Until a domain is verified with an email provider, UniPact can send through the project Gmail account:
+#### Option A: Resend API via HTTPS (Recommended for Render)
+Cloud hosting platforms like Render block outbound SMTP ports (25, 465, 587) on free tiers. Using **Resend** delivers emails over HTTPS (Port 443), which is never blocked:
+
+1. Create a free account at [resend.com](https://resend.com) (free 100 emails/day, no credit card required).
+2. Generate an API Key under **API Keys** (starts with `re_...`).
+3. Add to your Render Environment Variables:
+   ```
+   RESEND_API_KEY=re_your_api_key_here
+   DEFAULT_FROM_EMAIL=UniPact <onboarding@resend.dev>
+   SUPPORT_EMAIL=support@unipact.my
+   ```
+   *(Note: Resend allows sending immediately from `onboarding@resend.dev`. Once you verify your domain `unipact.my` in Resend's DNS settings, you can change `DEFAULT_FROM_EMAIL` to `UniPact <no-reply@unipact.my>`.)*
+
+#### Option B: Standard SMTP (Gmail or custom SMTP provider)
+*(Requires a paid Render tier or a host that does not block ports 587/465)*:
 
 ```
 EMAIL_HOST=smtp.gmail.com
@@ -130,8 +144,6 @@ SUPPORT_EMAIL=unipact.my@gmail.com
 ```
 
 Create the app password under the Google account's 2-Step Verification settings (a normal password will not work).
-Gmail allows roughly 500 messages a day and always shows the gmail.com sender, so move to a provider with the
-real domain (`no-reply@unipact.my`) before any serious volume.
 
 ## 2. Frontend (React)
 
