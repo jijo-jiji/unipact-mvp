@@ -395,7 +395,9 @@ const ManageCampaign = () => {
               <Info size={18} className="text-[#00AEEF] shrink-0 mt-0.5" />
               <span>
                 {milestonesOutstanding
-                  ? 'Approve every milestone above before closing out the project.'
+                  ? milestones.some((m) => m.status === 'SUBMITTED')
+                    ? 'A milestone is waiting for your approval below. Once every milestone is approved you can complete the project.'
+                    : 'Your team is working on it. Each milestone appears below for your approval when they submit it; once all are approved you can complete the project.'
                   : canComplete
                     ? 'Work has been submitted. When you are happy with it, approve and complete the project.'
                     : 'The team is working on it. You can approve the project once they submit their work.'}
@@ -491,6 +493,16 @@ const ManageCampaign = () => {
                         </div>
                       </div>
                       {m.description && <p className="text-[#5B6478] mb-2">{m.description}</p>}
+                      {['PENDING', 'IN_PROGRESS'].includes(m.status) && (
+                        <p className="text-xs text-[#5B6478]">
+                          {deliverables.length > 0
+                            ? 'Your team has shared work below but hasn\'t submitted it against this milestone yet. Once they do, you can approve it here and release the payment.'
+                            : 'Waiting for your team to submit this milestone. You\'ll be emailed, and can then approve it here.'}
+                        </p>
+                      )}
+                      {m.status === 'REVISION_REQUESTED' && (
+                        <p className="text-xs text-[#5B6478]">You asked for changes. It will come back here for approval when your team resubmits.</p>
+                      )}
                       {m.status === 'SUBMITTED' && (
                         <div className="mt-2 mb-3 flex flex-wrap gap-4 text-xs">
                           {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open submission <ArrowUpRight size={12} /></a>}

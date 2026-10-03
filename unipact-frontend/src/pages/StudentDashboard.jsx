@@ -813,6 +813,9 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }
   const milestones = job.milestones || [];
   const isOpen = job.status !== 'COMPLETED';
   const canSubmitMilestone = (m) => ['PENDING', 'IN_PROGRESS', 'REVISION_REQUESTED'].includes(m.status);
+  // Clients approve (and pay for) milestones, not loose files, so the main button submits the next
+  // milestone that is still open. A requested revision comes first.
+  const nextMilestone = milestones.find((m) => m.status === 'REVISION_REQUESTED') || milestones.find(canSubmitMilestone);
 
   return (
     <article className="card p-6 sm:p-8 hover:border-[#00AEEF] transition-colors">
@@ -829,11 +832,15 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }
             <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
           </p>
         </div>
-        {job.status === 'IN_PROGRESS' && (
-          <button onClick={onSubmit} className="btn-primary self-start shrink-0 whitespace-nowrap">
-            <Upload size={15} /> Submit work
+        {job.status === 'IN_PROGRESS' && (nextMilestone ? (
+          <button onClick={() => onSubmitMilestone(nextMilestone)} className="btn-primary self-start shrink-0 whitespace-nowrap">
+            <Upload size={15} /> {nextMilestone.status === 'REVISION_REQUESTED' ? 'Resubmit' : 'Submit'} milestone {nextMilestone.step_number}
           </button>
-        )}
+        ) : (
+          <button onClick={onSubmit} className={`${milestones.length > 0 ? 'btn-secondary' : 'btn-primary'} self-start shrink-0 whitespace-nowrap`}>
+            <Upload size={15} /> {milestones.length > 0 ? 'Share another file' : 'Submit work'}
+          </button>
+        ))}
       </div>
 
       {job.status === 'MATCHED' && (
@@ -931,6 +938,7 @@ const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }
           <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2 flex items-center gap-2">
             <Flag size={14} className="text-[#00AEEF]" /> Milestones ({milestones.length})
           </h4>
+          <p className="text-xs text-[#5B6478] mb-2">Submit your work against a milestone. You&apos;re paid for it once the client approves it.</p>
           <div className="space-y-2">
             {milestones.map((m) => (
               <div key={m.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3 text-sm">
