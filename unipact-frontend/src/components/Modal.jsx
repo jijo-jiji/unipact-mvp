@@ -1,7 +1,11 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-// Accessible modal shell: closes on Escape or backdrop click, locks page scroll while open
+// Accessible modal shell: closes on Escape or backdrop click, locks page scroll while open.
+// Rendered into <body>, not where it is used: a page section that has a CSS transform (the fade-in
+// animation leaves one behind) becomes the reference box for position: fixed, which put modals opened
+// from inside it off-centre with a backdrop that didn't cover the screen.
 const Modal = ({ isOpen, onClose, title, subtitle, icon, children, maxWidth = 'max-w-lg', dismissible = true }) => {
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -19,7 +23,7 @@ const Modal = ({ isOpen, onClose, title, subtitle, icon, children, maxWidth = 'm
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-[#0A1748]/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
       onMouseDown={(e) => {
@@ -57,7 +61,8 @@ const Modal = ({ isOpen, onClose, title, subtitle, icon, children, maxWidth = 'm
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
