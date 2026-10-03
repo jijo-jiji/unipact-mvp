@@ -661,16 +661,24 @@ class StudentPublicProfileView(views.APIView):
         completed = profile.assigned_jobs.filter(status='COMPLETED').select_related('company')
         # Only published ledgers are public proof; drafts stay private until UniPact publishes them
         published_ledgers = dict(profile.impact_ledgers.filter(status='PUBLISHED').values_list('campaign_id', 'slug'))
+        # Without the client's approval a job appears only as its type and that it was completed (Talent
+        # Agreement 7.2, Client Service Agreement 5.4). A published ledger is that approval: the client signed
+        # its impact statement. The student and admins still see their own full list.
+        viewer = request.user if request.user.is_authenticated else None
+        sees_everything = bool(viewer and (viewer.id == profile.user_id or viewer.role == User.Role.ADMIN))
         showcase = []
         for c in completed:
+            approved = c.id in published_ledgers
+            show_details = approved or sees_everything
             showcase.append({
                 'id': c.id,
-                'title': c.title,
-                'company_name': c.company.company_name,
+                'title': c.title if show_details else None,
+                'company_name': c.company.company_name if show_details else None,
                 'type': c.type,
-                'requirements': c.requirements,
+                'requirements': c.requirements if show_details else [],
                 'completed_at': c.completed_at or c.updated_at,
                 'ledger_slug': published_ledgers.get(c.id),
+                'client_approved': approved,
             })
 
         return Response({

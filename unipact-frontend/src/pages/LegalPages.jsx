@@ -109,7 +109,7 @@ export const PrivacyPolicyPage = () => {
           <ul>
             <li><strong>Companies you are matched with</strong> see your name, university, course, skills, bio, rating and the work you submit on their project.</li>
             <li><strong>Students matched to a company&apos;s project</strong> see the company name, the project brief and the files shared with the team.</li>
-            <li><strong>Anyone with the link</strong> can view a student&apos;s public portfolio: name, university, course, skills, bio, rating and completed projects. Verification documents and email addresses are never shown publicly.</li>
+            <li><strong>Anyone with the link</strong> can view a student&apos;s public portfolio: name, university, course, skills, bio, rating and the types of jobs they have completed. A project&apos;s name, the client&apos;s name and the work itself appear only once the client has approved it, for example by signing the project&apos;s Verified Impact Ledger. Verification documents, bank details and email addresses are never shown publicly.</li>
             <li><strong>UniPact administrators</strong> review verification documents and manage matches.</li>
             <li><strong>Service providers</strong> who host our website, store files, send email, process payments and report errors, under contracts that require them to protect your data.</li>
             <li><strong>Authorities</strong> when the law requires it.</li>
@@ -177,12 +177,16 @@ export const PrivacyPolicyPage = () => {
 export const TermsPage = () => {
   usePageTitle('Terms of Service');
 
+  // Kept in step with the Client Service Agreement and the Talent Agreement (see the agreements pack):
+  // where a signed agreement and these Terms differ, the signed agreement wins.
   const sections = [
     {
       id: 'agreement', title: 'About these terms',
       body: (
         <>
           <p>These Terms of Service (&quot;Terms&quot;) are an agreement between you and {LEGAL.entityName} (&quot;UniPact&quot;) for use of the UniPact website and services. By creating an account or using UniPact you agree to these Terms and to our <Link to="/privacy">Privacy Policy</Link>.</p>
+          <p>Clients also work with UniPact under a Client Service Agreement, and students under a Talent Agreement. If you have signed or accepted one of those, it applies together with these Terms, and it takes priority wherever the two differ.</p>
+          <p>In these Terms, a <strong>Client</strong> is a company or brand that buys work through UniPact, <strong>Talent</strong> is a verified university student who does that work, and a <strong>Job Order</strong> is a project set out on UniPact or in writing: its deliverables, milestones, deadlines and price.</p>
         </>
       ),
     },
@@ -190,10 +194,12 @@ export const TermsPage = () => {
       id: 'accounts', title: 'Accounts and eligibility',
       body: (
         <ul>
-          <li>You must be at least 18 years old, or have permission from a parent or guardian, to use UniPact.</li>
-          <li>Student accounts are for people currently enrolled at a university or college. Company accounts must represent a genuine business, and the person signing up must be authorised to act for it.</li>
+          <li>You must be at least 18 years old to use UniPact.</li>
+          <li>Talent accounts are for people currently enrolled at a university or college. UniPact verifies Talent through a student ID or enrolment letter and may also check their skills before offering them work.</li>
+          <li>Client accounts must represent a genuine business, and the person signing up must be authorised to act for it.</li>
           <li>The information you provide must be accurate and kept up to date. We may ask for documents to verify your account and may refuse or remove accounts we cannot verify.</li>
           <li>You are responsible for keeping your password secure and for activity on your account.</li>
+          <li>Talent are independent contractors, not employees of UniPact or of any Client. Talent choose which jobs to accept and are responsible for their own income tax.</li>
         </ul>
       ),
     },
@@ -201,10 +207,12 @@ export const TermsPage = () => {
       id: 'how-it-works', title: 'How projects work',
       body: (
         <ul>
-          <li>Companies post projects describing the work, budget, deadline and deliverables.</li>
-          <li>UniPact offers the project to verified students, who are free to accept or decline. Once the team has accepted, the company reviews it and decides whether to confirm the match. Students may invite other registered students to join their team.</li>
-          <li>The student team completes the work and submits deliverables through UniPact. The company reviews them, completes the project and may leave a rating.</li>
-          <li>UniPact provides the platform and matching service, and holds project fees and pays students as described under Fees and payments. Unless we agree otherwise in writing, we are not a party to the working arrangement between a company and its student team, and we do not guarantee the outcome of any project.</li>
+          <li>UniPact delivers software, digital marketing and content work through Talent that UniPact selects, manages and quality-checks. UniPact is responsible to the Client for the delivery: the Client deals with UniPact, not directly with the Talent, on scope, payment and disputes.</li>
+          <li>A Client posts a project describing the work, price, deadline and deliverables. UniPact offers it to suitable Talent, who are free to accept or decline; each offer shows the deliverables, the deadline and what the Talent will be paid. Once the team has accepted, the Client reviews it and confirms the match. Talent may invite other registered Talent to join their team, with a stated role and share of the payout.</li>
+          <li>Work outside the Job Order is a new Job Order.</li>
+          <li>The Client supplies on time everything the Job Order lists, such as raw footage, logos, brand guidelines, system access and data. Deadlines move by any delay in supplying it.</li>
+          <li>Talent deliver accepted jobs on time and to the brief, communicate with Clients through UniPact, and tell UniPact at once if a deadline is at risk.</li>
+          <li>If a Talent becomes unavailable during a job, UniPact assigns a replacement at no extra cost to the Client and tells the Client within 2 working days. The Talent is paid for the milestones they completed.</li>
         </ul>
       ),
     },
@@ -213,60 +221,84 @@ export const TermsPage = () => {
       body: (
         <ul>
           <li>Posting a project is free.</li>
-          <li>When a company confirms its student team, it pays the project fee (the project budget) to UniPact. Unless agreed otherwise in writing, the full project fee is paid before work starts; UniPact may agree a different schedule, such as monthly payments, with a company in writing.</li>
-          <li>UniPact keeps a service fee from each project fee for matching and managing the project (currently {SERVICE_FEE_PERCENT}%, unless a different fee is agreed for that project). The remainder is held by UniPact and paid to the student team as the company approves each milestone, split between team members by their agreed shares. Students see the amount they will be paid before they accept a project.</li>
-          <li>The amount is always shown before you pay. Except where the law requires otherwise, the service fee is non-refundable once the student team has been matched and confirmed. If a project ends early, amounts held for milestones that were not delivered are handled case by case; contact us.</li>
-          <li>Students must keep their bank details up to date. Payouts are made to the account on file, and we may pause a payout to confirm recent changes to bank details.</li>
+          <li>The Client pays for each milestone in full before work on it starts. On UniPact this is collected as the project fee when the Client confirms its team, unless UniPact has agreed a different schedule with the Client in writing, such as a monthly retainer paid in advance.</li>
+          <li>Clients can pay online by FPX through toyyibPay, or by bank transfer against a UniPact invoice. UniPact pays the payment gateway&apos;s fees. Ad spend on Meta, Google or other platforms is paid by the Client directly to those platforms, not through UniPact.</li>
+          <li>UniPact holds the Client&apos;s payment and releases the Talent&apos;s share only when the milestone is accepted. UniPact keeps a service fee from each project fee for matching and managing the project (currently {SERVICE_FEE_PERCENT}%, unless a different fee is agreed for that project).</li>
+          <li>Talent are paid by bank transfer within 7 working days after the Client accepts the milestone, split between team members by their agreed shares. Talent must keep their bank details up to date; payouts go to the account on file, and we may pause a payout to confirm a recent change of bank details.</li>
+          <li>If a Client refuses to pay for work that matches the Job Order, UniPact still pays the Talent for accepted milestones and handles the dispute with the Client.</li>
+          <li>If UniPact cannot deliver a milestone that matches the Job Order after the included revisions, the Client gets a full refund of that milestone&apos;s payment. Otherwise, except where the law requires, payments for accepted milestones are not refundable.</li>
         </ul>
       ),
     },
     {
-      id: 'content', title: 'Your content and project work',
+      id: 'revisions', title: 'Revisions and acceptance',
       body: (
         <ul>
-          <li>You keep ownership of the content you upload, such as briefs, brand assets and profile information. You give UniPact permission to store, display and share it only as needed to run the service.</li>
-          <li>Unless the company and the student team agree otherwise in writing, ownership of the final deliverables passes to the company once the project is completed and any amounts due for it have been paid.</li>
-          <li>Students may show a summary of completed projects on their UniPact portfolio. Companies should tell the team in the project brief if any part of the work is confidential.</li>
-          <li>Only upload content you have the right to share. Do not upload anything unlawful, harmful, infringing or containing malware.</li>
+          <li>Each deliverable includes 2 rounds of minor revisions, such as text changes, music swaps, colour or layout tweaks, and small bug fixes. Major changes to structure or scope are a new Job Order.</li>
+          <li>Within 5 working days of delivery, the Client either accepts the deliverable or requests a revision in writing, saying what does not match the Job Order.</li>
+          <li>If the Client does neither within 5 working days, the deliverable is treated as accepted and the payment for it is released.</li>
         </ul>
       ),
     },
     {
-      id: 'conduct', title: 'Acceptable use',
+      id: 'content', title: 'Ownership of work and portfolios',
+      body: (
+        <ul>
+          <li>You keep ownership of the content you upload, such as briefs, brand assets and profile information. You give UniPact permission to store, display and share it only as needed to run the service, and you confirm you have the rights to everything you supply.</li>
+          <li>Once a milestone is paid in full, all rights in its deliverables pass to the Client. Talent assign those rights to UniPact when they are paid for the work, and UniPact passes them to the Client.</li>
+          <li>UniPact keeps its own platform, tools and reusable code libraries, and Talent keep their general skills, know-how and any tools they owned before the job. The Client gets a permanent licence to use any of these built into its deliverables.</li>
+          <li>Talent deliver original work, with no copied code, footage, music or designs without a proper licence.</li>
+          <li>Every accepted job is added to the Talent&apos;s verified record on UniPact. Without the Client&apos;s approval, that record shows only the type of job and that it was completed. The project&apos;s name, the Client&apos;s name and the work itself are shown, by UniPact or the Talent, only once the Client has approved it in writing, for example by signing the project&apos;s Verified Impact Ledger.</li>
+          <li>Talent keep Client information, files and login details confidential during and after the job, and delete Client files when UniPact asks.</li>
+        </ul>
+      ),
+    },
+    {
+      id: 'warranty', title: 'Software warranty',
+      body: (
+        <p>Software deliverables come with 30 days of free bug fixes after acceptance, for defects against the Job Order. Talent fix bugs in their own work during that period at no extra payout.</p>
+      ),
+    },
+    {
+      id: 'conduct', title: 'Acceptable use and working directly',
       body: (
         <>
           <p>You agree not to:</p>
           <ul>
             <li>Provide false information, impersonate anyone or create accounts for someone else without permission.</li>
             <li>Harass, discriminate against or mistreat other users.</li>
-            <li>Arrange to take a project matched through UniPact off the platform to avoid fees.</li>
             <li>Attempt to access other accounts or data, disrupt the service, or scrape or copy it at scale.</li>
           </ul>
+          <p>For 12 months after a Talent&apos;s last job for a Client, any further work between them goes through UniPact. A Talent approached directly by such a Client refers them back to UniPact; a Client that hires or engages the Talent outside UniPact in that period pays the conversion fee set out in its Client Service Agreement. Talent may still work with anyone they knew before UniPact introduced them.</p>
         </>
       ),
     },
     {
-      id: 'suspension', title: 'Suspension and closing accounts',
+      id: 'suspension', title: 'Ending and closing accounts',
       body: (
-        <p>You can stop using UniPact at any time and ask us to close your account. We may suspend or close accounts that break these Terms, that we cannot verify, or where needed to protect other users or comply with the law. Where reasonable, we will tell you why.</p>
+        <ul>
+          <li>A Client or UniPact may end their agreement with 14 days&apos; written notice. Accepted milestones stay paid; funds for work not yet started are refunded. Either may end it immediately if the other seriously breaches it and does not fix the breach within 7 days of written notice.</li>
+          <li>Talent may close their account at any time after finishing or handing over any accepted jobs.</li>
+          <li>UniPact may pause or remove Talent who repeatedly miss deadlines, deliver poor work or behave unprofessionally, and may suspend or close any account that breaks these Terms, that we cannot verify, or where needed to protect other users or comply with the law. Payouts already earned are still paid. Where reasonable, we will tell you why.</li>
+        </ul>
       ),
     },
     {
       id: 'liability', title: 'Disclaimers and liability',
       body: (
         <>
-          <p>UniPact is provided &quot;as is&quot;. We work hard to keep it reliable and to verify users, but we cannot guarantee that the service will be uninterrupted or error-free, or that every user or project will meet your expectations.</p>
-          <p>To the extent permitted by law, UniPact is not liable for indirect or consequential losses, and our total liability to you for any claim is limited to the fees you paid to UniPact in the 12 months before the claim. Nothing in these Terms limits rights you have under Malaysian consumer protection law that cannot be excluded.</p>
+          <p>We work hard to keep the UniPact website reliable, but we cannot guarantee that it will be uninterrupted or error-free.</p>
+          <p>To the extent permitted by law, neither UniPact nor you is liable to the other for indirect losses, such as lost profits or lost data, and UniPact&apos;s total liability under a Job Order is limited to the amount the Client paid for that Job Order. Nothing in these Terms limits rights you have under Malaysian law that cannot be excluded.</p>
         </>
       ),
     },
     {
-      id: 'law', title: 'Governing law',
-      body: <p>These Terms are governed by the laws of Malaysia. Any dispute will be handled by the courts of Malaysia, although we encourage you to contact us first so we can try to resolve it informally.</p>,
+      id: 'law', title: 'Disputes and governing law',
+      body: <p>We will try to settle any dispute with you in good faith within 14 days, and then through mediation. If that fails, the dispute goes to the courts of Malaysia. These Terms are governed by the laws of Malaysia.</p>,
     },
     {
       id: 'changes', title: 'Changes to these terms',
-      body: <p>We may update these Terms. We will post the new version here with an updated date and, for significant changes, notify you in advance by email or in the app. Continuing to use UniPact after changes take effect means you accept them.</p>,
+      body: <p>We may update these Terms. We will post the new version here with an updated date and give you 30 days&apos; notice of significant changes by email or in the app. Jobs already accepted stay on the terms that applied when they were accepted.</p>,
     },
     {
       id: 'contact', title: 'Contact us',

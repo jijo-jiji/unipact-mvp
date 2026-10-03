@@ -182,3 +182,23 @@ class ImpactLedgerTests(APITestCase):
         self.publish()
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(portfolio_url).data['completed_projects'][0]['ledger_slug'], self.ledger().slug)
+
+    def test_portfolio_names_the_project_and_client_only_after_the_client_approves(self):
+        self.complete(self.campaign, 5)
+        portfolio_url = reverse('student_public_profile', kwargs={'user_id': self.adam_user.id})
+
+        self.client.force_authenticate(None)
+        project = self.client.get(portfolio_url).data['completed_projects'][0]
+        self.assertEqual((project['title'], project['company_name'], project['requirements'], project['client_approved']), (None, None, [], False))
+        self.assertEqual(project['type'], self.campaign.type)  # the job type and that it was completed still show
+
+        self.client.force_authenticate(self.adam_user)  # the student always sees their own list in full
+        self.assertEqual(self.client.get(portfolio_url).data['completed_projects'][0]['title'], self.campaign.title)
+
+        self.sign_statement()
+        self.submit_student_part()
+        self.pay_out()
+        self.publish()
+        self.client.force_authenticate(None)
+        project = self.client.get(portfolio_url).data['completed_projects'][0]
+        self.assertEqual((project['title'], project['company_name'], project['client_approved']), (self.campaign.title, self.campaign.company.company_name, True))
