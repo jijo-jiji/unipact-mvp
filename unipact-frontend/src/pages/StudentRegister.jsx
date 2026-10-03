@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, GraduationCap, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
+import RegisterBackLink from '../components/RegisterBackLink';
+import { GraduationCap, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
 import { MALAYSIAN_UNIVERSITIES } from '../utils/constants';
@@ -73,9 +74,7 @@ const StudentRegister = () => {
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl card p-6 sm:p-10 animate-fade-in">
 
-        <Link to="/register" className="back-link mb-6">
-          <ArrowLeft size={15} /> Back
-        </Link>
+        <RegisterBackLink />
 
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-xl bg-[#0B1E63] text-[#00AEEF] flex items-center justify-center shadow-sm shrink-0">
