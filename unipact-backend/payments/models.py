@@ -83,6 +83,8 @@ class Payout(models.Model):
     bank_details_changed_at = models.DateTimeField(null=True, blank=True)
 
     transfer_reference = models.CharField(max_length=100, blank=True, null=True)
+    # Admins are emailed once when a payout nears its 7-working-day deadline
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

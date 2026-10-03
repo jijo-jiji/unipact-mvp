@@ -1165,6 +1165,12 @@ const AdminDashboard = () => {
                               <p className="font-heading font-extrabold text-[#0B1E63] mt-0.5">
                                 {formatMoney(p.amount)}
                               </p>
+                              {/* Talent Agreement 4.2: paid within 7 working days of acceptance */}
+                              {!p.paid_at && p.due_at && (
+                                <p className={`text-xs mt-0.5 ${p.is_overdue ? 'text-red-700 font-semibold' : 'text-[#5B6478]'}`}>
+                                  {p.is_overdue ? 'Overdue: was due ' : 'Pay by '}{formatDate(p.due_at)}
+                                </p>
+                              )}
                             </td>
                             <td className="px-4 py-3.5">
                               {hasBank ? (

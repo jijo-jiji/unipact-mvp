@@ -254,6 +254,8 @@ class AdminPayoutListView(APIView):
     def get(self, request):
         if request.user.role != User.Role.ADMIN:
             return Response({"error": "Only admins can view the payout registry."}, status=status.HTTP_403_FORBIDDEN)
+        from campaigns.deadlines import run_deadlines_if_due
+        run_deadlines_if_due()
 
         status_filter = request.query_params.get('status')
         queryset = Payout.objects.select_related('campaign', 'milestone', 'student', 'student__user').order_by('-created_at')

@@ -308,6 +308,57 @@ def work_submitted(campaign, submitter_name, title):
     )
 
 
+def _local_date(moment):
+    from campaigns.workdays import MALAYSIA
+    return moment.astimezone(MALAYSIA).strftime('%d %b %Y')
+
+
+def milestone_approved(campaign, milestone, payouts, auto=False):
+    """Tell each student their milestone was accepted and when to expect the payout; if it was accepted
+    because the review period ran out, tell the client too."""
+    from payments.payouts import due_at
+
+    for payout in payouts:
+        student = payout.student
+        needs_bank = not student.has_bank_details
+        send_email(
+            student.user.email, f'Milestone accepted: "{milestone.title}"', 'Your milestone was accepted',
+            [f'{campaign.company.company_name} accepted "{milestone.title}".' if not auto
+             else f'"{milestone.title}" was accepted automatically because the client\'s review period ended.',
+             'Add your bank details in Settings so UniPact can pay you.' if needs_bank
+             else f'UniPact will transfer your payout by {_local_date(due_at(payout))}.'],
+            details=[('Project', campaign.title), ('Your payout', f'RM {payout.amount}')],
+            action_label='Add bank details' if needs_bank else 'Open your workspace',
+            action_path='/settings' if needs_bank else '/student/dashboard',
+        )
+    if auto:
+        send_email(
+            campaign.company.user.email, f'Milestone accepted automatically: "{milestone.title}"', 'A milestone was accepted automatically',
+            [f'"{milestone.title}" was delivered {settings.ACCEPTANCE_WORKING_DAYS} working days ago and was neither approved nor sent back for revision, '
+             'so under the Client Service Agreement it is treated as accepted and its payment has been released to the team.',
+             'If something is wrong with the work, reply to this email and we will help.'],
+            details=[('Project', campaign.title), ('Milestone', milestone.title), ('Amount released', f'RM {milestone.amount}')],
+            action_label='Open project', action_path=f'/manage-campaign/{campaign.id}',
+        )
+
+
+def payouts_due(payouts, due_dates):
+    """One reminder to the admins listing student payouts that are close to, or past, their deadline."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    send_email(
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)) + [settings.SUPPORT_EMAIL],
+        f'{len(payouts)} student payout{"s" if len(payouts) != 1 else ""} due soon', 'Student payouts are due',
+        [f'Talent are paid within {settings.PAYOUT_WORKING_DAYS} working days of the client accepting their work. These payouts are close to that deadline or past it:'],
+        details=[
+            (f'{p.student.full_name} · {p.campaign.title}',
+             f'RM {p.amount}, due {_local_date(due_dates[p.id])}' + ('' if p.student.has_bank_details else ' (waiting for their bank details)'))
+            for p in payouts
+        ],
+        action_label='Open payouts', action_path='/admin',
+    )
+
+
 def project_completed(campaign, rating=None):
     send_email(
         [s.user.email for s in _students(campaign)], f'"{campaign.title}" is complete', 'Project completed',
