@@ -55,7 +55,7 @@ const FEATURES = [
   { title: 'Curated matching', text: 'No bidding wars or spam. Every team is hand-picked by an admin from verified students.', icon: ShieldCheck },
   { title: 'Student teams', text: 'Matched students can invite classmates as teammates with a clear role and payout share.', icon: Users },
   { title: 'Project files vault', text: 'Share briefs, brand assets and raw footage with your team in one place.', icon: FolderOpen },
-  { title: 'Verified portfolios', text: 'Completed, client-rated projects appear automatically on each student’s public portfolio.', icon: BadgeCheck },
+  { title: 'Verified portfolios', text: 'Every completed job is added to the student’s verified record. Project details appear once the client approves them.', icon: BadgeCheck },
   { title: 'Escrow-secured pricing', text: `Free to post. Your project fee is held in escrow and released to the team milestone by milestone. UniPact keeps ${SERVICE_FEE_PERCENT}%.`, icon: Wallet },
   { title: 'Verified accounts', text: 'Companies and students are reviewed by UniPact before they can take part.', icon: CheckCircle2 },
 ];

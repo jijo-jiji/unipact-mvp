@@ -150,10 +150,14 @@ const StudentProfile = () => {
               {projects.map((proj) => (
                 <article key={proj.id} className="p-5 rounded-lg border border-[rgba(10,23,72,0.08)] bg-[#F5F7FC]">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-                    <h3 className="font-heading font-bold text-base">{proj.title}</h3>
+                    {/* The project and client are named only once the client has approved it */}
+                    <h3 className="font-heading font-bold text-base">{proj.title || `${campaignTypeLabel(proj.type)} project`}</h3>
                     <span className="badge bg-emerald-50 text-emerald-700 border-emerald-200 self-start sm:self-auto"><CheckCircle2 size={12} /> Completed</span>
                   </div>
-                  <p className="text-sm text-[#5B6478] mb-3">{proj.company_name} · {campaignTypeLabel(proj.type)} · {formatDate(proj.completed_at)}</p>
+                  <p className="text-sm text-[#5B6478] mb-3">{[proj.company_name, proj.title && campaignTypeLabel(proj.type), formatDate(proj.completed_at)].filter(Boolean).join(' · ')}</p>
+                  {isOwnProfile && !proj.client_approved && (
+                    <p className="text-xs text-[#5B6478] mb-3">Only you can see this project&apos;s name and client. Others see the job type until the client signs its impact statement and UniPact publishes the ledger.</p>
+                  )}
                   {proj.requirements?.length > 0 && (
                     <ul className="text-sm space-y-1">
                       {proj.requirements.map((r, i) => (
