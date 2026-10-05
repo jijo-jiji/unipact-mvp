@@ -123,6 +123,24 @@ python manage.py check --deploy
    ```
 4. Send yourself a password reset from the live site to confirm email delivery works.
 
+### Removing test accounts and projects
+
+`purge_test_data` removes accounts and projects together with everything attached to them: profiles, milestones, payment records, payouts, invoices, ledgers, agreement records and uploaded files. Admin accounts are never removed. It is a preview unless you add `--yes`.
+
+Run it from your own computer against the live database (PowerShell, in the `unipact-backend` folder). Set `DATABASE_URL` to the Neon connection string from Render first, and take a Neon backup or branch before deleting: this cannot be undone.
+
+| Command | What it does |
+|---|---|
+| `python manage.py purge_test_data` | Lists every non-admin account and every project. Changes nothing. |
+| `python manage.py purge_test_data --emails a@x.com,b@y.com` | Previews removing those accounts and their projects. |
+| `python manage.py purge_test_data --projects 3,7` | Previews removing those projects only; their clients stay. |
+| `python manage.py purge_test_data --all-except-admins` | Previews removing everything except admin accounts. |
+| the same command with `--yes` | Deletes what the preview showed. |
+
+If a student you are removing is on a project whose client you are keeping, the command stops and names the project, so a real client's project never loses work by accident.
+
+Uploaded files are only removed from Cloudflare R2 if the command also has the R2 settings (`USE_S3=true` and the four `AWS_…` values from Render); it says which storage it used. Without them it removes the database records and tells you how many files are still in the bucket, which you can delete in the Cloudflare dashboard.
+
 ### Sending email from Gmail (quick start)
 
 Until a domain is verified with an email provider, UniPact can send through the project Gmail account:
