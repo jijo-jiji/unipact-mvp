@@ -158,3 +158,43 @@ class AgreementDeadlineTests(APITestCase):
         self.milestone.refresh_from_db()
         self.assertEqual((self.milestone.status, self.milestone.auto_approved), (Milestone.Status.APPROVED, True))
         call_command('run_deadlines')  # runs cleanly with nothing left to do
+
+
+class PostgresRowLockTests(APITestCase):
+    """Tests run on SQLite, which ignores row locks; production is PostgreSQL, which rejects a plain
+    FOR UPDATE that reaches across an outer join (a nullable relation). That once left every online payment
+    unrecorded. So compile each locking query the way PostgreSQL would see it, without connecting."""
+
+    def postgres_sql(self, queryset):
+        from django.db.backends.postgresql.base import DatabaseWrapper
+
+        postgres = DatabaseWrapper({
+            'NAME': 'x', 'USER': '', 'PASSWORD': '', 'HOST': '', 'PORT': '', 'OPTIONS': {}, 'TIME_ZONE': None,
+            'CONN_MAX_AGE': 0, 'CONN_HEALTH_CHECKS': False, 'AUTOCOMMIT': True, 'ATOMIC_REQUESTS': False, 'TEST': {},
+        }, alias='postgres-sql-only')
+        postgres.get_autocommit = lambda: False  # compile as if inside a transaction; nothing connects
+        return queryset.query.get_compiler(connection=postgres).as_sql()[0]
+
+    def test_no_row_lock_reaches_across_an_outer_join(self):
+        from campaigns.models import MatchOffer
+        from payments import toyyibpay
+        from users.models import ShadowUser
+
+        campaign = Campaign(pk=1)
+        locking_queries = {
+            'approve milestone: project': Campaign.objects.select_for_update().filter(pk=1),
+            'approve milestone: milestone': Milestone.objects.select_for_update().filter(pk=1, campaign=campaign),
+            'request revision': Milestone.objects.select_for_update().filter(pk=1),
+            'answer a match offer': MatchOffer.objects.select_for_update().select_related('campaign__company__user').filter(campaign_id=1),
+            'issue an invoice': Campaign.objects.select_for_update().filter(pk=1),
+            'record an online payment': toyyibpay.locked_transactions().filter(pk=1),
+            'record a payout': Payout.objects.select_for_update().select_related('student', 'student__user', 'campaign').filter(pk=1),
+            'record a client payment': Campaign.objects.select_for_update().select_related('company').filter(pk=1),
+            'club invitation': ShadowUser.objects.select_for_update().select_related('invited_by__user').filter(pk=1),
+        }
+        for name, queryset in locking_queries.items():
+            sql = self.postgres_sql(queryset)
+            self.assertIn('FOR UPDATE', sql, name)
+            if 'OUTER JOIN' in sql:
+                # Allowed only when the lock names its own table, so the nullable side is left alone
+                self.assertIn('FOR UPDATE OF', sql, f'{name}: locks across an outer join, which PostgreSQL rejects')
