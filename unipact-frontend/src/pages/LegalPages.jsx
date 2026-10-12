@@ -89,6 +89,7 @@ export const PrivacyPolicyPage = () => {
             <li>Student profiles: university, course, skills, bio, club affiliation, an optional backup email, and verification documents such as a student ID or enrolment letter.</li>
             <li>Company profiles: company name, SSM registration number and registration documents.</li>
             <li>Project content: project briefs, files you upload, deliverables and contribution notes, team invitations, ratings and feedback.</li>
+            <li>Project messages: what you write, and any file you attach, in a project&apos;s conversation, along with when you last read it.</li>
             <li>Billing records: the amount, date, type and reference of payments. Online payments are processed by ToyyibPay through FPX online banking: we share the payer&apos;s name, email and phone number with ToyyibPay for the receipt, and we receive the payment status and reference, never your banking login or account details.</li>
             <li>Student payout details: the bank name, account number, account holder name or DuitNow ID a student gives us, used only to pay them for approved project milestones.</li>
           </ul>
@@ -102,7 +103,7 @@ export const PrivacyPolicyPage = () => {
         <ul>
           <li>To create and secure your account, and to verify that students and companies are genuine.</li>
           <li>To match students to client projects and run those projects: sharing briefs and files, collecting deliverables and recording ratings.</li>
-          <li>To send you service emails, such as verification results, match updates, password resets and payment receipts.</li>
+          <li>To send you service emails, such as verification results, match updates, password resets, payment receipts and a notice when someone writes to you in a project&apos;s conversation (which quotes the start of their message).</li>
           <li>To process fees and keep financial records required by law.</li>
           <li>To prevent fraud and abuse, keep the platform secure and fix errors.</li>
           <li>To improve UniPact using aggregated information that does not identify you.</li>
@@ -117,7 +118,8 @@ export const PrivacyPolicyPage = () => {
             <li><strong>Companies you are matched with</strong> see your name, university, course, skills, bio, rating and the work you submit on their project.</li>
             <li><strong>Students matched to a company&apos;s project</strong> see the company name, the project brief and the files shared with the team.</li>
             <li><strong>Anyone with the link</strong> can view a student&apos;s public portfolio: name, university, course, skills, bio, rating and the types of jobs they have completed. A project&apos;s name, the client&apos;s name and the work itself appear only once the client has approved it, for example by signing the project&apos;s Verified Impact Ledger. Verification documents, bank details and email addresses are never shown publicly.</li>
-            <li><strong>UniPact administrators</strong> review verification documents and manage matches.</li>
+            <li><strong>Everyone on a project</strong> (the client and each student on its team) sees the whole of that project&apos;s conversation, including attached files. It is not a private channel between two people.</li>
+            <li><strong>UniPact administrators</strong> review verification documents, manage matches, and can read and reply in every project&apos;s conversation, because UniPact is responsible for the delivery.</li>
             <li><strong>Service providers</strong> who host our website, store files, send email, process payments and report errors, under contracts that require them to protect your data.</li>
             <li><strong>Authorities</strong> when the law requires it.</li>
           </ul>
@@ -134,7 +136,7 @@ export const PrivacyPolicyPage = () => {
     {
       id: 'retention', title: 'How long we keep it',
       body: (
-        <p>We keep your data for as long as your account is active and for as long as needed to provide the service. If you close your account we delete or anonymise your personal data, except records we must keep for legal, tax or dispute-resolution purposes, which we keep only for the period required.</p>
+        <p>We keep your data for as long as your account is active and for as long as needed to provide the service. A project&apos;s conversation is kept with the project&apos;s other records, and stays readable to its participants after the project ends. If you close your account we delete or anonymise your personal data, except records we must keep for legal, tax or dispute-resolution purposes, which we keep only for the period required.</p>
       ),
     },
     {

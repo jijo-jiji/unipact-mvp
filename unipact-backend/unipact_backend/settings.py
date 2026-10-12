@@ -217,6 +217,15 @@ if IS_PRODUCTION and MOCK_PAYMENTS_ENABLED:
 ACCEPTANCE_WORKING_DAYS = int(os.getenv('ACCEPTANCE_WORKING_DAYS', '5'))  # client reviews a milestone, else it is accepted
 PAYOUT_WORKING_DAYS = int(os.getenv('PAYOUT_WORKING_DAYS', '7'))  # UniPact pays the talent after acceptance
 
+# Project conversations (campaigns/messaging.py): the longest message, and how long the conversation
+# stays open for new messages after the project is completed (it stays readable after that)
+PROJECT_MESSAGE_MAX_LENGTH = int(os.getenv('PROJECT_MESSAGE_MAX_LENGTH', '4000'))
+# A file sent in a conversation (same file types as project files; bigger files belong in project files)
+PROJECT_MESSAGE_MAX_ATTACHMENT_MB = int(os.getenv('PROJECT_MESSAGE_MAX_ATTACHMENT_MB', '25'))
+PROJECT_CHAT_DAYS_AFTER_COMPLETION = int(os.getenv('PROJECT_CHAT_DAYS_AFTER_COMPLETION', '30'))
+# The shortest gap between two "you have new messages" emails to the same person about the same project
+PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES = int(os.getenv('PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES', '60'))
+
 # Whether students must have accepted the Talent Agreement before taking a job, and clients the Client
 # Service Agreement before confirming a team or paying (users/agreements.py). Off under the test runner
 # so unrelated tests don't each have to accept one; the agreement tests switch it on.
@@ -294,6 +303,8 @@ REST_FRAMEWORK = {
         'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
         # Same reasoning for "resend my confirmation link"
         'email_verify': os.getenv('THROTTLE_EMAIL_VERIFY', '5/hour'),
+        # Posting in a project's conversation, per account
+        'project_message': os.getenv('THROTTLE_PROJECT_MESSAGE', '30/min'),
     },
     # Don't leak the browsable API in production
     'DEFAULT_RENDERER_CLASSES': (
@@ -308,6 +319,7 @@ if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({
         'login': '10000/min', 'register': '10000/min', 'token_refresh': '10000/min',
         'password_reset': '10000/min', 'password_change': '10000/min', 'email_verify': '10000/min',
+        'project_message': '10000/min',
     })
 
 # Throttle counters: set REDIS_URL when running more than one server process so limits are shared

@@ -8,6 +8,9 @@ from .views import (
     MilestonePlanView, StudentSubmitMilestoneView, ReviewMilestoneView,
     ImpactReportView, MyImpactLedgerView, ImpactLedgerDetailView, AdminImpactLedgerListView, AdminImpactLedgerPublishView,
 )
+from .messaging import (
+    ProjectMessagesView, ProjectMessagesReadView, ProjectMessageAttachmentView, AdminConversationListView,
+)
 
 urlpatterns = [
     path('', CampaignListCreateView.as_view(), name='campaign_list_create'),
@@ -30,6 +33,12 @@ urlpatterns = [
     path('<int:campaign_id>/milestones/plan/', MilestonePlanView.as_view(), name='milestone_plan'),
     path('<int:campaign_id>/milestones/<int:milestone_id>/submit/', StudentSubmitMilestoneView.as_view(), name='milestone_submit'),
     path('<int:campaign_id>/milestones/<int:milestone_id>/review/', ReviewMilestoneView.as_view(), name='milestone_review'),
+
+    # Project conversation (client, student team and UniPact)
+    path('<int:campaign_id>/messages/', ProjectMessagesView.as_view(), name='project_messages'),
+    path('<int:campaign_id>/messages/read/', ProjectMessagesReadView.as_view(), name='project_messages_read'),
+    path('<int:campaign_id>/messages/<int:message_id>/attachment/', ProjectMessageAttachmentView.as_view(), name='project_message_attachment'),
+    path('conversations/', AdminConversationListView.as_view(), name='project_conversations'),
 
     # Verified Impact Ledger
     path('<int:campaign_id>/impact-report/', ImpactReportView.as_view(), name='impact_report'),

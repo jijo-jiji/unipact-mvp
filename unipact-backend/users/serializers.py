@@ -262,17 +262,19 @@ class ShadowUserSerializer(serializers.ModelSerializer):
 
 class AdminCompanyVerificationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
-    
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+
     class Meta:
         model = CompanyProfile
-        fields = ['id', 'company_name', 'email', 'company_details', 'verification_status', 'ssm_document']
+        fields = ['id', 'user_id', 'company_name', 'email', 'company_details', 'verification_status', 'ssm_document']
 
 class AdminClubVerificationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
 
     class Meta:
         model = ClubProfile
-        fields = ['id', 'club_name', 'email', 'university', 'verification_status', 'verification_document']
+        fields = ['id', 'user_id', 'club_name', 'email', 'university', 'verification_status', 'verification_document']
 
 class SystemLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -398,6 +400,39 @@ class ClubSettingsSerializer(serializers.ModelSerializer):
 
     def validate_logo(self, value):
         return validate_image_upload(value, 'Club logo')
+
+
+# ------------------------------------------------------------------
+# Admin edits (what an admin may correct on someone else's profile)
+# ------------------------------------------------------------------
+# Bank details, ID documents and pictures are left out on purpose: payouts go where the bank details say,
+# so those stay with the account's owner (their own settings page), who is emailed whenever they change.
+
+class AdminStudentEditSerializer(StudentSettingsSerializer):
+    class Meta(StudentSettingsSerializer.Meta):
+        fields = [
+            'full_name', 'university', 'major', 'domain_focus', 'skills', 'bio',
+            'club_affiliation_name', 'club_affiliation_role', 'secondary_email',
+        ]
+        extra_kwargs = {
+            'full_name': {'allow_blank': False},
+            'university': {'allow_blank': False},
+        }
+
+
+class AdminCompanyEditSerializer(CompanySettingsSerializer):
+    class Meta(CompanySettingsSerializer.Meta):
+        fields = ['company_name', 'company_details']
+        extra_kwargs = {'company_name': {'allow_blank': False}}
+
+
+class AdminClubEditSerializer(ClubSettingsSerializer):
+    class Meta(ClubSettingsSerializer.Meta):
+        fields = ['club_name', 'university']
+        extra_kwargs = {
+            'club_name': {'allow_blank': False},
+            'university': {'allow_blank': False},
+        }
 
 
 class ClaimProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):

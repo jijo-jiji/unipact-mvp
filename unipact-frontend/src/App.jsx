@@ -42,6 +42,8 @@ const CompanyDashboard = page(() => import('./pages/CompanyDashboard'));
 const CreateCampaign = page(() => import('./pages/CreateCampaign'));
 const ManageCampaign = page(() => import('./pages/ManageCampaign'));
 const StudentDashboard = page(() => import('./pages/StudentDashboard'));
+const StudentProject = page(() => import('./pages/StudentProject'));
+const StudentProjects = page(() => import('./pages/StudentProjects'));
 const QuestDetails = page(() => import('./pages/QuestDetails'));
 const QuestBoard = page(() => import('./pages/QuestBoard'));
 const SubmitDeliverable = page(() => import('./pages/SubmitDeliverable'));
@@ -160,6 +162,22 @@ function App() {
             element={
               <ProtectedRoute allowedRole={['STUDENT', 'CLUB']}>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/projects"
+            element={
+              <ProtectedRoute allowedRole="STUDENT">
+                <StudentProjects />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/projects/:id"
+            element={
+              <ProtectedRoute allowedRole="STUDENT">
+                <StudentProject />
               </ProtectedRoute>
             }
           />

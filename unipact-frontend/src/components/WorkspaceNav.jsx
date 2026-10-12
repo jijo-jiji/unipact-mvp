@@ -12,8 +12,10 @@ const LINKS = {
     { to: '/company/treasury', label: 'Billing' },
   ],
   STUDENT: [
-    { to: '/student/dashboard', label: 'My workspace' },
-    { to: '/student/profile/:me', label: 'My portfolio' },
+    { to: '/student/dashboard', label: 'Workspace' },
+    // Stays highlighted on a project's own page (/student/projects/<id>)
+    { to: '/student/projects', label: 'Projects', end: false },
+    { to: '/student/profile/:me', label: 'Portfolio' },
   ],
   CLUB: [
     { to: '/student/dashboard', label: 'Dashboard' },
@@ -84,7 +86,7 @@ const WorkspaceNav = () => {
             <li key={l.to}>
               <NavLink
                 to={l.to}
-                end
+                end={l.end !== false}
                 className={({ isActive }) =>
                   `block px-4 py-1.5 rounded-full text-[0.9rem] font-medium transition-colors ${
                     isActive ? 'bg-white text-[#0A1748] shadow-sm' : 'text-[#5B6478] hover:text-[#0A1748]'
@@ -143,7 +145,7 @@ const WorkspaceNav = () => {
                 <li key={l.to}>
                   <NavLink
                     to={l.to}
-                    end
+                    end={l.end !== false}
                     className={({ isActive }) =>
                       `flex items-center justify-between py-3.5 px-1 text-base font-medium ${isActive ? 'text-[#0090C6]' : 'text-[#0A1748] hover:text-[#0090C6]'}`
                     }

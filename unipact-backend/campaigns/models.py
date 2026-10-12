@@ -322,3 +322,48 @@ class ImpactLedger(models.Model):
 
     def __str__(self):
         return f"Ledger {self.slug} - {self.student.full_name}"
+
+
+class ProjectMessage(models.Model):
+    """One message in a project's conversation between the client, the student team and UniPact.
+
+    There is one conversation per project rather than private chats: the agreements have talent and
+    clients communicate through UniPact, so admins can read it and reply (see campaigns/messaging.py).
+    """
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='messages')
+    # Kept when the account is removed, so the rest of the conversation still reads in order
+    sender = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='project_messages')
+    # Empty when the message is only a file
+    body = models.TextField(blank=True)
+    # At most one file per message. It is never linked to directly: participants download it through
+    # ProjectMessageAttachmentView, which checks they are in the conversation each time.
+    attachment = models.FileField(upload_to='project_messages/', blank=True, null=True)
+    attachment_name = models.CharField(max_length=255, blank=True)  # the name the sender's file had
+    attachment_size = models.PositiveBigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        indexes = [models.Index(fields=['campaign', 'id'])]
+
+    def __str__(self):
+        return f"Message {self.pk} on '{self.campaign.title}'"
+
+
+class ProjectMessageRead(models.Model):
+    """One participant's place in a project's conversation: how far they have read (everything up to
+    last_read_id), when they last had it open, and when they were last emailed about new messages."""
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='message_reads')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='project_message_reads')
+    last_read_id = models.PositiveBigIntegerField(default=0)
+    # Someone with the conversation on screen isn't emailed about what they are already looking at
+    seen_at = models.DateTimeField(null=True, blank=True)
+    # At most one "new messages" email per person per project within PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES
+    notified_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['campaign', 'user'], name='unique_project_message_read')]
+
+    def __str__(self):
+        return f"{self.user.email} read '{self.campaign.title}' up to {self.last_read_id}"

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Trophy, Clock, CheckCircle2, Star, FileText, Download, Upload, Sparkles,
-  CalendarDays, Loader2, ArrowUpRight, AlertCircle, Info, Lock, RotateCcw, Wallet, Flag,
+  CalendarDays, Loader2, ArrowUpRight, AlertCircle, Info, Lock, RotateCcw, Wallet, Flag, Activity, MessageSquare,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import api from '../api/client';
@@ -13,11 +13,18 @@ import AgreementModal from '../components/AgreementModal';
 import { agreementRequiredBy } from '../utils/agreements';
 import { downloadInvoice } from '../utils/invoices';
 import ImpactStatementCard from '../components/ImpactStatementCard';
+import ProjectProgress from '../components/ProjectProgress';
+import ProjectOverview from '../components/ProjectOverview';
+import ProjectPayments from '../components/ProjectPayments';
+import ProjectMessages from '../components/ProjectMessages';
+import { useProjectMessages } from '../hooks/useProjectMessages';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
 import PageLoader from '../components/PageLoader';
 import StatusBadge from '../components/StatusBadge';
 import { campaignTypeLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { latestEvents } from '../utils/projectHistory';
+import { clientStats } from '../utils/projectSummary';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { CARD_CHECKOUT_ENABLED } from '../utils/constants';
 
@@ -25,11 +32,14 @@ import { CARD_CHECKOUT_ENABLED } from '../utils/constants';
 // The V3 student flow (FinalizeMatchView) now charges the full project fee instead - see finalizeMatch below.
 const CLUB_FINDERS_FEE = 100;
 
-const STEPS = [
-  { status: 'OPEN', label: 'Posted' },
-  { status: 'MATCHED', label: 'Matched' },
-  { status: 'IN_PROGRESS', label: 'In progress' },
-  { status: 'COMPLETED', label: 'Completed' },
+// The page's sections, as tabs (the same pattern as the admin hub)
+const TABS = [
+  { key: 'overview', label: 'Overview', icon: <Activity size={16} /> },
+  { key: 'team', label: 'Team', icon: <Users size={16} /> },
+  { key: 'work', label: 'Milestones & work', icon: <Flag size={16} /> },
+  { key: 'messages', label: 'Messages', icon: <MessageSquare size={16} /> },
+  { key: 'payments', label: 'Payments', icon: <Wallet size={16} /> },
+  { key: 'brief', label: 'Brief & files', icon: <FileText size={16} /> },
 ];
 
 const ASSET_TYPES = [
@@ -40,29 +50,6 @@ const ASSET_TYPES = [
   { value: 'AUDIO_STEM', label: 'Audio' },
   { value: 'OTHER', label: 'Other' },
 ];
-
-const Progress = ({ status }) => {
-  const current = STEPS.findIndex((s) => s.status === status);
-  return (
-    <ol className="flex items-center gap-2 sm:gap-3 overflow-x-auto overflow-y-hidden" aria-label="Project progress">
-      {STEPS.map((step, i) => {
-        const done = i < current || status === 'COMPLETED';
-        const active = i === current && status !== 'COMPLETED';
-        return (
-          <li key={step.status} className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${
-              done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'bg-[#00AEEF] border-[#00AEEF] text-white' : 'bg-white border-[rgba(10,23,72,0.2)] text-[#5B6478]'
-            }`}>
-              {done ? <CheckCircle2 size={14} /> : i + 1}
-            </span>
-            <span className={`text-sm ${active ? 'font-semibold text-[#0A1748]' : 'text-[#5B6478]'}`}>{step.label}</span>
-            {i < STEPS.length - 1 && <span className="w-6 sm:w-10 h-px bg-[rgba(10,23,72,0.2)]" />}
-          </li>
-        );
-      })}
-    </ol>
-  );
-};
 
 const ManageCampaign = () => {
   usePageTitle('Manage project');
@@ -85,17 +72,31 @@ const ManageCampaign = () => {
   const [uploading, setUploading] = useState(false);
   const [revisionModal, setRevisionModal] = useState({ isOpen: false, milestoneId: null, feedback: '' });
   const [milestoneBusy, setMilestoneBusy] = useState(null);
+  // A link in an email (…?tab=messages) opens that section straight away
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (TABS.some((tab) => tab.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview'));
+  const landedRef = useRef(false); // the opening tab is chosen once, when the project first loads
+  // The project's conversation exists once work has started (and never for club sponsorships, which have no team)
+  const chatEnabled = ['IN_PROGRESS', 'COMPLETED', 'ARCHIVED'].includes(campaign?.status) && (campaign?.assigned_students || []).length > 0;
+  const chat = useProjectMessages(id, { enabled: chatEnabled, active: chatEnabled && activeTab === 'messages' });
 
   const fetchCampaign = useCallback(async () => {
     try {
       const response = await api.get(`/campaigns/${id}/`);
       setCampaign(response.data);
+      // Club proposals, and the button that awards the contract, are in the Team tab. Emails about a new
+      // proposal link to this page, so open on that tab while there is a contract waiting to be awarded.
+      if (!landedRef.current) {
+        landedRef.current = true;
+        const waitingToAward = response.data.status === 'OPEN' && (response.data.applications || []).length > 0;
+        if (waitingToAward && !searchParams.get('tab')) setActiveTab('team');
+      }
     } catch (error) {
       showToast(error.response?.status === 404 ? 'That project could not be found.' : getErrorMessage(error, 'Failed to load the project.'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [id, showToast]);
+  }, [id, showToast, searchParams]);
 
   useEffect(() => {
     fetchCampaign();
@@ -265,10 +266,39 @@ const ManageCampaign = () => {
   const applications = campaign.applications || [];
   const clubAwaitingReview = applications.some((a) => a.status === 'SUBMITTED');
   const milestonesOutstanding = milestones.length > 0 && milestones.some((m) => m.status !== 'APPROVED');
-  const canComplete = campaign.status === 'IN_PROGRESS' && (deliverables.length > 0 || clubAwaitingReview) && !milestonesOutstanding;
+  const allMilestonesApproved = milestones.length > 0 && !milestonesOutstanding;
+  // Work handed in against a milestone is kept on the milestone, not in student_deliverables. It counts as
+  // submitted work: it is listed with any other shared files, and approving every milestone is enough to
+  // complete the project.
+  const milestoneSubmissions = milestones.filter(
+    (m) => ['SUBMITTED', 'APPROVED'].includes(m.status) && (m.deliverable_url || m.deliverable_file || m.deliverable_notes),
+  );
+  const submittedCount = milestoneSubmissions.length + deliverables.length;
+  const canComplete = campaign.status === 'IN_PROGRESS' && !milestonesOutstanding
+    && (allMilestonesApproved || deliverables.length > 0 || clubAwaitingReview);
   const isCompleted = campaign.status === 'COMPLETED';
   // The invoice sent during this visit, or the open one the API returns when the page loads
   const invoice = issuedInvoice || campaign.invoice || null;
+  // Club sponsorships (SRS v2.2.1) have applications and a flat finder's fee instead of a student team and escrow
+  const isClubFlow = applications.length > 0 && team.length === 0 && milestones.length === 0;
+  const awaitingReview = milestones.filter((m) => m.status === 'SUBMITTED').length;
+
+  // Used by the banners and the overview to send the client to the section they need
+  const openTab = (key) => {
+    setActiveTab(key);
+    requestAnimationFrame(() => document.getElementById('project-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const handleDownloadInvoice = async () => {
+    setDownloading(true);
+    try {
+      await downloadInvoice(invoice);
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Could not download the invoice.'), 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F5F7FC] text-[#0A1748] font-body flex flex-col">
@@ -296,7 +326,7 @@ const ManageCampaign = () => {
             </div>
           </div>
           <div className="pt-5 border-t border-[rgba(10,23,72,0.08)]">
-            <Progress status={campaign.status} />
+            <ProjectProgress campaign={campaign} />
           </div>
         </section>
 
@@ -333,11 +363,7 @@ const ManageCampaign = () => {
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  setDownloading(true);
-                  try { await downloadInvoice(invoice); } catch (error) { showToast(getErrorMessage(error, 'Could not download the invoice.'), 'error'); }
-                  finally { setDownloading(false); }
-                }}
+                onClick={handleDownloadInvoice}
                 disabled={downloading}
                 className="btn-primary self-start shrink-0 whitespace-nowrap"
               >
@@ -368,7 +394,7 @@ const ManageCampaign = () => {
                 <span className="text-[#5B6478]">
                   {invoiceDue
                     ? `UniPact will email you an invoice for ${formatMoney(invoiceDue)} to pay by bank transfer, usually within one business day. Once we've received it, click Confirm match again to start the project.`
-                    : 'Every student has accepted. Review the team below, then confirm to start the project.'}
+                    : 'Every student has accepted. Review them in the Team tab, then confirm to start the project.'}
                 </span>
               </div>
             </div>
@@ -401,16 +427,24 @@ const ManageCampaign = () => {
               <span>
                 {milestonesOutstanding
                   ? milestones.some((m) => m.status === 'SUBMITTED')
-                    ? 'A milestone is waiting for your approval below. Once every milestone is approved you can complete the project.'
-                    : 'Your team is working on it. Each milestone appears below for your approval when they submit it; once all are approved you can complete the project.'
+                    ? 'A milestone is waiting for your approval. Once every milestone is approved you can complete the project.'
+                    : 'Your team is working on it. Each milestone comes to you for approval when they submit it; once all are approved you can complete the project.'
+                  : allMilestonesApproved
+                    ? 'Every milestone is approved. Complete the project to close it and rate your team.'
                   : canComplete
                     ? 'Work has been submitted. When you are happy with it, approve and complete the project.'
                     : 'The team is working on it. You can approve the project once they submit their work.'}
               </span>
             </div>
-            <button onClick={() => setReview({ isOpen: true, rating: 5, comment: '' })} disabled={!canComplete || busy} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
-              <CheckCircle2 size={15} /> Approve & complete
-            </button>
+            {awaitingReview > 0 ? (
+              <button onClick={() => openTab('work')} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
+                <Flag size={15} /> Review milestone
+              </button>
+            ) : (
+              <button onClick={() => setReview({ isOpen: true, rating: 5, comment: '' })} disabled={!canComplete || busy} className="btn-primary self-start sm:self-auto shrink-0 whitespace-nowrap">
+                <CheckCircle2 size={15} /> Approve & complete
+              </button>
+            )}
           </div>
         )}
 
@@ -429,8 +463,38 @@ const ManageCampaign = () => {
         )}
         {isCompleted && team.length > 0 && <ImpactStatementCard campaign={campaign} />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        {/* Sections */}
+        <div id="project-tabs" role="tablist" className="flex gap-1 sm:gap-4 border-b border-[rgba(10,23,72,0.12)] overflow-x-auto overflow-y-hidden scroll-mt-24">
+          {TABS.filter((tab) => !(isClubFlow && tab.key === 'messages')).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={activeTab === key}
+              onClick={() => setActiveTab(key)}
+              className={`pb-3 px-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap flex items-center gap-2 transition-colors ${
+                activeTab === key ? 'border-[#00AEEF] text-[#0090C6]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
+              }`}
+            >
+              {icon} {label}
+              {key === 'work' && awaitingReview > 0 && <span className="badge bg-amber-50 border-amber-200 text-amber-800 px-1.5 py-0">{awaitingReview}</span>}
+              {key === 'messages' && chat.unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{chat.unread}</span>}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'overview' && (
+          <ProjectOverview
+            campaign={campaign}
+            stats={clientStats(campaign, isClubFlow)}
+            events={latestEvents(campaign)}
+            isClubFlow={isClubFlow}
+            noTeamText={isClubFlow ? 'Clubs apply to this project. Review their applications in the Team tab.' : 'No team yet. A UniPact admin is reviewing verified students for this project.'}
+            onOpenTab={openTab}
+          />
+        )}
+
+        {activeTab === 'team' && (
+          <div className="space-y-6">
             {/* Team */}
             {team.length > 0 && (
               <section className="card p-6 sm:p-8">
@@ -461,11 +525,12 @@ const ManageCampaign = () => {
                       <div className="text-xs text-[#5B6478] mt-0.5">{[s.university, s.major].filter(Boolean).join(' • ')}</div>
                       {s.skills?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {s.skills.slice(0, 4).map((skill) => (
+                          {s.skills.map((skill) => (
                             <span key={skill} className="text-[11px] px-2 py-0.5 rounded bg-white border border-[rgba(10,23,72,0.08)]">{skill}</span>
                           ))}
                         </div>
                       )}
+                      {s.bio && <p className="text-xs text-[#5B6478] mt-2 line-clamp-4">{s.bio}</p>}
                       <span className="text-xs font-semibold text-[#0090C6] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
                     </Link>
                   ))}
@@ -473,6 +538,54 @@ const ManageCampaign = () => {
               </section>
             )}
 
+            {/* Club applications (V2.2.1) */}
+            {applications.length > 0 && (
+              <section className="card p-6 sm:p-8">
+                <h2 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">
+                  <Trophy size={18} className="text-[#00AEEF]" /> Club applications ({applications.length})
+                </h2>
+                <div className="space-y-3">
+                  {applications.map((app) => (
+                    <div key={app.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex flex-col md:flex-row justify-between gap-4 text-sm">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link to={`/club/profile/${app.club_user_id}`} className="font-semibold hover:text-[#0090C6]">{app.club_name}</Link>
+                          <StatusBadge status={isCompleted && ['AWARDED', 'SUBMITTED'].includes(app.status) ? 'COMPLETED' : app.status} />
+                        </div>
+                        <p className="text-[#5B6478] mt-1">“{app.message}”</p>
+                        <div className="text-xs text-[#5B6478] mt-2 flex items-center gap-1.5"><Clock size={12} /> Applied {formatDate(app.submitted_at)}</div>
+                        {app.deliverables?.length > 0 && (
+                          <div className="flex flex-wrap gap-3 mt-2">
+                            {app.deliverables.map((d) => (
+                              <a key={d.id} href={d.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1 text-xs">
+                                <Download size={12} /> Submission {formatDate(d.uploaded_at)}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {campaign.status === 'OPEN' && app.status === 'PENDING' && (
+                        <button onClick={() => handleAwardClick(app.id, app.club_name)} className="btn-primary btn-sm self-start">
+                          <Trophy size={14} /> Award contract
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {team.length === 0 && applications.length === 0 && (
+              <section className="card p-10 text-center text-sm text-[#5B6478]">
+                <Users className="mx-auto mb-2 text-[#00AEEF]" size={28} />
+                No team yet. A UniPact admin is reviewing verified students and will propose the best match here.
+              </section>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'work' && (
+          <div className="space-y-6">
             {/* Milestones (managed escrow) */}
             {milestones.length > 0 && (
               <section className="card p-6 sm:p-8">
@@ -548,11 +661,25 @@ const ManageCampaign = () => {
             {/* Deliverables */}
             {(team.length > 0 || deliverables.length > 0) && (
               <section className="card p-6 sm:p-8">
-                <h2 className="font-heading text-lg font-bold mb-4">Submitted work ({deliverables.length})</h2>
-                {deliverables.length === 0 ? (
+                <h2 className="font-heading text-lg font-bold mb-4">Submitted work ({submittedCount})</h2>
+                {submittedCount === 0 ? (
                   <p className="text-sm text-[#5B6478]">Nothing submitted yet. You&apos;ll see links and files here as soon as the team uploads them.</p>
                 ) : (
                   <div className="space-y-3">
+                    {milestoneSubmissions.map((m) => (
+                      <div key={`milestone-${m.id}`} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 text-sm">
+                        <div className="flex flex-wrap justify-between items-start gap-2 mb-1">
+                          <div className="font-semibold text-base">Milestone {m.step_number}: {m.title}</div>
+                          <span className="text-xs text-[#5B6478]">{formatDate(m.submitted_at, '')}</span>
+                        </div>
+                        <div className="text-[#5B6478] mb-2">{m.status === 'APPROVED' ? 'Approved' : 'Waiting for your review above'}</div>
+                        {m.deliverable_notes && <p className="bg-white p-3 rounded border border-[rgba(10,23,72,0.06)] mb-2">{m.deliverable_notes}</p>}
+                        <div className="flex flex-wrap gap-4">
+                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
+                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
+                        </div>
+                      </div>
+                    ))}
                     {deliverables.map((del) => (
                       <div key={del.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 text-sm">
                         <div className="flex flex-wrap justify-between items-start gap-2 mb-1">
@@ -572,43 +699,34 @@ const ManageCampaign = () => {
               </section>
             )}
 
-            {/* Club applications (V2.2.1) */}
-            {applications.length > 0 && (
-              <section className="card p-6 sm:p-8">
-                <h2 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">
-                  <Trophy size={18} className="text-[#00AEEF]" /> Club applications ({applications.length})
-                </h2>
-                <div className="space-y-3">
-                  {applications.map((app) => (
-                    <div key={app.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex flex-col md:flex-row justify-between gap-4 text-sm">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link to={`/club/profile/${app.club_user_id}`} className="font-semibold hover:text-[#0090C6]">{app.club_name}</Link>
-                          <StatusBadge status={isCompleted && ['AWARDED', 'SUBMITTED'].includes(app.status) ? 'COMPLETED' : app.status} />
-                        </div>
-                        <p className="text-[#5B6478] mt-1">“{app.message}”</p>
-                        <div className="text-xs text-[#5B6478] mt-2 flex items-center gap-1.5"><Clock size={12} /> Applied {formatDate(app.submitted_at)}</div>
-                        {app.deliverables?.length > 0 && (
-                          <div className="flex flex-wrap gap-3 mt-2">
-                            {app.deliverables.map((d) => (
-                              <a key={d.id} href={d.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1 text-xs">
-                                <Download size={12} /> Submission {formatDate(d.uploaded_at)}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {campaign.status === 'OPEN' && app.status === 'PENDING' && (
-                        <button onClick={() => handleAwardClick(app.id, app.club_name)} className="btn-primary btn-sm self-start">
-                          <Trophy size={14} /> Award contract
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            {milestones.length === 0 && team.length === 0 && deliverables.length === 0 && (
+              <section className="card p-10 text-center text-sm text-[#5B6478]">
+                <Flag className="mx-auto mb-2 text-[#00AEEF]" size={28} />
+                {isClubFlow
+                  ? 'Each club\'s submissions are listed with its application in the Team tab.'
+                  : 'Nothing here yet. Milestones and submitted work appear once your team is matched.'}
               </section>
             )}
+          </div>
+        )}
 
+        {activeTab === 'messages' && <ProjectMessages chat={chat} viewer="client" started={chatEnabled} />}
+
+        {activeTab === 'payments' && (
+          <ProjectPayments
+            campaign={campaign}
+            invoice={invoice}
+            isClubFlow={isClubFlow}
+            balancePayable={balancePayable}
+            onPayNow={openBalancePayment}
+            onDownloadInvoice={handleDownloadInvoice}
+            downloading={downloading}
+          />
+        )}
+
+        {activeTab === 'brief' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Brief */}
             <section className="card p-6 sm:p-8 space-y-4">
               <h2 className="font-heading text-lg font-bold">Project brief</h2>
@@ -676,6 +794,7 @@ const ManageCampaign = () => {
             )}
           </aside>
         </div>
+        )}
       </main>
 
       {/* Review modal */}

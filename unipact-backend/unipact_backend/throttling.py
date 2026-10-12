@@ -38,3 +38,13 @@ class PasswordChangeThrottle(ScopedIPThrottle):
 
 class EmailVerifyThrottle(ScopedIPThrottle):
     scope = 'email_verify'
+
+
+class ProjectMessageThrottle(ScopedIPThrottle):
+    """How fast one signed-in person may post project messages (per account, not per IP)."""
+    scope = 'project_message'
+
+    def get_cache_key(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return None
+        return self.cache_format % {'scope': self.scope, 'ident': request.user.pk}

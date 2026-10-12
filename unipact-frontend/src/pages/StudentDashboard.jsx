@@ -8,25 +8,23 @@ import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import ClubCommittee from '../components/ClubCommittee';
-import ImpactLedgerPanel from '../components/ImpactLedgerPanel';
+import StudentProjectCard from '../components/StudentProjectCard';
 import AgreementModal from '../components/AgreementModal';
 import { agreementRequiredBy } from '../utils/agreements';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
+import { studentNextStep } from '../utils/projectSummary';
 import {
   GraduationCap,
   Briefcase,
   ShieldCheck,
   AlertCircle,
-  ArrowUpRight,
+  ArrowRight,
   Share2,
   Upload,
   Users,
-  UserPlus,
   Check,
   X,
   ExternalLink,
-  FileText,
-  Download,
   CalendarDays,
   Compass,
   Loader2,
@@ -35,7 +33,6 @@ import {
   Sparkles,
   CreditCard,
   Wallet,
-  Flag,
 } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -50,7 +47,7 @@ const SectionHeading = ({ title, description, action }) => (
 );
 
 const StudentDashboard = () => {
-  usePageTitle('My workspace');
+  usePageTitle('Workspace');
   const { user } = useAuth();
   const { showToast } = useToast();
   const isClub = user?.role === 'CLUB';
@@ -71,29 +68,11 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
-  // Deliverable modal state
-  const [activeJob, setActiveJob] = useState(null);
-  const [deliverable, setDeliverable] = useState({ title: '', url: '', role: '', summary: '', file: null });
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-
-  // Invite teammate modal state
-  const [inviteModalJob, setInviteModalJob] = useState(null);
-  const [invite, setInvite] = useState({ email: '', role: '', share: '30', notes: '' });
-  const [inviting, setInviting] = useState(false);
-  const [inviteError, setInviteError] = useState('');
-
   // Decline offer modal state
   const [declineJob, setDeclineJob] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
 
   const [agreementGate, setAgreementGate] = useState(null); // { agreement, retry }: accept it, then carry on
-  // Milestone submission modal state (managed escrow)
-  const [milestoneTarget, setMilestoneTarget] = useState(null); // { job, milestone }
-  const [milestoneForm, setMilestoneForm] = useState({ url: '', notes: '', file: null });
-  const [submittingMilestone, setSubmittingMilestone] = useState(false);
-  const [milestoneError, setMilestoneError] = useState('');
-
   const fetchDashboard = useCallback(async () => {
     try {
       if (isClubMember) {
@@ -151,105 +130,13 @@ const StudentDashboard = () => {
     }
   };
 
-  const openInviteModal = (job) => {
-    setInviteModalJob(job);
-    setInvite({ email: '', role: '', share: '30', notes: '' });
-    setInviteError('');
-  };
-
-  const handleSendInvite = async (e) => {
-    e.preventDefault();
-    setInviting(true);
-    setInviteError('');
-    try {
-      await api.post(`/campaigns/${inviteModalJob.id}/team/invite/`, {
-        email: invite.email.trim(),
-        role_in_project: invite.role.trim(),
-        payout_share_percentage: parseInt(invite.share, 10) || 0,
-        notes: invite.notes,
-      });
-      showToast(`Invitation sent to ${invite.email.trim()}.`, 'success');
-      setInviteModalJob(null);
-      await fetchDashboard();
-    } catch (err) {
-      setInviteError(getErrorMessage(err, 'Could not send the invitation.'));
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const openSubmitModal = (job) => {
-    setActiveJob(job);
-    setDeliverable({ title: `${job.title} – deliverable`, url: '', role: '', summary: '', file: null });
-    setSubmitError('');
-  };
-
-  const handleSubmitDeliverable = async (e) => {
-    e.preventDefault();
-    if (!deliverable.url.trim() && !deliverable.file) {
-      setSubmitError('Add a link to your work or attach a file.');
-      return;
-    }
-    setSubmitting(true);
-    setSubmitError('');
-    try {
-      const formData = new FormData();
-      formData.append('title', deliverable.title);
-      if (deliverable.url.trim()) formData.append('external_url', deliverable.url.trim());
-      formData.append('contribution_role', deliverable.role);
-      formData.append('contribution_summary', deliverable.summary);
-      if (deliverable.file) formData.append('file', deliverable.file);
-
-      await api.post(`/campaigns/${activeJob.id}/student-deliverable/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      showToast('Deliverable submitted. The client has been notified.', 'success');
-      setActiveJob(null);
-      await fetchDashboard();
-    } catch (err) {
-      setSubmitError(getErrorMessage(err, 'Could not submit your deliverable.'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const openMilestoneModal = (job, milestone) => {
-    setMilestoneTarget({ job, milestone });
-    setMilestoneForm({ url: milestone.deliverable_url || '', notes: '', file: null });
-    setMilestoneError('');
-  };
-
-  const handleSubmitMilestone = async (e) => {
-    e.preventDefault();
-    if (!milestoneForm.url.trim() && !milestoneForm.file) {
-      setMilestoneError('Add a link to your work or attach a file.');
-      return;
-    }
-    setSubmittingMilestone(true);
-    setMilestoneError('');
-    try {
-      const { job, milestone } = milestoneTarget;
-      const formData = new FormData();
-      if (milestoneForm.url.trim()) formData.append('deliverable_url', milestoneForm.url.trim());
-      formData.append('deliverable_notes', milestoneForm.notes);
-      if (milestoneForm.file) formData.append('deliverable_file', milestoneForm.file);
-
-      await api.post(`/campaigns/${job.id}/milestones/${milestone.id}/submit/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      showToast('Milestone submitted. The client has been notified.', 'success');
-      setMilestoneTarget(null);
-      await fetchDashboard();
-    } catch (err) {
-      setMilestoneError(getErrorMessage(err, 'Could not submit this milestone.'));
-    } finally {
-      setSubmittingMilestone(false);
-    }
-  };
-
   // Admin match offers the student hasn't answered yet are shown apart from their projects
   const offers = assignedJobs.filter((j) => j.status === 'MATCHED' && j.my_offer?.status === 'PENDING');
   const projects = assignedJobs.filter((j) => !offers.includes(j));
+  // The workspace shows the few that matter now (ones waiting on the student first, then other active
+  // ones, then finished ones); the Projects page has them all
+  const projectPriority = (j) => (studentNextStep(j).action ? 0 : ['IN_PROGRESS', 'MATCHED'].includes(j.status) ? 1 : 2);
+  const featuredProjects = [...projects].sort((x, y) => projectPriority(x) - projectPriority(y)).slice(0, 3);
   const activeCount = projects.filter((j) => ['IN_PROGRESS', 'MATCHED'].includes(j.status)).length;
   const completedCount = projects.filter((j) => j.status === 'COMPLETED').length;
 
@@ -571,7 +458,15 @@ const StudentDashboard = () => {
 
             {/* Project workspaces */}
             <section className="space-y-4">
-              <SectionHeading title="Your projects" description="Projects you have been matched to or joined as a teammate." />
+              <SectionHeading
+                title="Your projects"
+                description="Projects you have been matched to or joined as a teammate. Open one to submit work, see your team and track your payouts."
+                action={projects.length > 0 && (
+                  <Link to="/student/projects" className="btn-secondary btn-sm self-start">
+                    All projects ({projects.length}) <ArrowRight size={14} />
+                  </Link>
+                )}
+              />
 
               {projects.length === 0 ? (
                 <div className="card p-12 text-center">
@@ -584,16 +479,9 @@ const StudentDashboard = () => {
                   <Link to={portfolioPath} className="btn-secondary mt-5">View my portfolio</Link>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {projects.map((job) => (
-                    <ProjectCard
-                      key={job.id}
-                      job={job}
-                      myProfileId={studentProfile.id}
-                      onSubmit={() => openSubmitModal(job)}
-                      onInvite={() => openInviteModal(job)}
-                      onSubmitMilestone={(milestone) => openMilestoneModal(job, milestone)}
-                    />
+                <div className="space-y-4">
+                  {featuredProjects.map((job) => (
+                    <StudentProjectCard key={job.id} job={job} />
                   ))}
                 </div>
               )}
@@ -601,49 +489,6 @@ const StudentDashboard = () => {
           </>
         )}
       </main>
-
-      {/* Deliverable submission modal */}
-      <Modal
-        isOpen={!!activeJob}
-        onClose={() => !submitting && setActiveJob(null)}
-        title="Submit your work"
-        subtitle={activeJob ? `${activeJob.title} · ${activeJob.company_name}` : ''}
-        icon={<Upload size={20} />}
-        maxWidth="max-w-xl"
-      >
-        {submitError && (
-          <div className="alert-error mb-4"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{submitError}</span></div>
-        )}
-        <form onSubmit={handleSubmitDeliverable} className="space-y-4">
-          <div>
-            <label className="field-label" htmlFor="deliv-title">Title</label>
-            <input id="deliv-title" required value={deliverable.title} onChange={(e) => setDeliverable({ ...deliverable, title: e.target.value })} className="input" />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="deliv-url">Link to your work</label>
-            <input id="deliv-url" type="url" value={deliverable.url} onChange={(e) => setDeliverable({ ...deliverable, url: e.target.value })} placeholder="https://github.com/… or https://staging.example.com" className="input" />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="deliv-file">Or attach a file</label>
-            <input id="deliv-file" type="file" onChange={(e) => setDeliverable({ ...deliverable, file: e.target.files?.[0] || null })} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
-            <p className="field-hint">PDF, ZIP, MP4 or any file the client asked for. Provide a link, a file, or both.</p>
-          </div>
-          <div>
-            <label className="field-label" htmlFor="deliv-role">Your role on this deliverable</label>
-            <input id="deliv-role" required value={deliverable.role} onChange={(e) => setDeliverable({ ...deliverable, role: e.target.value })} placeholder="e.g. Lead full-stack developer" className="input" />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="deliv-summary">What did you do?</label>
-            <textarea id="deliv-summary" rows={3} required value={deliverable.summary} onChange={(e) => setDeliverable({ ...deliverable, summary: e.target.value })} placeholder="Summarise what you built or produced. This appears on your verified portfolio." className="input" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(10,23,72,0.08)]">
-            <button type="button" onClick={() => setActiveJob(null)} disabled={submitting} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={submitting} className="btn-primary">
-              {submitting ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : 'Submit deliverable'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {agreementGate && (
         <AgreementModal
@@ -656,41 +501,6 @@ const StudentDashboard = () => {
           }}
         />
       )}
-
-      {/* Milestone submission modal (managed escrow) */}
-      <Modal
-        isOpen={!!milestoneTarget}
-        onClose={() => !submittingMilestone && setMilestoneTarget(null)}
-        title="Submit milestone"
-        subtitle={milestoneTarget ? `${milestoneTarget.milestone.title} · ${milestoneTarget.job.title}` : ''}
-        icon={<Flag size={20} />}
-        maxWidth="max-w-xl"
-      >
-        {milestoneError && (
-          <div className="alert-error mb-4"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{milestoneError}</span></div>
-        )}
-        <form onSubmit={handleSubmitMilestone} className="space-y-4">
-          <div>
-            <label className="field-label" htmlFor="milestone-url">Link to your work</label>
-            <input id="milestone-url" type="url" value={milestoneForm.url} onChange={(e) => setMilestoneForm({ ...milestoneForm, url: e.target.value })} placeholder="https://github.com/… or https://staging.example.com" className="input" />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="milestone-file">Or attach a file</label>
-            <input id="milestone-file" type="file" onChange={(e) => setMilestoneForm({ ...milestoneForm, file: e.target.files?.[0] || null })} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
-            <p className="field-hint">Provide a link, a file, or both.</p>
-          </div>
-          <div>
-            <label className="field-label" htmlFor="milestone-notes">Notes for the client (optional)</label>
-            <textarea id="milestone-notes" rows={3} value={milestoneForm.notes} onChange={(e) => setMilestoneForm({ ...milestoneForm, notes: e.target.value })} placeholder="What's included in this milestone?" className="input" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(10,23,72,0.08)]">
-            <button type="button" onClick={() => setMilestoneTarget(null)} disabled={submittingMilestone} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={submittingMilestone} className="btn-primary">
-              {submittingMilestone ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : 'Submit milestone'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Decline offer modal */}
       <Modal
@@ -715,48 +525,6 @@ const StudentDashboard = () => {
         </form>
       </Modal>
 
-      {/* Invite teammate modal */}
-      <Modal
-        isOpen={!!inviteModalJob}
-        onClose={() => !inviting && setInviteModalJob(null)}
-        title="Invite a teammate"
-        subtitle={inviteModalJob ? `${inviteModalJob.title} · ${inviteModalJob.company_name}` : ''}
-        icon={<UserPlus size={20} />}
-      >
-        {inviteError && (
-          <div className="alert-error mb-4"><AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{inviteError}</span></div>
-        )}
-        <form onSubmit={handleSendInvite} className="space-y-4">
-          <div>
-            <label className="field-label" htmlFor="invite-email">Student&apos;s email</label>
-            <input id="invite-email" type="email" required value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} placeholder="classmate@university.edu.my" className="input" />
-            <p className="field-hint">We&apos;ll email them the invitation. If they&apos;re not on UniPact yet, they can sign up with this email and find it on their dashboard.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label" htmlFor="invite-role">Their role</label>
-              <input id="invite-role" required value={invite.role} onChange={(e) => setInvite({ ...invite, role: e.target.value })} placeholder="e.g. UI/UX designer" className="input" />
-            </div>
-            <div>
-              <label className="field-label" htmlFor="invite-share">Payout share</label>
-              <div className="relative">
-                <input id="invite-share" type="number" min="0" max="100" step="1" required value={invite.share} onChange={(e) => setInvite({ ...invite, share: e.target.value })} className="input pr-8" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5B6478] text-sm">%</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="field-label" htmlFor="invite-notes">Notes (optional)</label>
-            <textarea id="invite-notes" rows={3} value={invite.notes} onChange={(e) => setInvite({ ...invite, notes: e.target.value })} placeholder="What would you like them to work on?" className="input" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(10,23,72,0.08)]">
-            <button type="button" onClick={() => setInviteModalJob(null)} disabled={inviting} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={inviting} className="btn-primary">
-              {inviting ? <><Loader2 size={15} className="animate-spin" /> Sending…</> : <><UserPlus size={15} /> Send invitation</>}
-            </button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };
@@ -823,195 +591,6 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
           </button>
         </div>
       </div>
-    </article>
-  );
-};
-
-const ProjectCard = ({ job, myProfileId, onSubmit, onInvite, onSubmitMilestone }) => {
-  const pendingInvites = (job.team_invitations || []).filter((i) => i.status === 'PENDING');
-  const team = job.assigned_students_details || [];
-  const assets = job.client_assets || [];
-  const submissions = job.student_deliverables || [];
-  const milestones = job.milestones || [];
-  const isOpen = job.status !== 'COMPLETED';
-  const canSubmitMilestone = (m) => ['PENDING', 'IN_PROGRESS', 'REVISION_REQUESTED'].includes(m.status);
-  // Clients approve (and pay for) milestones, not loose files, so the main button submits the next
-  // milestone that is still open. A requested revision comes first.
-  const nextMilestone = milestones.find((m) => m.status === 'REVISION_REQUESTED') || milestones.find(canSubmitMilestone);
-
-  return (
-    <article className="card p-6 sm:p-8 hover:border-[#00AEEF] transition-colors">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(job.type)}</span>
-            <StatusBadge status={job.status} />
-          </div>
-          <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
-          <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
-            <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
-            <span>Team pay: <strong className="text-[#0B1E63]">{formatMoney(job.student_pool ?? job.budget)}</strong>{job.student_pool && <span className="text-xs"> (after {job.service_fee_percent}% UniPact fee)</span>}</span>
-            <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
-          </p>
-        </div>
-        {job.status === 'IN_PROGRESS' && (nextMilestone ? (
-          <button onClick={() => onSubmitMilestone(nextMilestone)} className="btn-primary self-start shrink-0 whitespace-nowrap">
-            <Upload size={15} /> {nextMilestone.status === 'REVISION_REQUESTED' ? 'Resubmit' : 'Submit'} milestone {nextMilestone.step_number}
-          </button>
-        ) : (
-          <button onClick={onSubmit} className={`${milestones.length > 0 ? 'btn-secondary' : 'btn-primary'} self-start shrink-0 whitespace-nowrap`}>
-            <Upload size={15} /> {milestones.length > 0 ? 'Share another file' : 'Submit work'}
-          </button>
-        ))}
-      </div>
-
-      {job.status === 'MATCHED' && (
-        <p className="mt-4 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 flex items-start gap-2">
-          <Clock size={16} className="shrink-0 mt-0.5" />
-          <span>
-            You accepted this project.{' '}
-            {job.awaiting_student_acceptance
-              ? 'We\'re waiting for the rest of the team to accept, then the client confirms and work starts.'
-              : 'Work starts as soon as the client confirms the match.'}
-          </span>
-        </p>
-      )}
-
-      {job.description && <p className="mt-4 text-sm text-[#0A1748] leading-relaxed">{job.description}</p>}
-
-      {job.match_notes && (
-        <div className="mt-4 p-3.5 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg text-sm">
-          <strong className="text-[#0090C6]">Why you were matched:</strong> {job.match_notes}
-        </div>
-      )}
-
-      {/* Requirements */}
-      {job.requirements?.length > 0 && (
-        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
-          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2">What the client needs</h4>
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-            {job.requirements.map((req, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <CheckCircle2 size={15} className="text-[#00AEEF] shrink-0 mt-0.5" /> {req}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Client files */}
-      {assets.length > 0 && (
-        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
-          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2">Files from the client ({assets.length})</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {assets.map((asset) => (
-              <a key={asset.id} href={asset.file} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-lg border border-[rgba(10,23,72,0.08)] bg-[#F5F7FC] hover:border-[#00AEEF] text-sm group">
-                <FileText size={16} className="text-[#00AEEF] shrink-0" />
-                <span className="truncate flex-1 font-medium">{asset.title}</span>
-                <Download size={15} className="text-[#5B6478] group-hover:text-[#0090C6] shrink-0" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Team */}
-      <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider flex items-center gap-2">
-            <Users size={14} className="text-[#00AEEF]" /> Project team ({team.length})
-          </h4>
-          {isOpen && (
-            <button onClick={onInvite} className="btn-secondary btn-sm">
-              <UserPlus size={13} /> Invite teammate
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {team.map((member) => (
-            <div key={member.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3 flex items-center justify-between gap-2 text-sm">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold truncate">{member.full_name}</span>
-                  {member.id === myProfileId && <span className="badge bg-[#00AEEF]/15 border-transparent text-[#0090C6] px-1.5 py-0 text-[10px]">You</span>}
-                </div>
-                <p className="text-xs text-[#5B6478] truncate">{member.university}</p>
-              </div>
-              <Link to={`/student/profile/${member.user_id}`} title={`View ${member.full_name}'s portfolio`} aria-label={`View ${member.full_name}'s portfolio`} className="p-3 -m-1.5 sm:p-1.5 sm:m-0 rounded text-[#5B6478] hover:text-[#0090C6] hover:bg-white shrink-0">
-                <ArrowUpRight size={15} />
-              </Link>
-            </div>
-          ))}
-        </div>
-        {pendingInvites.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {pendingInvites.map((inv) => (
-              <span key={inv.id} className="badge bg-amber-50 border-amber-200 text-amber-900 font-normal">
-                Invited {inv.invitee_email} as {inv.role_in_project} ({inv.payout_share_percentage}%) · awaiting reply
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Milestones (managed escrow) */}
-      {milestones.length > 0 && (
-        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
-          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2 flex items-center gap-2">
-            <Flag size={14} className="text-[#00AEEF]" /> Milestones ({milestones.length})
-          </h4>
-          <p className="text-xs text-[#5B6478] mb-2">Submit your work against a milestone. You&apos;re paid for it once the client approves it.</p>
-          <div className="space-y-2">
-            {milestones.map((m) => (
-              <div key={m.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold">{m.step_number}. {m.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading font-bold text-[#0B1E63]">{formatMoney(m.amount)}</span>
-                    <StatusBadge status={m.status} />
-                  </div>
-                </div>
-                {m.status === 'REVISION_REQUESTED' && m.deliverable_notes && (
-                  <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-                    <strong>Client feedback</strong> (revision {m.revisions_used} of {m.max_revisions}): {m.deliverable_notes}
-                  </p>
-                )}
-                {m.status === 'SUBMITTED' && m.review_due_at && (
-                  <p className="mt-2 text-xs text-[#5B6478]">With the client for review. If they don&apos;t respond by {formatDate(m.review_due_at)}, it is accepted automatically.</p>
-                )}
-                {m.status === 'APPROVED' && (
-                  <p className="mt-2 text-xs text-[#5B6478]">Accepted{m.auto_approved ? ' automatically' : ''}. UniPact pays you within 7 working days.</p>
-                )}
-                {canSubmitMilestone(m) && (
-                  <button onClick={() => onSubmitMilestone(m)} className="btn-secondary btn-sm mt-2">
-                    <Upload size={13} /> {m.status === 'REVISION_REQUESTED' ? 'Resubmit' : 'Submit milestone'}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Submissions */}
-      {submissions.length > 0 && (
-        <div className="mt-5 pt-5 border-t border-[rgba(10,23,72,0.08)]">
-          <h4 className="text-xs font-semibold text-[#5B6478] uppercase tracking-wider mb-2">Submitted work ({submissions.length})</h4>
-          <ul className="space-y-2">
-            {submissions.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 text-sm p-3 rounded-lg bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)]">
-                <span><strong>{s.title}</strong> <span className="text-[#5B6478]">by {s.student_name} · {formatDate(s.submitted_at)}</span></span>
-                <span className="flex gap-3">
-                  {s.external_url && <a href={s.external_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline">Open link</a>}
-                  {s.file && <a href={s.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline">Download file</a>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {job.status === 'COMPLETED' && <ImpactLedgerPanel campaignId={job.id} />}
     </article>
   );
 };

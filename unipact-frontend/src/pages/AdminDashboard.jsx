@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, CheckCircle2, XCircle, Search, Activity, Users, ChevronLeft, ChevronRight, Ban,
   Briefcase, UserCheck, Check, Sparkles, Lock, FileText, Loader2, Inbox,
-  CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye,
+  CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye, MessageSquare,
 } from 'lucide-react';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import WorkspaceNav from '../components/WorkspaceNav';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
+import AdminUserModal from '../components/AdminUserModal';
+import AdminConversations from '../components/AdminConversations';
 import StatusBadge from '../components/StatusBadge';
 import PageLoader from '../components/PageLoader';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
@@ -18,6 +20,7 @@ const TABS = [
   { key: 'dashboard', label: 'Overview', icon: <Activity size={16} /> },
   { key: 'entities', label: 'Users', icon: <Users size={16} /> },
   { key: 'matchmaking', label: 'Matchmaking', icon: <Sparkles size={16} /> },
+  { key: 'messages', label: 'Messages', icon: <MessageSquare size={16} /> },
   { key: 'payouts', label: 'Payouts', icon: <CreditCard size={16} /> },
   { key: 'ledgers', label: 'Impact ledgers', icon: <Award size={16} /> },
 ];
@@ -70,6 +73,7 @@ const AdminDashboard = () => {
   const [logs, setLogs] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [verdictLoading, setVerdictLoading] = useState(null);
+  const [detailUserId, setDetailUserId] = useState(null); // the account whose full details are open
 
   // Users
   const [entities, setEntities] = useState([]);
@@ -141,6 +145,30 @@ const AdminDashboard = () => {
       setRecordingPayout(false);
     }
   };
+
+  // Project conversations (the Messages tab). Loaded with the hub so the tab can show what is unread.
+  const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      setConversations((await api.get('/campaigns/conversations/')).data);
+    } catch {
+      // Refreshed every half minute; keep showing the last list we had
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchConversations();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchConversations]);
+
+  const unreadMessages = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   const fetchLogs = useCallback(async () => {
 
@@ -351,14 +379,26 @@ const AdminDashboard = () => {
   const addMilestoneRow = () => setMilestoneRows((rows) => [...rows, { title: '', percentage: 0 }]);
   const removeMilestoneRow = (index) => setMilestoneRows((rows) => rows.filter((_, i) => i !== index));
 
+  // The rows on screen are only a draft (a new project starts with "Delivery 100%") until they are sent
+  const savedPlan = selectedCampaign?.milestones || [];
+  const planReady = milestonePercentTotal === 100 && milestoneRows.every((r) => r.title.trim());
+  const planUnsaved = Boolean(selectedCampaign) && !selectedCampaign.is_match_finalized && (
+    savedPlan.length !== milestoneRows.length
+    || milestoneRows.some((r, i) => r.title.trim() !== savedPlan[i].title || Number(r.percentage) !== Number(savedPlan[i].percentage))
+  );
+
+  const postMilestonePlan = async () => {
+    const res = await api.post(`/campaigns/${selectedCampaign.id}/milestones/plan/`, {
+      milestones: milestoneRows.map((r, i) => ({ title: r.title.trim() || `Milestone ${i + 1}`, percentage: Number(r.percentage) || 0 })),
+    });
+    setCampaigns((prev) => prev.map((c) => (c.id === selectedCampaign.id ? { ...c, milestones: res.data } : c)));
+  };
+
   const saveMilestonePlan = async () => {
     setSavingMilestonePlan(true);
     try {
-      const res = await api.post(`/campaigns/${selectedCampaign.id}/milestones/plan/`, {
-        milestones: milestoneRows.map((r, i) => ({ title: r.title.trim() || `Milestone ${i + 1}`, percentage: Number(r.percentage) || 0 })),
-      });
+      await postMilestonePlan();
       showToast('Milestone plan saved.', 'success');
-      setCampaigns((prev) => prev.map((c) => (c.id === selectedCampaign.id ? { ...c, milestones: res.data } : c)));
     } catch (err) {
       showToast(getErrorMessage(err, 'Could not save the milestone plan.'), 'error');
     } finally {
@@ -379,8 +419,15 @@ const AdminDashboard = () => {
   }, [students, studentSearch, selectedCampaign?.type]);
 
   const handleAssignMatch = async () => {
+    if (planUnsaved && !planReady) {
+      showToast('Finish the milestone plan first: every milestone needs a title and the percentages must add up to 100.', 'error');
+      return;
+    }
     setMatchSubmitting(true);
     try {
+      // The plan on screen goes with the match. Without a saved plan the client is asked to confirm a
+      // team they can't confirm ("UniPact hasn't set up a milestone plan").
+      if (planUnsaved) await postMilestonePlan();
       const res = await api.post(`/campaigns/${selectedCampaign.id}/match/`, { student_ids: selectedStudentIds, match_notes: matchNotes });
       showToast(res.data?.message || `Offer sent for "${selectedCampaign.title}".`, 'success');
       if (campaignFilter === 'OPEN') setCampaignFilter('MATCHED');
@@ -419,7 +466,14 @@ const AdminDashboard = () => {
       }
       const name = entity.company_name || entity.club_name || entity.full_name;
       showToast(action === 'approve' ? `${name} is now verified.` : action === 'reject' ? `${name} was rejected.` : `${name} was flagged as high risk.`, 'success');
-      fetchLogs();
+      if (detailUserId) {
+        // Decided from the account's details, which also covers accounts that weren't in the queue:
+        // re-read the queue and the counts rather than adjusting them by hand
+        setDetailUserId(null);
+        fetchDashboardData();
+      } else {
+        fetchLogs();
+      }
     } catch (err) {
       showToast(getErrorMessage(err, 'Could not save the decision.'), 'error');
     } finally {
@@ -472,7 +526,6 @@ const AdminDashboard = () => {
 
       <main className="max-w-[1160px] mx-auto px-4 sm:px-8 py-8">
         <div className="mb-6">
-          <p className="eyebrow mb-1"><span className="eyebrow-dot" /> Admin</p>
           <h1 className="font-heading font-extrabold text-2xl sm:text-3xl">Operations hub</h1>
           <p className="text-sm text-[#5B6478] mt-1">Verify new accounts, manage users and match students to client projects.</p>
         </div>
@@ -490,6 +543,7 @@ const AdminDashboard = () => {
             >
               {icon} {label}
               {key === 'dashboard' && reviews.length > 0 && <span className="badge bg-amber-50 border-amber-200 text-amber-800 px-1.5 py-0">{reviews.length}</span>}
+              {key === 'messages' && unreadMessages > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{unreadMessages}</span>}
             </button>
           ))}
         </div>
@@ -526,7 +580,9 @@ const AdminDashboard = () => {
                         <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                           <div className="min-w-0">
                             <h3 className="font-semibold text-base flex flex-wrap items-center gap-2">
-                              {entity.company_name || entity.club_name || entity.full_name}
+                              <button type="button" onClick={() => setDetailUserId(entity.user_id)} className="text-left hover:text-[#0090C6] hover:underline underline-offset-2">
+                                {entity.company_name || entity.club_name || entity.full_name}
+                              </button>
                               <span className="badge bg-[#F5F7FC] border-[rgba(10,23,72,0.12)] text-[#5B6478]">{entity.type.toLowerCase()}</span>
                             </h3>
                             <div className="text-sm text-[#5B6478] mt-1 break-words">
@@ -541,6 +597,9 @@ const AdminDashboard = () => {
                         <div className="flex flex-wrap gap-2 pt-4 border-t border-[rgba(10,23,72,0.08)]">
                           <button onClick={() => confirmVerdict(entity, 'approve')} disabled={busy} className="btn btn-sm bg-emerald-600 text-white hover:bg-emerald-700">
                             {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve
+                          </button>
+                          <button type="button" onClick={() => setDetailUserId(entity.user_id)} className="btn-secondary btn-sm">
+                            <Eye size={14} /> View details
                           </button>
                           {doc ? (
                             <a href={doc} target="_blank" rel="noreferrer" className="btn-secondary btn-sm"><FileText size={14} /> View document</a>
@@ -645,7 +704,7 @@ const AdminDashboard = () => {
                     <li key={ent.id} className="p-4 text-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold break-words">{ent.entity_name}</div>
+                          <button type="button" onClick={() => setDetailUserId(ent.id)} className="font-semibold break-words text-left hover:text-[#0090C6] hover:underline underline-offset-2">{ent.entity_name}</button>
                           <div className="text-[#5B6478] break-all">{ent.email}</div>
                         </div>
                         <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6] shrink-0">{ent.role.toLowerCase()}</span>
@@ -655,9 +714,12 @@ const AdminDashboard = () => {
                         {ent.status === 'Active'
                           ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>
                           : <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>}
-                        <button onClick={() => handleBlockUser(ent)} className={ent.status === 'Active' ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>
-                          {ent.status === 'Active' ? <><Ban size={13} /> Block</> : 'Unblock'}
-                        </button>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setDetailUserId(ent.id)} className="btn-secondary btn-sm"><Eye size={13} /> View</button>
+                          <button onClick={() => handleBlockUser(ent)} className={ent.status === 'Active' ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>
+                            {ent.status === 'Active' ? <><Ban size={13} /> Block</> : 'Unblock'}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))
@@ -683,7 +745,9 @@ const AdminDashboard = () => {
                     ) : (
                       entities.map((ent) => (
                         <tr key={ent.id} className="hover:bg-[#F5F7FC]/60">
-                          <td className="px-4 py-3 font-semibold">{ent.entity_name}</td>
+                          <td className="px-4 py-3 font-semibold">
+                            <button type="button" onClick={() => setDetailUserId(ent.id)} className="text-left hover:text-[#0090C6] hover:underline underline-offset-2">{ent.entity_name}</button>
+                          </td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.email}</td>
                           <td className="px-4 py-3"><span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{ent.role.toLowerCase()}</span></td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.details}</td>
@@ -692,7 +756,8 @@ const AdminDashboard = () => {
                               ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>
                               : <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <button type="button" onClick={() => setDetailUserId(ent.id)} className="btn-secondary btn-sm mr-2"><Eye size={13} /> View</button>
                             <button onClick={() => handleBlockUser(ent)} className={ent.status === 'Active' ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>
                               {ent.status === 'Active' ? <><Ban size={13} /> Block</> : 'Unblock'}
                             </button>
@@ -712,6 +777,17 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* MESSAGES */}
+        {activeTab === 'messages' && (
+          <AdminConversations
+            conversations={conversations}
+            loading={conversationsLoading}
+            onRefresh={fetchConversations}
+            // Opening a conversation reads it: clear its count here without waiting for the next refresh
+            onOpened={(id) => setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)))}
+          />
         )}
 
         {/* MATCHMAKING */}
@@ -1004,6 +1080,16 @@ const AdminDashboard = () => {
                           {savingMilestonePlan ? <Loader2 size={13} className="animate-spin" /> : <Flag size={13} />} Save milestone plan
                         </button>
                       </div>
+                    )}
+                    {planUnsaved && (
+                      <p className="flex items-start gap-1.5 mt-3 text-xs text-amber-800">
+                        <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                        {savedPlan.length > 0
+                          ? 'You have changes to this plan that are not saved yet.'
+                          : selectedCampaign.status === 'MATCHED'
+                            ? 'No milestone plan is saved for this project, so the client cannot confirm the team. Save it now.'
+                            : 'This plan is not saved yet. It is saved when you send the match.'}
+                      </p>
                     )}
                     {selectedCampaign.milestones?.length > 0 && selectedCampaign.is_match_finalized && (
                       <p className="text-xs text-[#5B6478] mt-2">Locked in - {selectedCampaign.milestones.length} milestone(s) set.</p>
@@ -1374,6 +1460,20 @@ const AdminDashboard = () => {
           </form>
         )}
       </Modal>
+
+      {detailUserId && (
+        <AdminUserModal
+          key={detailUserId}
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+          onVerdict={confirmVerdict}
+          verdictBusy={verdictLoading !== null}
+          onChanged={() => {
+            fetchDashboardData();
+            if (activeTab === 'entities') fetchEntities();
+          }}
+        />
+      )}
 
       <ConfirmationModal
 

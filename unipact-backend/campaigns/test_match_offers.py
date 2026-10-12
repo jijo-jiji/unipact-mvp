@@ -1,5 +1,6 @@
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -128,6 +129,28 @@ class MatchOfferFlowTests(APITestCase):
         self.assertEqual(self.respond(self.mei_user, 'accept').status_code, 404)
         self.assertEqual(self.respond(self.company_user, 'accept').status_code, 403)
         self.assertEqual(self.respond(self.ali_user, 'maybe').status_code, 400)
+
+    def test_project_page_gets_the_dates_behind_each_phase(self):
+        """The client's progress bar opens a dated history: when the team was offered, accepted and started."""
+        self.match(self.ali)
+        self.respond(self.ali_user, 'accept')
+        self.client.force_authenticate(self.admin)
+        self.client.post(reverse('milestone_plan', kwargs={'campaign_id': self.campaign.id}),
+                         {'milestones': [{'title': 'Delivery', 'percentage': 100}]}, format='json')
+        self.assertEqual(self.finalize().status_code, status.HTTP_200_OK)
+
+        detail = self.client.get(reverse('campaign_detail', kwargs={'pk': self.campaign.id})).data
+        [offer] = detail['match_offers']
+        self.assertIsNotNone(offer['offered_at'])
+        self.assertIsNotNone(offer['responded_at'])
+        self.assertIsNotNone(detail['started_at'])
+        self.assertIsNone(detail['completed_at'])
+        self.assertIsNotNone(detail['escrow']['payments'][0]['created_at'])
+
+        # The dates are not something the client can set
+        self.client.patch(reverse('campaign_detail', kwargs={'pk': self.campaign.id}), {'started_at': '2020-01-01T00:00:00Z'}, format='json')
+        self.campaign.refresh_from_db()
+        self.assertEqual(self.campaign.started_at.year, timezone.now().year)
 
     def test_admin_lock_also_waits_for_acceptance(self):
         self.match(self.ali)

@@ -92,6 +92,8 @@ class CampaignSerializer(serializers.ModelSerializer):
     # What the team is actually paid: the budget minus UniPact's service fee
     student_pool = serializers.SerializerMethodField()
     service_fee_percent = serializers.SerializerMethodField()
+    # Messages in the project's conversation this viewer hasn't read (None unless they are in it)
+    unread_messages = serializers.SerializerMethodField()
 
     class Meta:
         model = Campaign
@@ -103,6 +105,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             'assigned_students', 'assigned_students_details', 'client_assets', 'student_deliverables',
             'team_invitations', 'milestones', 'match_offers', 'my_offer', 'awaiting_student_acceptance',
             'payment_structure', 'platform_fee_percent', 'student_pool', 'service_fee_percent',
+            'unread_messages',
         ]
         # Talent assignment is admin-only (via /match/), never writable by the posting company.
         # payment_structure/platform_fee_percent are admin-only edits enforced in CampaignDetailView.
@@ -131,6 +134,15 @@ class CampaignSerializer(serializers.ModelSerializer):
         # normalize() alone renders 10 as '1E+1'
         return format(obj.resolved_fee_percent().normalize(), 'f')
 
+    def get_unread_messages(self, obj):
+        # Only the client and the team get a count: it drives the badge on their project cards and tab.
+        # Projects that haven't started have no conversation, so the public board costs no extra queries.
+        user = self._user()
+        if not user or user.role not in ('COMPANY', 'STUDENT') or obj.status not in ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED'):
+            return None
+        from .messaging import is_participant, unread_count
+        return unread_count(user, obj) if is_participant(user, obj) else None
+
     def get_match_offers(self, obj):
         """Who has accepted the admin's offer. Only admins see decline reasons."""
         user = self._user()
@@ -147,6 +159,7 @@ class CampaignSerializer(serializers.ModelSerializer):
                 'student': o.student_id,
                 'student_name': o.student.full_name,
                 'status': o.status,
+                'offered_at': o.created_at,
                 'responded_at': o.responded_at,
                 **({'decline_reason': o.decline_reason} if is_admin else {}),
             }
@@ -178,7 +191,10 @@ class CampaignDetailSerializer(CampaignSerializer):
     invoice = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
-        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow', 'invoice']
+        # started_at / completed_at date the project page's phase history
+        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow', 'invoice',
+                                                   'started_at', 'completed_at']
+        read_only_fields = CampaignSerializer.Meta.read_only_fields + ['started_at', 'completed_at']
 
     def get_invoice(self, obj):
         # The bank-transfer invoice still awaiting payment, for the owning client and admins only

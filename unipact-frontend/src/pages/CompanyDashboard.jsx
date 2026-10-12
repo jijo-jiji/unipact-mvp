@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Users, ArrowUpRight, ShieldCheck, CreditCard, Sparkles, Briefcase, CalendarDays, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Users, ArrowUpRight, ShieldCheck, CreditCard, Sparkles, Briefcase, CalendarDays, AlertCircle, Loader2, MessageSquare } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WorkspaceNav from '../components/WorkspaceNav';
@@ -151,6 +151,11 @@ const CompanyDashboard = () => {
                         <div className="flex flex-wrap items-center gap-2 mb-1.5">
                           <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(camp.type)}</span>
                           <StatusBadge status={camp.status} label={camp.awaiting_student_acceptance ? 'Students accepting' : undefined} />
+                          {camp.unread_messages > 0 && (
+                            <span className="badge bg-[#00AEEF] border-transparent text-white">
+                              <MessageSquare size={12} /> {camp.unread_messages} new message{camp.unread_messages === 1 ? '' : 's'}
+                            </span>
+                          )}
                         </div>
                         <h3 className="font-heading font-bold text-lg group-hover:text-[#0090C6] transition-colors">{camp.title}</h3>
                         <p className="text-[#5B6478] text-sm mt-1 line-clamp-2">{camp.description}</p>

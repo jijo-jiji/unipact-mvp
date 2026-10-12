@@ -8,7 +8,7 @@ from .views import (
     ClaimProfileView, ClaimInvitePreviewView, ClubInviteDetailView, TransferOwnershipView,
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
     VerifyEmailView, ResendEmailVerificationView,
-    AgreementStatusView, AgreementAcceptView,
+    AgreementStatusView, AgreementAcceptView, AdminUserDetailView,
 )
 
 urlpatterns = [
@@ -46,6 +46,7 @@ urlpatterns = [
     
     # Checkpoint 2 Additions
     path('admin/entities/', AdminEntityListView.as_view(), name='admin_entities'),
+    path('admin/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
     path('admin/users/<int:user_id>/block/', AdminBlockUserView.as_view(), name='admin_block_user'),
     path('admin/students/', AdminStudentPoolView.as_view(), name='admin_student_pool'),
     path('club/transfer-ownership/', TransferOwnershipView.as_view(), name='club_transfer_ownership'),

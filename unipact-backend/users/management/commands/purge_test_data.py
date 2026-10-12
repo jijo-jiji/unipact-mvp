@@ -190,6 +190,7 @@ class Command(BaseCommand):
             'payments.Transaction': 'payment records', 'payments.Payout': 'payouts', 'payments.Invoice': 'invoices',
             'payments.Subscription': 'plan records', 'campaigns.Campaign_assigned_students': 'team assignments',
             'campaigns.ProjectTeamInvitation': 'team invitations', 'campaigns.MilestoneMessage': 'milestone messages',
+            'campaigns.ProjectMessage': 'project messages', 'campaigns.ProjectMessageRead': 'message read markers',
         }
         for label, count in sorted(deleted.items(), key=lambda item: labels.get(item[0], item[0])):
             self.stdout.write(f'  {count:>4}  {labels.get(label, label)}')

@@ -31,6 +31,10 @@ from .serializers import (
     ClaimProfileSerializer
 )
 
+# How a successful sign-in is recorded. The admin activity feed leaves these out (see AdminSystemLogsView)
+LOGIN_LOG_PREFIX = 'User Login: '
+
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {
@@ -401,7 +405,7 @@ class LoginView(views.APIView):
             # Log Success
             from .models import SystemLog
             from .utils import log_event
-            log_event(SystemLog.Category.SECURITY, SystemLog.Level.SUCCESS, f"User Login: {email}")
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.SUCCESS, f"{LOGIN_LOG_PREFIX}{email}")
 
             return response
         
@@ -1101,7 +1105,9 @@ class AdminSystemLogsView(views.APIView):
         from .models import SystemLog
         from .serializers import SystemLogSerializer
         
-        logs = SystemLog.objects.all()[:50]
+        # Successful sign-ins are still recorded, but left out here: there are so many that they push
+        # sign-ups, payments and failed sign-in attempts out of the 50 most recent lines.
+        logs = SystemLog.objects.exclude(category=SystemLog.Category.SECURITY, message__startswith=LOGIN_LOG_PREFIX)[:50]
         serializer = SystemLogSerializer(logs, many=True)
         return Response(serializer.data)
         
@@ -1129,6 +1135,89 @@ class AdminEntityListView(generics.ListAPIView):
         if self.request.user.role != User.Role.ADMIN:
              raise exceptions.PermissionDenied("Admin access required.")
         return User.objects.filter(role__in=[User.Role.CLUB, User.Role.COMPANY, User.Role.STUDENT]).order_by('-date_joined')
+
+class AdminUserDetailView(views.APIView):
+    """GET: everything UniPact holds about one student, company or club account, for an admin deciding
+    whether to approve it. PATCH: correct the profile details that person entered."""
+    permission_classes = [IsAuthenticated]
+
+    PROFILES = {
+        User.Role.STUDENT: ('student_profile', StudentProfileSerializer),
+        User.Role.COMPANY: ('company_profile', CompanyProfileSerializer),
+        User.Role.CLUB: ('club_profile', ClubProfileSerializer),
+    }
+
+    def get_account(self, request, user_id):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+        return get_object_or_404(User, pk=user_id, role__in=list(self.PROFILES))
+
+    def payload(self, request, user):
+        profile_attr, serializer_class = self.PROFILES[user.role]
+        profile = getattr(user, profile_attr, None)  # None for a club committee member who joined by invitation
+
+        if profile is not None and user.role == User.Role.STUDENT:
+            projects = profile.assigned_jobs.order_by('-created_at')[:20]
+        elif profile is not None and user.role == User.Role.COMPANY:
+            projects = profile.campaigns.order_by('-created_at')[:20]
+        else:
+            projects = []
+
+        account = account_payload(user)
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "name": account["name"],
+            "is_active": user.is_active,
+            "email_verified": user.email_verified,
+            "date_joined": user.date_joined,
+            "terms_accepted_at": user.terms_accepted_at,
+            "verification_status": account["verification_status"],
+            # What the verify endpoint takes, so the account can be approved from its details
+            "entity_type": user.role if profile is not None else None,
+            "entity_id": profile.id if profile is not None else None,
+            # Request context makes the document and picture links absolute
+            "profile": serializer_class(profile, context={'request': request}).data if profile is not None else None,
+            "club_membership": account["club_membership"],
+            "agreements": account["agreements"],
+            "projects": [{"id": c.id, "title": c.title, "status": c.status, "budget": c.budget} for c in projects],
+        }
+
+    def get(self, request, user_id):
+        return Response(self.payload(request, self.get_account(request, user_id)))
+
+    def patch(self, request, user_id):
+        from .serializers import AdminStudentEditSerializer, AdminCompanyEditSerializer, AdminClubEditSerializer
+
+        user = self.get_account(request, user_id)
+        profile = getattr(user, self.PROFILES[user.role][0], None)
+        if profile is None:
+            return Response({"error": "This account has no profile to edit."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer_class = {
+            User.Role.STUDENT: AdminStudentEditSerializer,
+            User.Role.COMPANY: AdminCompanyEditSerializer,
+            User.Role.CLUB: AdminClubEditSerializer,
+        }[user.role]
+        serializer = serializer_class(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        # The form sends every field back, so only the ones whose value is different count as changed
+        # (an empty box and a field that was never filled in are the same thing)
+        changed = sorted(f for f, value in serializer.validated_data.items() if (getattr(profile, f) or None) != (value or None))
+
+        if changed:
+            with transaction.atomic():
+                profile = serializer.save()
+                if user.role == User.Role.STUDENT and 'full_name' in changed:
+                    user.first_name = profile.full_name[:150]
+                    user.save(update_fields=['first_name'])
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.WARNING,
+                      f"Admin {request.user.email} edited {user.email}: {', '.join(changed)}")
+
+        user.refresh_from_db()
+        return Response(self.payload(request, user))
+
 
 class AdminBlockUserView(views.APIView):
     permission_classes = [IsAuthenticated]

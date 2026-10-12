@@ -64,6 +64,11 @@ def validate_project_file_upload(file_obj, label='File'):
     return _check(file_obj, PROJECT_FILE_EXTENSIONS, settings.MAX_PROJECT_FILE_UPLOAD_MB, label)
 
 
+def validate_message_attachment(file_obj, label='Attachment'):
+    """A file sent in a project conversation: the same types as project files, but kept small."""
+    return _check(file_obj, PROJECT_FILE_EXTENSIONS, settings.PROJECT_MESSAGE_MAX_ATTACHMENT_MB, label)
+
+
 def validate_image_upload(file_obj, label='Image', max_mb=None):
     limit = max_mb if max_mb is not None else getattr(settings, 'MAX_IMAGE_UPLOAD_MB', 5)
     return _check(file_obj, IMAGE_EXTENSIONS, limit, label)

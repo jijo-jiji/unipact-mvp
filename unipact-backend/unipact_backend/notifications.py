@@ -308,6 +308,23 @@ def work_submitted(campaign, submitter_name, title):
     )
 
 
+def project_message(campaign, recipient, sender_name, body, path, attachment_name=''):
+    """Someone wrote in a project's conversation while this person wasn't looking at it. Sent at most once
+    per PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES per person per project (campaigns/messaging.py decides)."""
+    text = ' '.join(body.split())
+    excerpt = text if len(text) <= 300 else f'{text[:297].rstrip()}…'
+    attached = f'Attached file: {attachment_name}' if attachment_name else ''
+    minutes = settings.PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES
+    at_most = 'one of these emails an hour' if minutes == 60 else f'one of these emails every {minutes} minutes'
+    send_email(
+        recipient.email, f'New message on "{campaign.title}"', 'You have a new message',
+        [line for line in (f'{sender_name} wrote in the conversation for "{campaign.title}":', excerpt and f'“{excerpt}”', attached) if line],
+        action_label='Open the conversation', action_path=path,
+        note='To reply, open the conversation in UniPact: a reply to this email is not added to it. '
+             f'We send at most {at_most} for each project, so there may be more new messages waiting.',
+    )
+
+
 def _local_date(moment):
     from campaigns.workdays import MALAYSIA
     return moment.astimezone(MALAYSIA).strftime('%d %b %Y')
@@ -363,9 +380,9 @@ def project_completed(campaign, rating=None):
     send_email(
         [s.user.email for s in _students(campaign)], f'"{campaign.title}" is complete', 'Project completed',
         [f'{campaign.company.company_name} approved the work and closed the project. Well done!',
-         'The project now appears on your public portfolio. Next, add your part to your Verified Impact Ledger from your dashboard.'],
+         'The project now appears on your public portfolio. Next, add your part to your Verified Impact Ledger on the project\'s page.'],
         details=[('Project', campaign.title), ('Client rating', f'{rating} out of 5' if rating else None)],
-        action_label='Open your dashboard', action_path='/student/dashboard',
+        action_label='Open the project', action_path=f'/student/projects/{campaign.id}',
     )
 
 
@@ -376,7 +393,7 @@ def impact_statement_signed(campaign):
         [f'{campaign.company.company_name} signed off the results of "{campaign.title}".',
          'Add what you built and your before/after screenshots, and UniPact will publish your Verified Impact Ledger - '
          'a shareable proof of work for your CV and LinkedIn.'],
-        action_label='Build your ledger', action_path='/student/dashboard',
+        action_label='Build your ledger', action_path=f'/student/projects/{campaign.id}',
     )
 
 
