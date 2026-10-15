@@ -75,7 +75,7 @@ export const formatDate = (value, fallback = '—') => {
 export const getErrorMessage = (err, fallback = 'Something went wrong. Please try again.') => {
   if (!err?.response) {
     return err?.message === 'Network Error'
-      ? "Can't reach the UniPact server. Check that the backend is running and try again."
+      ? "We couldn't reach UniPact. Check your internet connection and try again in a moment."
       : fallback;
   }
   if (err.response.status === 429) {

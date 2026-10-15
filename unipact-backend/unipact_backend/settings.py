@@ -123,10 +123,16 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if IS_PRODUCTION and not DATABASE_URL:
     raise ImproperlyConfigured('Set DATABASE_URL to your PostgreSQL connection string in production.')
 
+# How long a server process keeps its database connection open. Keep it under the database's own idle
+# shutdown (Neon suspends a quiet database after 5 minutes): a connection kept across that shutdown is dead,
+# and reusing it stalled requests for about 18 seconds until it timed out. A new connection costs well under
+# a second, so after a quiet minute we simply open a fresh one.
+DATABASE_CONN_MAX_AGE = int(os.getenv('DATABASE_CONN_MAX_AGE', '60'))
+
 DATABASES = {
     'default': dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=DATABASE_CONN_MAX_AGE,
         conn_health_checks=True,
         ssl_require=env_bool('DATABASE_SSL_REQUIRE', default=IS_PRODUCTION),
     ) if DATABASE_URL else {
@@ -134,6 +140,9 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    # Give up on an unreachable database within seconds, instead of leaving the request hanging
+    DATABASES['default'].setdefault('OPTIONS', {})['connect_timeout'] = int(os.getenv('DATABASE_CONNECT_TIMEOUT', '10'))
 
 
 # ------------------------------------------------------------------
