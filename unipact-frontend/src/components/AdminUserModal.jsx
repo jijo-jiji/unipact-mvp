@@ -40,7 +40,7 @@ const Row = ({ label, children, wide = false }) => (
 
 const DocumentLink = ({ href, label = 'View document' }) =>
   href ? (
-    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#0090C6] font-semibold hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#00729F] font-semibold hover:underline">
       <FileText size={14} /> {label}
     </a>
   ) : (
@@ -173,7 +173,7 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
                     {profile.skills?.length > 0 && (
                       <span className="flex flex-wrap gap-1.5 mt-1">
                         {profile.skills.map((skill) => (
-                          <span key={skill} className="px-2.5 py-0.5 rounded-full bg-[#00AEEF]/10 text-[#0090C6] text-xs font-medium">{skill}</span>
+                          <span key={skill} className="px-2.5 py-0.5 rounded-full bg-[#00AEEF]/10 text-[#00729F] text-xs font-medium">{skill}</span>
                         ))}
                       </span>
                     )}

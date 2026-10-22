@@ -28,7 +28,7 @@ const ProjectPayments = ({ campaign, invoice, isClubFlow, balancePayable, onPayN
         </h2>
         <p className="text-[#5B6478]">
           This project runs through club sponsorships: a flat finder&apos;s fee is charged when you award the contract to a club.
-          Your receipts are on the <Link to="/company/treasury" className="text-[#0090C6] font-semibold hover:underline">Billing page</Link>.
+          Your receipts are on the <Link to="/company/treasury" className="text-[#00729F] font-semibold hover:underline">Billing page</Link>.
         </p>
       </section>
     );
@@ -156,7 +156,7 @@ const ProjectPayments = ({ campaign, invoice, isClubFlow, balancePayable, onPayN
             </ul>
           )}
           <p className="text-xs text-[#5B6478] mt-4 pt-4 border-t border-[rgba(10,23,72,0.08)]">
-            Invoices and receipts for all your projects are on the <Link to="/company/treasury" className="text-[#0090C6] font-semibold hover:underline">Billing page</Link>.
+            Invoices and receipts for all your projects are on the <Link to="/company/treasury" className="text-[#00729F] font-semibold hover:underline">Billing page</Link>.
           </p>
         </section>
       </div>

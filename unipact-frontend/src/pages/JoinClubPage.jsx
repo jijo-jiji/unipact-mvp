@@ -90,7 +90,7 @@ const JoinClubPage = () => {
           <p className="text-sm">{linkError}</p>
           {!hasAccount && <p className="text-sm text-[#5B6478] mt-2">Invitation links work once and expire after 14 days.</p>}
           <Link to="/login" className="btn-primary w-full py-3 mt-6">Go to sign in</Link>
-          <Link to="/" className="btn w-full mt-2 text-[#0090C6] hover:bg-[#00AEEF]/5">Back to UniPact</Link>
+          <Link to="/" className="btn w-full mt-2 text-[#00729F] hover:bg-[#00AEEF]/5">Back to UniPact</Link>
         </div>
       </AuthShell>
     );
@@ -100,7 +100,7 @@ const JoinClubPage = () => {
     <AuthShell
       title={`Join ${invite.club_name}`}
       subtitle="Set up your account to accept the invitation."
-      footer={<>Already have an account? <Link to="/login" className="font-semibold text-[#0090C6] hover:underline">Sign in</Link></>}
+      footer={<>Already have an account? <Link to="/login" className="font-semibold text-[#00729F] hover:underline">Sign in</Link></>}
     >
       <div className="flex items-start gap-3 p-4 rounded-lg bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] mb-6">
         <div className="w-10 h-10 rounded-lg bg-[#0B1E63] flex items-center justify-center shrink-0">

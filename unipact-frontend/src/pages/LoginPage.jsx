@@ -91,7 +91,7 @@ const LoginPage = () => {
         <div>
           <PasswordField id="login-password" label="Password" value={password} onChange={setPassword} autoComplete="current-password" placeholder="Your password" />
           <div className="flex justify-end">
-            <Link to="/forgot-password" state={{ email }} className="inline-block py-2 text-sm font-medium text-[#0090C6] hover:underline">
+            <Link to="/forgot-password" state={{ email }} className="inline-block py-2 text-sm font-medium text-[#00729F] hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -104,7 +104,7 @@ const LoginPage = () => {
 
       <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-sm text-[#5B6478]">
         Don&apos;t have an account yet?{' '}
-        <Link to="/register" className="inline-block py-2 font-semibold text-[#0090C6] hover:underline">
+        <Link to="/register" className="inline-block py-2 font-semibold text-[#00729F] hover:underline">
           Create an account
         </Link>
       </div>

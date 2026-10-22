@@ -88,7 +88,7 @@ const OnlinePaymentModal = ({ isOpen, onClose, campaign, amount, testMode, allow
                 <div className="flex items-baseline justify-between gap-2">
                   <label className="field-label" htmlFor="fpx-amount">Amount to pay now (RM)</label>
                   {payValue !== balance && (
-                    <button type="button" onClick={() => setCustomAmount(null)} className="text-xs font-semibold text-[#0090C6] hover:underline">Pay in full</button>
+                    <button type="button" onClick={() => setCustomAmount(null)} className="text-xs font-semibold text-[#00729F] hover:underline">Pay in full</button>
                   )}
                 </div>
                 <input id="fpx-amount" type="number" inputMode="decimal" min="1" max={balance} step="0.01" value={payAmount}

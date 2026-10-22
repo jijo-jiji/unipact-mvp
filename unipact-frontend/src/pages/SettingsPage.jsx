@@ -79,7 +79,7 @@ const SkillsInput = ({ value, onChange }) => {
     <div>
       <div className="flex flex-wrap gap-2 mb-2">
         {value.map((skill) => (
-          <span key={skill} className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full bg-[#00AEEF]/10 text-[#0090C6] text-sm font-medium">
+          <span key={skill} className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full bg-[#00AEEF]/10 text-[#00729F] text-sm font-medium">
             {skill}
             <button type="button" onClick={() => onChange(value.filter((s) => s !== skill))} className="p-2.5 -my-1.5 sm:p-1 sm:my-0 rounded-full hover:bg-[#00AEEF]/20" aria-label={`Remove ${skill}`}>
               <X size={12} />
@@ -410,7 +410,7 @@ const SettingsPage = () => {
                       {/* Malaysian Bank Account Details for Project Payouts */}
                       <div id="payouts" className="p-5 rounded-xl border border-[rgba(10,23,72,0.12)] bg-gradient-to-br from-white to-[#F5F8FE] shadow-sm space-y-4 scroll-mt-28 mt-6">
                         <div className="flex items-center gap-2 pb-2 border-b border-[rgba(10,23,72,0.08)]">
-                          <div className="w-8 h-8 rounded-lg bg-[#00AEEF]/10 text-[#0090C6] flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-lg bg-[#00AEEF]/10 text-[#00729F] flex items-center justify-center">
                             <CreditCard size={18} />
                           </div>
                           <div>
@@ -573,7 +573,7 @@ const SettingsPage = () => {
                   <button type="submit" disabled={savingPassword || !passwords.current || !passwords.next} className="btn-primary">
                     {savingPassword ? <><Loader2 size={15} className="animate-spin" /> Updating…</> : 'Update password'}
                   </button>
-                  <Link to="/forgot-password" state={{ email: user?.email }} className="inline-block py-2 text-sm font-medium text-[#0090C6] hover:underline">Forgot your current password?</Link>
+                  <Link to="/forgot-password" state={{ email: user?.email }} className="inline-block py-2 text-sm font-medium text-[#00729F] hover:underline">Forgot your current password?</Link>
                 </div>
               </form>
             </Section>

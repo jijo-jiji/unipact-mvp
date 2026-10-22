@@ -42,7 +42,7 @@ const ForgotPasswordPage = () => {
           <p className="text-sm text-[#5B6478] mt-3">Can&apos;t find it? Check your spam folder, or try again in a few minutes.</p>
           <div className="flex flex-col gap-2 mt-6">
             <Link to="/login" className="btn-primary w-full py-3">Back to sign in</Link>
-            <button type="button" onClick={() => setSentTo('')} className="btn w-full text-[#0090C6] hover:bg-[#00AEEF]/5">Use a different email</button>
+            <button type="button" onClick={() => setSentTo('')} className="btn w-full text-[#00729F] hover:bg-[#00AEEF]/5">Use a different email</button>
           </div>
         </div>
       </AuthShell>

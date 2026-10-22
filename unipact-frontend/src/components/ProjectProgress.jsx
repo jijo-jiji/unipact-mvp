@@ -28,7 +28,7 @@ const ProjectProgress = ({ campaign, viewer = 'client', myProfileId = null }) =>
           const content = (
             <>
               <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${
-                done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'bg-[#00AEEF] border-[#00AEEF] text-white' : 'bg-white border-[rgba(10,23,72,0.2)] text-[#5B6478]'
+                done ? 'bg-emerald-500 border-emerald-500 text-white' : active ? 'bg-[#00AEEF] border-[#00AEEF] text-[#0A1748]' : 'bg-white border-[rgba(10,23,72,0.2)] text-[#5B6478]'
               }`}>
                 {done ? <CheckCircle2 size={14} /> : i + 1}
               </span>

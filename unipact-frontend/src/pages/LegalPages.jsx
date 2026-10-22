@@ -46,7 +46,7 @@ export const LegalLayout = ({ title, intro, sections, updated }) => (
           {numberSections(sections).map((s) => (
             <section key={s.id} id={s.id} className="scroll-mt-28">
               <h2 className="font-heading font-bold text-xl mb-3">{s.label}</h2>
-              <div className="space-y-3 text-[0.95rem] leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_a]:text-[#0090C6] [&_a]:underline">
+              <div className="space-y-3 text-[0.95rem] leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_a]:text-[#00729F] [&_a]:underline">
                 {s.body}
               </div>
             </section>
@@ -60,7 +60,7 @@ export const LegalLayout = ({ title, intro, sections, updated }) => (
 
 const Contact = () => (
   <p>
-    {LEGAL.entityName} ({LEGAL.registrationNumber})<br />
+    {LEGAL.entityName}, Registration No. {LEGAL.registrationNumber}<br />
     {LEGAL.address}<br />
     Email: <a href={`mailto:${LEGAL.contactEmail}`}>{LEGAL.contactEmail}</a>
   </p>

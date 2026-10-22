@@ -14,14 +14,14 @@ const TermsConsent = ({ checked, onChange, agreement }) => (
     />
     <span>
       I agree to the{' '}
-      <Link to="/terms" target="_blank" rel="noopener" className="font-semibold text-[#0090C6] underline">Terms of Service</Link>
+      <Link to="/terms" target="_blank" rel="noopener" className="font-semibold text-[#00729F] underline">Terms of Service</Link>
       {agreement ? ', the ' : ' and '}
       {agreement && (
         <>
-          <Link to={agreement.path} target="_blank" rel="noopener" className="font-semibold text-[#0090C6] underline">{agreement.title}</Link>{' and '}
+          <Link to={agreement.path} target="_blank" rel="noopener" className="font-semibold text-[#00729F] underline">{agreement.title}</Link>{' and '}
         </>
       )}
-      <Link to="/privacy" target="_blank" rel="noopener" className="font-semibold text-[#0090C6] underline">Privacy Policy</Link>,
+      <Link to="/privacy" target="_blank" rel="noopener" className="font-semibold text-[#00729F] underline">Privacy Policy</Link>,
       including how UniPact uses my personal data to verify my account and match me to projects.
     </span>
   </label>

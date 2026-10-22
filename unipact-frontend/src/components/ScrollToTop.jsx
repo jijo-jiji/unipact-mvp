@@ -7,11 +7,31 @@ const ScrollToTop = () => {
   const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    if (hash) {
-      document.getElementById(hash.slice(1))?.scrollIntoView();
-      return;
+    if (!hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      return undefined;
     }
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    const id = decodeURIComponent(hash.slice(1));
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView();
+      return undefined;
+    }
+    // Opened straight from a link, the page is still behind the sign-in check's loading screen,
+    // so wait (briefly) for the section to appear.
+    const observer = new MutationObserver(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        observer.disconnect();
+        el.scrollIntoView();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const giveUp = window.setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(giveUp);
+    };
   }, [pathname, hash]);
 
   return null;

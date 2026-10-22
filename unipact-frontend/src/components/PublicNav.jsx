@@ -9,7 +9,8 @@ import BrandLogo from './BrandLogo';
 // Top bar for signed-out pages. Two clean states only:
 //   lg and up  -> logo | centred section links | Sign in + Get started
 //   below lg   -> logo | menu button (everything else lives in the dropdown)
-const PublicNav = ({ links = [] }) => {
+// inlineLinks={false} keeps the links in the phone menu only, for a page with its own section menu.
+const PublicNav = ({ links = [], inlineLinks = true }) => {
   const { user } = useAuth();
   const { open, toggle, setOpen, scrolled } = useNavMenu();
   const dashboardPath = user ? homePathForRole(user.role) : null;
@@ -21,8 +22,9 @@ const PublicNav = ({ links = [] }) => {
           <BrandLogo subtitle="Talent Marketplace" />
         </Link>
 
-        <ul className="hidden lg:flex items-center gap-1">
-          {links.map((l) => (
+        {/* Without inline links the centre column stays, empty, so the buttons keep to the right */}
+        <ul className={`hidden lg:flex items-center gap-1 ${inlineLinks ? '' : 'lg:invisible'}`} aria-hidden={inlineLinks ? undefined : 'true'}>
+          {(inlineLinks ? links : []).map((l) => (
             <li key={l.href}>
               <a href={l.href} className="relative px-3.5 py-2 text-[0.9rem] font-medium text-[#5B6478] hover:text-[#0A1748] transition-colors after:absolute after:left-3.5 after:right-3.5 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-[#00AEEF] after:scale-x-0 hover:after:scale-x-100 after:transition-transform">
                 {l.label}
@@ -38,7 +40,7 @@ const PublicNav = ({ links = [] }) => {
             </Link>
           ) : (
             <>
-              <Link to="/login" className="btn h-10 px-4 text-[#0A1748] hover:bg-white hover:text-[#0090C6]">Sign in</Link>
+              <Link to="/login" className="btn h-10 px-4 text-[#0A1748] hover:bg-white hover:text-[#00729F]">Sign in</Link>
               <Link to="/register" className="btn-primary h-10 px-5">
                 Get started <ArrowRight size={16} />
               </Link>
@@ -64,7 +66,7 @@ const PublicNav = ({ links = [] }) => {
               <ul className="divide-y divide-[rgba(10,23,72,0.06)] mb-4">
                 {links.map((l) => (
                   <li key={l.href}>
-                    <a href={l.href} onClick={() => setOpen(false)} className="flex items-center justify-between py-3.5 text-base font-medium text-[#0A1748] hover:text-[#0090C6]">
+                    <a href={l.href} onClick={() => setOpen(false)} className="flex items-center justify-between py-3.5 text-base font-medium text-[#0A1748] hover:text-[#00729F]">
                       {l.label} <ChevronRight size={18} className="text-[#5B6478]" />
                     </a>
                   </li>

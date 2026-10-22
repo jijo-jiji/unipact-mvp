@@ -10,6 +10,7 @@ export const MALAYSIAN_UNIVERSITIES = [
   "Asia Pacific University (APU)",
   "Multimedia University (MMU)",
   "Universiti Teknologi MARA (UiTM)",
+  "Universiti Kuala Lumpur (UniKL)",
   "UCSI University",
   "Other Institution"
 ];

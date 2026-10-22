@@ -66,6 +66,8 @@ const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
 const PaymentReturn = page(() => import('./pages/PaymentReturn'));
 const TalentAgreementPage = page(() => import('./pages/AgreementPages'), (m) => m.TalentAgreementPage);
 const ClientAgreementPage = page(() => import('./pages/AgreementPages'), (m) => m.ClientAgreementPage);
+// Development only: the hero picture's screens laid out flat, to capture as textures for its Blender render
+const HeroTextures = import.meta.env.DEV ? page(() => import('./components/home/HeroTextures')) : null;
 
 function App() {
   return (
@@ -233,6 +235,7 @@ function App() {
           />
 
           {/* Unknown URLs go back to the landing page instead of a blank screen */}
+          {HeroTextures && <Route path="/dev/hero-textures" element={<HeroTextures />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>

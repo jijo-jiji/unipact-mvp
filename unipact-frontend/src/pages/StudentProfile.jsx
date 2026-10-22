@@ -119,9 +119,9 @@ const StudentProfile = () => {
               <div className="bg-[#F5F7FC] p-3 rounded-lg">
                 <dt className="text-xs text-[#5B6478]">Client rating</dt>
                 {profile.rating ? (
-                  <dd className="font-semibold text-amber-600 inline-flex items-center gap-1"><Star size={14} className="fill-amber-400 text-amber-400" /> {profile.rating}</dd>
+                  <dd className="font-semibold text-amber-700 inline-flex items-center gap-1"><Star size={14} className="fill-amber-400 text-amber-400" /> {profile.rating}</dd>
                 ) : (
-                  <dd className="font-semibold text-[#0090C6]">No ratings yet</dd>
+                  <dd className="font-semibold text-[#00729F]">No ratings yet</dd>
                 )}
               </div>
               <div className="bg-[#F5F7FC] p-3 rounded-lg">
@@ -166,7 +166,7 @@ const StudentProfile = () => {
                     </ul>
                   )}
                   {proj.ledger_slug && (
-                    <Link to={`/ledger/${proj.ledger_slug}`} className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#0090C6] hover:underline">
+                    <Link to={`/ledger/${proj.ledger_slug}`} className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#00729F] hover:underline">
                       <Award size={15} /> View verified impact ledger
                     </Link>
                   )}

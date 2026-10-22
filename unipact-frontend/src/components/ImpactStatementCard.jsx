@@ -152,7 +152,7 @@ const ImpactStatementCard = ({ campaign }) => {
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((skill) => (
                   <button key={skill} type="button" onClick={() => toggleSkill(skill)} aria-pressed={form.verified_skills.includes(skill)}
-                    className={`px-3 py-1 rounded-md text-sm border ${form.verified_skills.includes(skill) ? 'bg-[#00AEEF]/10 border-[#00AEEF] text-[#0090C6] font-semibold' : 'bg-white border-[rgba(10,23,72,0.12)]'}`}>
+                    className={`px-3 py-1 rounded-md text-sm border ${form.verified_skills.includes(skill) ? 'bg-[#00AEEF]/10 border-[#00AEEF] text-[#00729F] font-semibold' : 'bg-white border-[rgba(10,23,72,0.12)]'}`}>
                     {skill}
                   </button>
                 ))}

@@ -53,17 +53,17 @@ export const clientStats = (campaign, isClubFlow) => {
             : 'Paid in full',
     },
     noEscrow
-      ? { label: 'Club applications', value: (campaign.applications || []).length, className: 'text-[#0090C6]', note: null }
+      ? { label: 'Club applications', value: (campaign.applications || []).length, className: 'text-[#00729F]', note: null }
       : {
         label: 'Paid to your team',
         value: formatMoney(escrow.released),
         className: 'text-emerald-600',
         note: `of their ${formatMoney(campaign.student_pool)} share`,
       },
-    isClubFlow ? { label: 'Awarded to', value: campaign.guild || 'Not awarded yet', className: 'text-[#0090C6]', note: null } : {
+    isClubFlow ? { label: 'Awarded to', value: campaign.guild || 'Not awarded yet', className: 'text-[#00729F]', note: null } : {
       label: 'Milestones approved',
       value: total > 0 ? `${approved} of ${total}` : '—',
-      className: 'text-[#0090C6]',
+      className: 'text-[#00729F]',
       note: total === 0
         ? 'No milestone plan yet'
         : submitted > 0
@@ -98,7 +98,7 @@ export const studentStats = (campaign, payouts) => {
     {
       label: 'Milestones approved',
       value: total > 0 ? `${approved} of ${total}` : '—',
-      className: 'text-[#0090C6]',
+      className: 'text-[#00729F]',
       note: total === 0
         ? 'No milestone plan'
         : submitted > 0

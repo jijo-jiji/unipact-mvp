@@ -80,7 +80,7 @@ const QuestDetails = () => {
           <div className="lg:col-span-2 space-y-6">
             <section className="card p-6 sm:p-8">
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(quest.type)}</span>
+                <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(quest.type)}</span>
                 <StatusBadge status={quest.status} />
               </div>
               <h1 className="font-heading font-extrabold text-2xl sm:text-3xl mb-1">{quest.title}</h1>

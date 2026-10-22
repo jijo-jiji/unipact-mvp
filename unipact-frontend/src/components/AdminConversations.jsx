@@ -66,7 +66,7 @@ const AdminConversations = ({ conversations, loading, onOpened, onRefresh }) => 
                     <div className="flex items-start justify-between gap-3">
                       <span className="font-semibold min-w-0 break-words">{c.title}</span>
                       <span className="flex items-center gap-2 shrink-0">
-                        {unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{unread}</span>}
+                        {unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748] px-1.5 py-0">{unread}</span>}
                         <StatusBadge status={c.status} />
                       </span>
                     </div>

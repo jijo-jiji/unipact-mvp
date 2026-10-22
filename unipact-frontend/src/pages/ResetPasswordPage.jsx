@@ -61,7 +61,7 @@ const ResetPasswordPage = () => {
           <Link2Off size={40} className="mx-auto text-[#5B6478]/60 mb-3" />
           <p className="text-sm">Password reset links work once and expire after 1 hour. Request a new one to continue.</p>
           <Link to="/forgot-password" className="btn-primary w-full py-3 mt-6">Request a new link</Link>
-          <Link to="/login" className="btn w-full mt-2 text-[#0090C6] hover:bg-[#00AEEF]/5">Back to sign in</Link>
+          <Link to="/login" className="btn w-full mt-2 text-[#00729F] hover:bg-[#00AEEF]/5">Back to sign in</Link>
         </div>
       </AuthShell>
     );

@@ -95,7 +95,7 @@ const ClubProfile = () => {
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-sm truncate">{label}</div>
-                      <div className="text-xs text-[#0090C6]">{member.role}</div>
+                      <div className="text-xs text-[#00729F]">{member.role}</div>
                       {pending && <div className="text-xs text-[#5B6478]">Invitation pending · sent {formatDate(member.created_at)} · only you can see this</div>}
                     </div>
                   </div>

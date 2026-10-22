@@ -314,7 +314,7 @@ const ManageCampaign = () => {
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(campaign.type)}</span>
+                <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(campaign.type)}</span>
                 <StatusBadge status={campaign.status} />
               </div>
               <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight">{campaign.title}</h1>
@@ -472,12 +472,12 @@ const ManageCampaign = () => {
               aria-selected={activeTab === key}
               onClick={() => setActiveTab(key)}
               className={`pb-3 px-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap flex items-center gap-2 transition-colors ${
-                activeTab === key ? 'border-[#00AEEF] text-[#0090C6]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
+                activeTab === key ? 'border-[#00AEEF] text-[#00729F]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
               }`}
             >
               {icon} {label}
               {key === 'work' && awaitingReview > 0 && <span className="badge bg-amber-50 border-amber-200 text-amber-800 px-1.5 py-0">{awaitingReview}</span>}
-              {key === 'messages' && chat.unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{chat.unread}</span>}
+              {key === 'messages' && chat.unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748] px-1.5 py-0">{chat.unread}</span>}
             </button>
           ))}
         </div>
@@ -503,18 +503,18 @@ const ManageCampaign = () => {
                 </h2>
                 {campaign.match_notes && (
                   <p className="text-sm bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3 mb-4">
-                    <strong className="text-[#0090C6]">Admin&apos;s note:</strong> {campaign.match_notes}
+                    <strong className="text-[#00729F]">Admin&apos;s note:</strong> {campaign.match_notes}
                   </p>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {team.map((s) => (
                     <Link key={s.id} to={`/student/profile/${s.user_id}`} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] hover:border-[#00AEEF] rounded-lg p-4 text-sm group">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold group-hover:text-[#0090C6]">{s.full_name}</span>
+                        <span className="font-semibold group-hover:text-[#00729F]">{s.full_name}</span>
                         {s.rating ? (
                           <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star size={13} className="fill-amber-400 text-amber-400" /> {s.rating}</span>
                         ) : (
-                          <span className="text-xs font-semibold text-[#0090C6]">New to UniPact</span>
+                          <span className="text-xs font-semibold text-[#00729F]">New to UniPact</span>
                         )}
                       </div>
                       {campaign.status === 'MATCHED' && offerStatus[s.id] && (
@@ -531,7 +531,7 @@ const ManageCampaign = () => {
                         </div>
                       )}
                       {s.bio && <p className="text-xs text-[#5B6478] mt-2 line-clamp-4">{s.bio}</p>}
-                      <span className="text-xs font-semibold text-[#0090C6] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
+                      <span className="text-xs font-semibold text-[#00729F] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
                     </Link>
                   ))}
                 </div>
@@ -549,7 +549,7 @@ const ManageCampaign = () => {
                     <div key={app.id} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-4 flex flex-col md:flex-row justify-between gap-4 text-sm">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link to={`/club/profile/${app.club_user_id}`} className="font-semibold hover:text-[#0090C6]">{app.club_name}</Link>
+                          <Link to={`/club/profile/${app.club_user_id}`} className="font-semibold hover:text-[#00729F]">{app.club_name}</Link>
                           <StatusBadge status={isCompleted && ['AWARDED', 'SUBMITTED'].includes(app.status) ? 'COMPLETED' : app.status} />
                         </div>
                         <p className="text-[#5B6478] mt-1">“{app.message}”</p>
@@ -557,7 +557,7 @@ const ManageCampaign = () => {
                         {app.deliverables?.length > 0 && (
                           <div className="flex flex-wrap gap-3 mt-2">
                             {app.deliverables.map((d) => (
-                              <a key={d.id} href={d.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1 text-xs">
+                              <a key={d.id} href={d.file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1 text-xs">
                                 <Download size={12} /> Submission {formatDate(d.uploaded_at)}
                               </a>
                             ))}
@@ -623,8 +623,8 @@ const ManageCampaign = () => {
                       )}
                       {m.status === 'SUBMITTED' && (
                         <div className="mt-2 mb-3 flex flex-wrap gap-4 text-xs">
-                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open submission <ArrowUpRight size={12} /></a>}
-                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={12} /> Download file</a>}
+                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1">Open submission <ArrowUpRight size={12} /></a>}
+                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1"><Download size={12} /> Download file</a>}
                           {m.deliverable_notes && <p className="text-[#5B6478] w-full">{m.deliverable_notes}</p>}
                         </div>
                       )}
@@ -675,8 +675,8 @@ const ManageCampaign = () => {
                         <div className="text-[#5B6478] mb-2">{m.status === 'APPROVED' ? 'Approved' : 'Waiting for your review above'}</div>
                         {m.deliverable_notes && <p className="bg-white p-3 rounded border border-[rgba(10,23,72,0.06)] mb-2">{m.deliverable_notes}</p>}
                         <div className="flex flex-wrap gap-4">
-                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
-                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
+                          {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
+                          {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
                         </div>
                       </div>
                     ))}
@@ -689,8 +689,8 @@ const ManageCampaign = () => {
                         <div className="text-[#5B6478] mb-2">{del.student_name}{del.contribution_role && <> · {del.contribution_role}</>}</div>
                         {del.contribution_summary && <p className="bg-white p-3 rounded border border-[rgba(10,23,72,0.06)] mb-2">{del.contribution_summary}</p>}
                         <div className="flex flex-wrap gap-4">
-                          {del.external_url && <a href={del.external_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
-                          {del.file && <a href={del.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
+                          {del.external_url && <a href={del.external_url} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
+                          {del.file && <a href={del.file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
                         </div>
                       </div>
                     ))}
@@ -769,7 +769,7 @@ const ManageCampaign = () => {
                         <span className="block truncate font-medium">{a.title}</span>
                         <span className="block text-xs text-[#5B6478]">{ASSET_TYPES.find((t) => t.value === a.asset_type)?.label || a.asset_type} · {formatDate(a.uploaded_at)}</span>
                       </span>
-                      <Download size={15} className="text-[#5B6478] group-hover:text-[#0090C6] shrink-0" />
+                      <Download size={15} className="text-[#5B6478] group-hover:text-[#00729F] shrink-0" />
                     </a>
                   </li>
                 ))}

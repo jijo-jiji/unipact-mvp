@@ -58,7 +58,7 @@ const ProjectOverview = ({ campaign, stats, events, isClubFlow = false, myProfil
                   <li key={s.id} className="flex items-center justify-between gap-3">
                     <span className="font-medium min-w-0 break-words">
                       {s.full_name}
-                      {s.id === myProfileId && <span className="badge bg-[#00AEEF]/15 border-transparent text-[#0090C6] px-1.5 py-0 text-[10px] ml-1.5 align-middle">You</span>}
+                      {s.id === myProfileId && <span className="badge bg-[#00AEEF]/15 border-transparent text-[#00729F] px-1.5 py-0 text-[10px] ml-1.5 align-middle">You</span>}
                     </span>
                     {campaign.status === 'MATCHED' && offerStatus[s.id] && (
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold shrink-0 ${offerStatus[s.id] === 'ACCEPTED' ? 'text-emerald-700' : 'text-amber-700'}`}>
@@ -69,7 +69,7 @@ const ProjectOverview = ({ campaign, stats, events, isClubFlow = false, myProfil
                 ))}
               </ul>
             )}
-            <button type="button" onClick={() => onOpenTab('team')} className="text-sm font-semibold text-[#0090C6] hover:underline inline-flex items-center gap-1 mt-4">
+            <button type="button" onClick={() => onOpenTab('team')} className="text-sm font-semibold text-[#00729F] hover:underline inline-flex items-center gap-1 mt-4">
               Open team <ArrowRight size={14} />
             </button>
           </section>
@@ -91,7 +91,7 @@ const ProjectOverview = ({ campaign, stats, events, isClubFlow = false, myProfil
                   ))}
                 </ul>
               )}
-              <button type="button" onClick={() => onOpenTab('work')} className="text-sm font-semibold text-[#0090C6] hover:underline inline-flex items-center gap-1 mt-4">
+              <button type="button" onClick={() => onOpenTab('work')} className="text-sm font-semibold text-[#00729F] hover:underline inline-flex items-center gap-1 mt-4">
                 Open milestones &amp; work <ArrowRight size={14} />
               </button>
             </section>

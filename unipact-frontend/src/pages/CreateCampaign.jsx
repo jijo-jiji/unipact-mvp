@@ -214,7 +214,7 @@ const CreateCampaign = () => {
                       const on = targetPlatforms.includes(p);
                       return (
                         <button key={p} type="button" aria-pressed={on} onClick={() => togglePlatform(p)}
-                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${on ? 'border-[#00AEEF] bg-[#00AEEF]/10 text-[#0090C6] font-semibold' : 'border-[rgba(10,23,72,0.15)] bg-white text-[#5B6478] hover:border-[#00AEEF]/50'}`}>
+                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${on ? 'border-[#00AEEF] bg-[#00AEEF]/10 text-[#00729F] font-semibold' : 'border-[rgba(10,23,72,0.15)] bg-white text-[#5B6478] hover:border-[#00AEEF]/50'}`}>
                           {on && <CheckCircle2 size={13} className="inline mr-1 -mt-0.5" />}{p}
                         </button>
                       );
@@ -270,7 +270,7 @@ const CreateCampaign = () => {
               {assetFile ? (
                 <span className="text-sm text-emerald-700 font-medium inline-flex items-center gap-1.5"><CheckCircle2 size={15} /> {assetFile.name}</span>
               ) : (
-                <span className="text-sm text-[#5B6478]"><span className="text-[#0090C6] font-semibold">Choose a file</span> to upload</span>
+                <span className="text-sm text-[#5B6478]"><span className="text-[#00729F] font-semibold">Choose a file</span> to upload</span>
               )}
             </label>
           </section>

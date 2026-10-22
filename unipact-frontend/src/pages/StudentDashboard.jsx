@@ -292,7 +292,7 @@ const StudentDashboard = () => {
                     {formatMoney(payoutsData.total_earned)}
                   </p>
                 </div>
-                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1 font-medium">
+                <p className="text-xs text-emerald-700 mt-2 flex items-center gap-1 font-medium">
                   <CheckCircle2 size={12} /> Disbursed to your Malaysian bank
                 </p>
               </div>
@@ -301,9 +301,9 @@ const StudentDashboard = () => {
                 <div>
                   <div className="flex items-center justify-between text-[#5B6478] mb-1">
                     <span className="text-xs font-medium">Pending Escrow</span>
-                    <Clock size={16} className="text-[#0090C6]" />
+                    <Clock size={16} className="text-[#00729F]" />
                   </div>
-                  <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
+                  <p className="font-heading font-extrabold text-2xl text-[#00729F]">
                     {formatMoney(payoutsData.pending_amount)}
                   </p>
                 </div>
@@ -330,7 +330,7 @@ const StudentDashboard = () => {
                   ) : (
                     <div>
                       <p className="text-xs text-amber-700 font-medium">No account on file</p>
-                      <Link to="/settings#payouts" className="text-xs text-[#0090C6] hover:underline font-semibold mt-1 inline-block">
+                      <Link to="/settings#payouts" className="text-xs text-[#00729F] hover:underline font-semibold mt-1 inline-block">
                         Configure bank &rarr;
                       </Link>
                     </div>
@@ -446,7 +446,7 @@ const StudentDashboard = () => {
               {[
                 { label: 'Active projects', value: activeCount, className: 'text-[#0B1E63]' },
                 { label: 'Completed', value: completedCount, className: 'text-emerald-600' },
-                { label: 'Client rating', value: studentProfile.rating ? `${studentProfile.rating} ★` : 'No ratings yet', className: studentProfile.rating ? 'text-amber-500' : 'text-[#5B6478] text-base sm:text-lg pt-1.5' },
+                { label: 'Client rating', value: studentProfile.rating ? `${studentProfile.rating} ★` : 'No ratings yet', className: studentProfile.rating ? 'text-amber-700' : 'text-[#5B6478] text-base sm:text-lg pt-1.5' },
                 { label: 'Track', value: domainLabel(studentProfile.domain_focus), className: 'text-[#0A1748] text-base sm:text-lg pt-1.5' },
               ].map((m) => (
                 <div key={m.label} className="card p-5">
@@ -536,8 +536,8 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
   return (
     <article className="card border-2 border-[#00AEEF] p-6 sm:p-8">
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        <span className="badge bg-[#00AEEF] border-transparent text-white"><Sparkles size={12} /> New offer</span>
-        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(job.type)}</span>
+        <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748]"><Sparkles size={12} /> New offer</span>
+        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(job.type)}</span>
         {teamSize > 1 && <span className="badge bg-[#F5F7FC] border-[rgba(10,23,72,0.12)] text-[#0A1748]"><Users size={12} /> Team of {teamSize}</span>}
       </div>
       <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
@@ -551,7 +551,7 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
 
       {job.match_notes && (
         <div className="mt-4 p-3.5 bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg text-sm">
-          <strong className="text-[#0090C6]">Why you were picked:</strong> {job.match_notes}
+          <strong className="text-[#00729F]">Why you were picked:</strong> {job.match_notes}
         </div>
       )}
 
@@ -636,7 +636,7 @@ const ClubApplications = ({ applications }) => (
           <div key={app.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <Link to={`/quest/${app.campaign}`} className="font-heading font-bold text-base hover:text-[#0090C6]">{app.campaign_title}</Link>
+                <Link to={`/quest/${app.campaign}`} className="font-heading font-bold text-base hover:text-[#00729F]">{app.campaign_title}</Link>
                 <StatusBadge status={app.status} />
               </div>
               <p className="text-sm text-[#5B6478]">Budget {formatMoney(app.campaign_budget)} · Applied {formatDate(app.submitted_at)}</p>

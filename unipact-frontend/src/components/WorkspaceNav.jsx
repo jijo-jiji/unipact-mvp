@@ -147,7 +147,7 @@ const WorkspaceNav = () => {
                     to={l.to}
                     end={l.end !== false}
                     className={({ isActive }) =>
-                      `flex items-center justify-between py-3.5 px-1 text-base font-medium ${isActive ? 'text-[#0090C6]' : 'text-[#0A1748] hover:text-[#0090C6]'}`
+                      `flex items-center justify-between py-3.5 px-1 text-base font-medium ${isActive ? 'text-[#00729F]' : 'text-[#0A1748] hover:text-[#00729F]'}`
                     }
                   >
                     {l.label} <ChevronRight size={18} className="text-[#5B6478]" />

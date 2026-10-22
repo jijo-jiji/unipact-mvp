@@ -108,7 +108,7 @@ const CompanyRegister = () => {
 
         <div className="mt-6 pt-6 border-t border-[rgba(10,23,72,0.08)] text-center text-sm text-[#5B6478]">
           Already have an account?{' '}
-          <Link to="/login" className="inline-block py-2 font-semibold text-[#0090C6] hover:underline">Sign in</Link>
+          <Link to="/login" className="inline-block py-2 font-semibold text-[#00729F] hover:underline">Sign in</Link>
         </div>
       </div>
     </div>

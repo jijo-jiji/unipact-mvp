@@ -54,7 +54,7 @@ const AgreementModal = ({ agreement: agreementKey, onClose, onAccepted }) => {
             </li>
           ))}
         </ul>
-        <a href={agreement.path} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-[#0090C6] hover:underline">
+        <a href={agreement.path} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-[#00729F] hover:underline">
           Read the full {agreement.title} <ArrowUpRight size={14} />
         </a>
 

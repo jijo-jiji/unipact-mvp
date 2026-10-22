@@ -83,8 +83,8 @@ const QuestBoard = () => {
             {visibleQuests.map((quest) => (
               <Link key={quest.id} to={`/quest/${quest.id}`} className="card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-[#00AEEF] transition-colors group">
                 <div className="min-w-0">
-                  <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6] mb-1.5">{campaignTypeLabel(quest.type)}</span>
-                  <h2 className="font-heading font-bold text-lg group-hover:text-[#0090C6] transition-colors">{quest.title}</h2>
+                  <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F] mb-1.5">{campaignTypeLabel(quest.type)}</span>
+                  <h2 className="font-heading font-bold text-lg group-hover:text-[#00729F] transition-colors">{quest.title}</h2>
                   <p className="text-sm text-[#5B6478] flex items-center gap-1.5 mt-0.5"><Building2 size={14} /> {quest.company_name}</p>
                 </div>
                 <div className="flex items-center gap-6 justify-between md:justify-end shrink-0">

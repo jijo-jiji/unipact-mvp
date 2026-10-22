@@ -2,44 +2,88 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import { LEGAL } from '../utils/legal';
+import { INSTAGRAM, MARKETING_SITE, TEAM_CONTACTS } from '../utils/contacts';
 
-// Footer for public pages (landing, legal). Section links jump back to the landing page sections.
+// Footer for public pages (front page, legal pages), laid out like the one on www.unipact.my:
+// brand and contact details, three link columns, the team's direct contacts, then the legal line.
+// Section links jump back to the front page's sections.
+const COLUMNS = [
+  {
+    title: 'Platform',
+    links: [
+      { to: '/#how-it-works', label: 'How it works' },
+      { to: '/#workspace', label: 'Your workspace' },
+      { to: '/#payments', label: 'Payments' },
+      { to: '/#faq', label: 'FAQ' },
+      { href: MARKETING_SITE, label: 'About UniPact' },
+    ],
+  },
+  {
+    title: 'Get started',
+    links: [
+      { to: '/register/company', label: 'Post a project' },
+      { to: '/register/student', label: 'Join as a student' },
+      { href: `${MARKETING_SITE}/#contact`, label: 'Talk to us' },
+      { to: '/login', label: 'Sign in' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { to: '/privacy', label: 'Privacy Policy' },
+      { to: '/terms', label: 'Terms of Service' },
+      { to: '/agreements/client', label: 'Client Service Agreement' },
+      { to: '/agreements/talent', label: 'Talent Agreement' },
+    ],
+  },
+];
+
+const linkClass = 'inline-block py-1.5 hover:text-[#0A1748]';
+
 const SiteFooter = () => (
-  <footer className="border-t border-[rgba(10,23,72,0.08)] bg-white">
-    <div className="max-w-[1160px] mx-auto px-4 sm:px-8 py-10 grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-8 text-sm text-[#5B6478]">
-      <div className="text-center md:text-left">
-        <Link to="/" aria-label="UniPact home"><BrandLogo subtitle="Talent Marketplace" /></Link>
-        <p className="mt-3 max-w-xs mx-auto md:mx-0">Connecting companies with verified university talent in Malaysia.</p>
+  <footer className="border-t border-[rgba(10,23,72,0.08)] bg-white text-sm text-[#5B6478]">
+    <div className="max-w-[1160px] mx-auto px-4 sm:px-8 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] gap-8">
+      <div className="sm:col-span-2 lg:col-span-1">
+        <Link to="/" aria-label="UniPact home" className="inline-flex"><BrandLogo /></Link>
+        <p className="mt-3 max-w-xs">Vetted university student teams for software and digital marketing projects in Malaysia.</p>
+        <a href={`mailto:${LEGAL.contactEmail}`} className="inline-block mt-2 font-semibold text-[#0B1E63] hover:underline break-all">
+          {LEGAL.contactEmail}
+        </a>
+        <a href={INSTAGRAM.url} target="_blank" rel="noopener noreferrer" className="block w-fit mt-1 py-0.5 hover:text-[#0A1748] hover:underline">
+          Instagram {INSTAGRAM.handle}
+        </a>
       </div>
-      <nav aria-label="Product" className="text-center md:text-left">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0A1748] mb-3 font-body">Product</h2>
-        <ul className="space-y-1">
-          <li><Link to="/#how-it-works" className="inline-block py-1.5 hover:text-[#0A1748]">How it works</Link></li>
-          <li><Link to="/#faq" className="inline-block py-1.5 hover:text-[#0A1748]">FAQ</Link></li>
-        </ul>
-      </nav>
-      <nav aria-label="Get started" className="text-center md:text-left">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0A1748] mb-3 font-body">Get started</h2>
-        <ul className="space-y-1">
-          <li><Link to="/register/company" className="inline-block py-1.5 hover:text-[#0A1748]">For companies</Link></li>
-          <li><Link to="/register/student" className="inline-block py-1.5 hover:text-[#0A1748]">For students</Link></li>
-          <li><Link to="/login" className="inline-block py-1.5 hover:text-[#0A1748]">Sign in</Link></li>
-        </ul>
-      </nav>
-      <nav aria-label="Legal" className="text-center md:text-left">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0A1748] mb-3 font-body">Legal</h2>
-        <ul className="space-y-1">
-          <li><Link to="/privacy" className="inline-block py-1.5 hover:text-[#0A1748]">Privacy Policy</Link></li>
-          <li><Link to="/terms" className="inline-block py-1.5 hover:text-[#0A1748]">Terms of Service</Link></li>
-          <li><Link to="/agreements/client" className="inline-block py-1.5 hover:text-[#0A1748]">Client Service Agreement</Link></li>
-          <li><Link to="/agreements/talent" className="inline-block py-1.5 hover:text-[#0A1748]">Talent Agreement</Link></li>
-          <li><a href={`mailto:${LEGAL.contactEmail}`} className="inline-block py-1.5 hover:text-[#0A1748] break-all">Contact us</a></li>
-        </ul>
-      </nav>
+
+      {COLUMNS.map(({ title, links }) => (
+        <nav key={title} aria-label={title}>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[#0A1748] mb-3 font-body">{title}</h2>
+          <ul>
+            {links.map((l) => (
+              <li key={l.label}>
+                {l.to ? <Link to={l.to} className={linkClass}>{l.label}</Link> : <a href={l.href} className={linkClass}>{l.label}</a>}
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))}
     </div>
+
     <div className="border-t border-[rgba(10,23,72,0.06)]">
-      <p className="max-w-[1160px] mx-auto px-4 sm:px-8 py-5 text-xs text-[#5B6478] text-center md:text-left">
-        © {new Date().getFullYear()} {LEGAL.entityName} ({LEGAL.registrationNumber}). All rights reserved.
+      <ul className="max-w-[1160px] mx-auto px-4 sm:px-8 py-7 grid grid-cols-1 sm:grid-cols-3 gap-6" aria-label="Contact the UniPact team">
+        {TEAM_CONTACTS.map((person) => (
+          <li key={person.email}>
+            <p className="font-heading font-bold text-base text-[#0A1748]">{person.name}</p>
+            <p>{person.role}</p>
+            <a href={`mailto:${person.email}`} className="inline-block mt-2 font-semibold text-[#0B1E63] hover:underline break-all">{person.email}</a>
+            <a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`} className="block w-fit mt-1 py-0.5 hover:text-[#0A1748] hover:underline">{person.phone}</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div className="border-t border-[rgba(10,23,72,0.06)]">
+      <p className="max-w-[1160px] mx-auto px-4 sm:px-8 py-5 text-xs">
+        © {new Date().getFullYear()} UniPact. {LEGAL.entityName}, registered in Malaysia, Registration No. {LEGAL.registrationNumber}. All rights reserved.
       </p>
     </div>
   </footer>

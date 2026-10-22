@@ -238,7 +238,7 @@ const StudentProject = () => {
         {/* Header */}
         <section className="card p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(campaign.type)}</span>
+            <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(campaign.type)}</span>
             <StatusBadge status={campaign.status} />
           </div>
           <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight">{campaign.title}</h1>
@@ -297,12 +297,12 @@ const StudentProject = () => {
               aria-selected={activeTab === key}
               onClick={() => setActiveTab(key)}
               className={`pb-3 px-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap flex items-center gap-2 transition-colors ${
-                activeTab === key ? 'border-[#00AEEF] text-[#0090C6]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
+                activeTab === key ? 'border-[#00AEEF] text-[#00729F]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
               }`}
             >
               {icon} {label}
               {key === 'work' && step.action && next && <span className="badge bg-amber-50 border-amber-200 text-amber-800 px-1.5 py-0">1</span>}
-              {key === 'messages' && chat.unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{chat.unread}</span>}
+              {key === 'messages' && chat.unread > 0 && <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748] px-1.5 py-0">{chat.unread}</span>}
             </button>
           ))}
         </div>
@@ -393,8 +393,8 @@ const StudentProject = () => {
                       <div className="text-[#5B6478] mb-2">{m.status === 'APPROVED' ? 'Approved by the client' : 'With the client for review'}</div>
                       {m.deliverable_notes && <p className="bg-white p-3 rounded border border-[rgba(10,23,72,0.06)] mb-2">{m.deliverable_notes}</p>}
                       <div className="flex flex-wrap gap-4">
-                        {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
-                        {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
+                        {m.deliverable_url && <a href={m.deliverable_url} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
+                        {m.deliverable_file && <a href={m.deliverable_file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
                       </div>
                     </div>
                   ))}
@@ -407,8 +407,8 @@ const StudentProject = () => {
                       <div className="text-[#5B6478] mb-2">{s.student_name}{s.contribution_role && <> · {s.contribution_role}</>}</div>
                       {s.contribution_summary && <p className="bg-white p-3 rounded border border-[rgba(10,23,72,0.06)] mb-2">{s.contribution_summary}</p>}
                       <div className="flex flex-wrap gap-4">
-                        {s.external_url && <a href={s.external_url} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
-                        {s.file && <a href={s.file} target="_blank" rel="noreferrer" className="text-[#0090C6] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
+                        {s.external_url && <a href={s.external_url} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1">Open link <ArrowUpRight size={13} /></a>}
+                        {s.file && <a href={s.file} target="_blank" rel="noreferrer" className="text-[#00729F] font-semibold hover:underline inline-flex items-center gap-1"><Download size={13} /> Download file</a>}
                       </div>
                     </div>
                   ))}
@@ -438,8 +438,8 @@ const StudentProject = () => {
                 return (
                   <Link key={member.id} to={`/student/profile/${member.user_id}`} className="bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] hover:border-[#00AEEF] rounded-lg p-4 text-sm group">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold group-hover:text-[#0090C6]">{member.full_name}</span>
-                      {member.id === myProfileId && <span className="badge bg-[#00AEEF]/15 border-transparent text-[#0090C6] px-1.5 py-0 text-[10px]">You</span>}
+                      <span className="font-semibold group-hover:text-[#00729F]">{member.full_name}</span>
+                      {member.id === myProfileId && <span className="badge bg-[#00AEEF]/15 border-transparent text-[#00729F] px-1.5 py-0 text-[10px]">You</span>}
                     </div>
                     {campaign.status === 'MATCHED' && offerStatus[member.id] && (
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold mt-1 ${offerStatus[member.id] === 'ACCEPTED' ? 'text-emerald-700' : 'text-amber-700'}`}>
@@ -459,7 +459,7 @@ const StudentProject = () => {
                         ))}
                       </div>
                     )}
-                    <span className="text-xs font-semibold text-[#0090C6] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
+                    <span className="text-xs font-semibold text-[#00729F] inline-flex items-center gap-1 mt-2">View portfolio <ArrowUpRight size={12} /></span>
                   </Link>
                 );
               })}
@@ -566,7 +566,7 @@ const StudentProject = () => {
                     No bank account on file. Add one so UniPact can pay you.
                   </p>
                 )}
-                <Link to="/settings#payouts" className="text-sm font-semibold text-[#0090C6] hover:underline inline-block mt-3">
+                <Link to="/settings#payouts" className="text-sm font-semibold text-[#00729F] hover:underline inline-block mt-3">
                   {payoutsData.has_bank_details ? 'Update bank details' : 'Add bank details'}
                 </Link>
               </section>
@@ -581,7 +581,7 @@ const StudentProject = () => {
               {campaign.description && <p className="text-sm leading-relaxed whitespace-pre-line">{campaign.description}</p>}
               {campaign.match_notes && (
                 <p className="text-sm bg-[#F5F7FC] border border-[rgba(10,23,72,0.08)] rounded-lg p-3">
-                  <strong className="text-[#0090C6]">Why you were matched:</strong> {campaign.match_notes}
+                  <strong className="text-[#00729F]">Why you were matched:</strong> {campaign.match_notes}
                 </p>
               )}
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -621,7 +621,7 @@ const StudentProject = () => {
                           <span className="block truncate font-medium">{a.title}</span>
                           <span className="block text-xs text-[#5B6478]">{formatDate(a.uploaded_at)}</span>
                         </span>
-                        <Download size={15} className="text-[#5B6478] group-hover:text-[#0090C6] shrink-0" />
+                        <Download size={15} className="text-[#5B6478] group-hover:text-[#00729F] shrink-0" />
                       </a>
                     </li>
                   ))}

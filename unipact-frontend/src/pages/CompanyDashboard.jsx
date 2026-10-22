@@ -124,7 +124,7 @@ const CompanyDashboard = () => {
                   aria-selected={activeTab === tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-sm font-semibold pt-1 pb-3 px-2 -mb-px border-b-2 whitespace-nowrap transition-colors ${
-                    activeTab === tab.key ? 'text-[#0090C6] border-[#00AEEF]' : 'text-[#5B6478] border-transparent hover:text-[#0A1748]'
+                    activeTab === tab.key ? 'text-[#00729F] border-[#00AEEF]' : 'text-[#5B6478] border-transparent hover:text-[#0A1748]'
                   }`}
                 >
                   {tab.label} <span className="ml-1 text-xs text-[#5B6478]">({countFor(tab.statuses)})</span>
@@ -149,15 +149,15 @@ const CompanyDashboard = () => {
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                          <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(camp.type)}</span>
+                          <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(camp.type)}</span>
                           <StatusBadge status={camp.status} label={camp.awaiting_student_acceptance ? 'Students accepting' : undefined} />
                           {camp.unread_messages > 0 && (
-                            <span className="badge bg-[#00AEEF] border-transparent text-white">
+                            <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748]">
                               <MessageSquare size={12} /> {camp.unread_messages} new message{camp.unread_messages === 1 ? '' : 's'}
                             </span>
                           )}
                         </div>
-                        <h3 className="font-heading font-bold text-lg group-hover:text-[#0090C6] transition-colors">{camp.title}</h3>
+                        <h3 className="font-heading font-bold text-lg group-hover:text-[#00729F] transition-colors">{camp.title}</h3>
                         <p className="text-[#5B6478] text-sm mt-1 line-clamp-2">{camp.description}</p>
                       </div>
                       <div className="sm:text-right shrink-0">
@@ -176,7 +176,7 @@ const CompanyDashboard = () => {
                       ) : (
                         <span className="text-[#5B6478] italic">A UniPact admin is finding the right students for you.</span>
                       )}
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#0090C6] shrink-0">
+                      <span className="inline-flex items-center gap-1 font-semibold text-[#00729F] shrink-0">
                         {camp.status === 'MATCHED' && !camp.awaiting_student_acceptance ? 'Review match' : 'Open project'} <ArrowUpRight size={14} />
                       </span>
                     </div>

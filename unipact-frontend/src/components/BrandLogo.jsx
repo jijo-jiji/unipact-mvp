@@ -20,7 +20,7 @@ const BrandLogo = ({ variant = 'horizontal', subtitle, onDark = false, className
           UNIPACT
         </span>
         {subtitle && (
-          <span className={`mt-1 text-[10px] font-semibold tracking-[0.12em] uppercase ${onDark ? 'text-white/70' : 'text-[#0090C6]'}`}>
+          <span className={`mt-1 text-[10px] font-semibold tracking-[0.12em] uppercase ${onDark ? 'text-white/70' : 'text-[#00729F]'}`}>
             {subtitle}
           </span>
         )}

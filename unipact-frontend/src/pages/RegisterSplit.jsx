@@ -35,7 +35,7 @@ const OPTIONS = [
       'Share a public portfolio with employers',
     ],
     cta: 'Create a student account',
-    iconClass: 'bg-[#00AEEF] text-white',
+    iconClass: 'bg-[#00AEEF] text-[#0A1748]',
   },
 ];
 
@@ -67,8 +67,8 @@ const RegisterSplit = () => {
               <span className={`w-14 h-14 rounded-xl flex items-center justify-center mb-5 shadow-sm ${iconClass}`}>
                 {React.createElement(icon, { size: 28 })}
               </span>
-              <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#0090C6]">{eyebrow}</span>
-              <h2 className="font-heading font-bold text-2xl mt-1 mb-2 group-hover:text-[#0090C6] transition-colors">{title}</h2>
+              <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#00729F]">{eyebrow}</span>
+              <h2 className="font-heading font-bold text-2xl mt-1 mb-2 group-hover:text-[#00729F] transition-colors">{title}</h2>
               <p className="text-[#5B6478] mb-5">{text}</p>
               <ul className="space-y-2.5 text-sm mb-8">
                 {points.map((point) => (
@@ -91,7 +91,7 @@ const RegisterSplit = () => {
 
         <p className="text-center text-sm text-[#5B6478] mt-8">
           Already have an account?{' '}
-          <Link to="/login" className="inline-block py-2 font-semibold text-[#0090C6] hover:underline">Sign in</Link>
+          <Link to="/login" className="inline-block py-2 font-semibold text-[#00729F] hover:underline">Sign in</Link>
         </p>
       </main>
     </div>

@@ -16,7 +16,7 @@ const READINESS = [
 ];
 
 const SectionTitle = ({ children }) => (
-  <h2 className="font-heading font-bold text-sm uppercase tracking-[0.12em] text-[#0090C6] mb-3">{children}</h2>
+  <h2 className="font-heading font-bold text-sm uppercase tracking-[0.12em] text-[#00729F] mb-3">{children}</h2>
 );
 
 const ProofImage = ({ src, caption, label }) => (
@@ -179,7 +179,7 @@ const ImpactLedgerPage = () => {
                 <p className="text-sm mb-4 flex items-center gap-2 break-all">
                   <Link2 size={15} className="text-[#00AEEF] shrink-0" />
                   <span className="font-semibold shrink-0">Project link:</span>
-                  <a href={proof.url} target="_blank" rel="noreferrer" className="text-[#0090C6] hover:underline">{proof.url.replace(/^https?:\/\//, '')}</a>
+                  <a href={proof.url} target="_blank" rel="noreferrer" className="text-[#00729F] hover:underline">{proof.url.replace(/^https?:\/\//, '')}</a>
                 </p>
               )}
               {images.length > 0 && (
@@ -216,7 +216,7 @@ const ImpactLedgerPage = () => {
           <footer className="pt-5 border-t border-[rgba(10,23,72,0.12)] space-y-3 text-xs text-[#5B6478] leading-relaxed">
             <p>
               <span className="font-semibold text-[#0A1748]">Ledger ID {ledger.slug}</span>
-              {isPublished && <> · Published {formatDate(ledger.published_at)} · Verify the original at <span className="text-[#0090C6] break-all">{verifyUrl}</span></>}
+              {isPublished && <> · Published {formatDate(ledger.published_at)} · Verify the original at <span className="text-[#00729F] break-all">{verifyUrl}</span></>}
             </p>
             <p>
               <span className="font-semibold text-[#0A1748]">Corporate Terminology Guide: </span>

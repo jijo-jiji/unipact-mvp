@@ -6,7 +6,7 @@ const SITE_NAME = 'UniPact';
 export const usePageTitle = (title) => {
   useEffect(() => {
     const previous = document.title;
-    document.title = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Curated University Talent Marketplace`;
+    document.title = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Real projects done by verified university students`;
     return () => {
       document.title = previous;
     };

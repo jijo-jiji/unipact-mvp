@@ -35,7 +35,7 @@ const LEDGER_CHECKS = [
 const LOG_COLORS = {
   FINANCIAL: 'text-emerald-700',
   SECURITY: 'text-red-600',
-  MARKETPLACE: 'text-[#0090C6]',
+  MARKETPLACE: 'text-[#00729F]',
   GROWTH: 'text-[#0B1E63]',
 };
 
@@ -538,12 +538,12 @@ const AdminDashboard = () => {
               aria-selected={activeTab === key}
               onClick={() => setActiveTab(key)}
               className={`pb-3 px-2 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap flex items-center gap-2 transition-colors ${
-                activeTab === key ? 'border-[#00AEEF] text-[#0090C6]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
+                activeTab === key ? 'border-[#00AEEF] text-[#00729F]' : 'border-transparent text-[#5B6478] hover:text-[#0A1748]'
               }`}
             >
               {icon} {label}
               {key === 'dashboard' && reviews.length > 0 && <span className="badge bg-amber-50 border-amber-200 text-amber-800 px-1.5 py-0">{reviews.length}</span>}
-              {key === 'messages' && unreadMessages > 0 && <span className="badge bg-[#00AEEF] border-transparent text-white px-1.5 py-0">{unreadMessages}</span>}
+              {key === 'messages' && unreadMessages > 0 && <span className="badge bg-[#00AEEF] border-transparent text-[#0A1748] px-1.5 py-0">{unreadMessages}</span>}
             </button>
           ))}
         </div>
@@ -580,7 +580,7 @@ const AdminDashboard = () => {
                         <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                           <div className="min-w-0">
                             <h3 className="font-semibold text-base flex flex-wrap items-center gap-2">
-                              <button type="button" onClick={() => setDetailUserId(entity.user_id)} className="text-left hover:text-[#0090C6] hover:underline underline-offset-2">
+                              <button type="button" onClick={() => setDetailUserId(entity.user_id)} className="text-left hover:text-[#00729F] hover:underline underline-offset-2">
                                 {entity.company_name || entity.club_name || entity.full_name}
                               </button>
                               <span className="badge bg-[#F5F7FC] border-[rgba(10,23,72,0.12)] text-[#5B6478]">{entity.type.toLowerCase()}</span>
@@ -704,10 +704,10 @@ const AdminDashboard = () => {
                     <li key={ent.id} className="p-4 text-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <button type="button" onClick={() => setDetailUserId(ent.id)} className="font-semibold break-words text-left hover:text-[#0090C6] hover:underline underline-offset-2">{ent.entity_name}</button>
+                          <button type="button" onClick={() => setDetailUserId(ent.id)} className="font-semibold break-words text-left hover:text-[#00729F] hover:underline underline-offset-2">{ent.entity_name}</button>
                           <div className="text-[#5B6478] break-all">{ent.email}</div>
                         </div>
-                        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6] shrink-0">{ent.role.toLowerCase()}</span>
+                        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F] shrink-0">{ent.role.toLowerCase()}</span>
                       </div>
                       {ent.details && ent.details !== '-' && <div className="text-xs text-[#5B6478] mt-1.5">{ent.details}</div>}
                       <div className="flex items-center justify-between gap-3 mt-3">
@@ -746,10 +746,10 @@ const AdminDashboard = () => {
                       entities.map((ent) => (
                         <tr key={ent.id} className="hover:bg-[#F5F7FC]/60">
                           <td className="px-4 py-3 font-semibold">
-                            <button type="button" onClick={() => setDetailUserId(ent.id)} className="text-left hover:text-[#0090C6] hover:underline underline-offset-2">{ent.entity_name}</button>
+                            <button type="button" onClick={() => setDetailUserId(ent.id)} className="text-left hover:text-[#00729F] hover:underline underline-offset-2">{ent.entity_name}</button>
                           </td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.email}</td>
-                          <td className="px-4 py-3"><span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{ent.role.toLowerCase()}</span></td>
+                          <td className="px-4 py-3"><span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{ent.role.toLowerCase()}</span></td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.details}</td>
                           <td className="px-4 py-3">
                             {ent.status === 'Active'
@@ -872,7 +872,7 @@ const AdminDashboard = () => {
                   <div>
                     <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                       <h3 className="font-semibold flex items-center gap-2"><Users size={15} className="text-[#00AEEF]" /> Student talent ({students.length})</h3>
-                      <span className="text-sm text-[#0090C6] font-medium">{selectedStudentIds.length} selected</span>
+                      <span className="text-sm text-[#00729F] font-medium">{selectedStudentIds.length} selected</span>
                     </div>
                     <div className="relative mb-3">
                       <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5B6478]" />
@@ -900,7 +900,7 @@ const AdminDashboard = () => {
                             <span className="flex flex-col items-end gap-1 shrink-0">
                               {OFFER_BADGES[selectedOffers[stud.id]?.status] && <StatusBadge status={OFFER_BADGES[selectedOffers[stud.id].status].status} label={OFFER_BADGES[selectedOffers[stud.id].status].label} />}
                               {isVerified ? <StatusBadge status="VERIFIED" /> : <StatusBadge status="PENDING_VERIFICATION" label="Not verified" />}
-                              {stud.isFit && isVerified && <span className="text-[10px] font-semibold text-[#0090C6] inline-flex items-center gap-0.5"><Check size={11} /> Good fit</span>}
+                              {stud.isFit && isVerified && <span className="text-[10px] font-semibold text-[#00729F] inline-flex items-center gap-0.5"><Check size={11} /> Good fit</span>}
                             </span>
                           </label>
                         );
@@ -982,7 +982,7 @@ const AdminDashboard = () => {
                         {escrowLoaded && (
                           <span className="text-sm">
                             Outstanding <strong className="text-[#0B1E63]">{formatMoney(selectedEscrow.outstanding)}</strong>
-                            <button type="button" onClick={() => setClientPayment((p) => ({ ...p, amount: String(selectedEscrow.outstanding) }))} className="ml-2 text-xs font-semibold text-[#0090C6] hover:underline">
+                            <button type="button" onClick={() => setClientPayment((p) => ({ ...p, amount: String(selectedEscrow.outstanding) }))} className="ml-2 text-xs font-semibold text-[#00729F] hover:underline">
                               Use full amount
                             </button>
                           </span>
@@ -1159,9 +1159,9 @@ const AdminDashboard = () => {
                 <div>
                   <div className="flex items-center justify-between text-[#5B6478] mb-1">
                     <span className="text-xs font-medium">Pending Milestone Escrow</span>
-                    <Clock size={16} className="text-[#0090C6]" />
+                    <Clock size={16} className="text-[#00729F]" />
                   </div>
-                  <p className="font-heading font-extrabold text-2xl text-[#0090C6]">
+                  <p className="font-heading font-extrabold text-2xl text-[#00729F]">
                     {formatMoney(payoutsData.total_pending)}
                   </p>
                 </div>
@@ -1264,7 +1264,7 @@ const AdminDashboard = () => {
                                   <p className="font-semibold text-[#0A1748]">{p.bank_name}</p>
                                   <p className="font-mono text-[#5B6478]">{p.bank_account_number}</p>
                                   <p className="text-[#5B6478]">{p.bank_account_holder_name}</p>
-                                  {p.duitnow_id && <p className="text-[11px] text-[#0090C6]">DuitNow: {p.duitnow_id}</p>}
+                                  {p.duitnow_id && <p className="text-[11px] text-[#00729F]">DuitNow: {p.duitnow_id}</p>}
                                 </div>
                               ) : (
                                 <span className="text-xs text-amber-700 italic flex items-center gap-1">

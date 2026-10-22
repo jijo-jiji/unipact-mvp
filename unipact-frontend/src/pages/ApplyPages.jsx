@@ -102,7 +102,7 @@ const StudentApplyPage = ({ track }) => {
   };
 
   const chip = (active) => `px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${active
-    ? 'bg-[#00AEEF] border-[#00AEEF] text-white'
+    ? 'bg-[#00AEEF] border-[#00AEEF] text-[#0A1748]'
     : 'bg-white border-[rgba(10,23,72,0.15)] text-[#5B6478] hover:border-[#00AEEF]'}`;
 
   return (
@@ -243,7 +243,7 @@ const StudentApplyPage = ({ track }) => {
                 <input type="checkbox" required className="mt-0.5 w-4 h-4 accent-[#00AEEF]" />
                 <span>
                   I agree UniPact may share my profile with verified companies, and to the{' '}
-                  <Link to="/privacy" className="text-[#0090C6] underline">Privacy Policy</Link>.
+                  <Link to="/privacy" className="text-[#00729F] underline">Privacy Policy</Link>.
                 </span>
               </label>
 
@@ -253,7 +253,7 @@ const StudentApplyPage = ({ track }) => {
                 {sending ? <><Loader2 size={17} className="animate-spin" /> Sending…</> : 'Submit application'}
               </button>
               <p className="text-xs text-[#5B6478] text-center">
-                Already applied? <Link to="/register/student" className="text-[#0090C6] underline">Create your student account</Link> to finish setting up your profile.
+                Already applied? <Link to="/register/student" className="text-[#00729F] underline">Create your student account</Link> to finish setting up your profile.
               </p>
             </form>
           </div>

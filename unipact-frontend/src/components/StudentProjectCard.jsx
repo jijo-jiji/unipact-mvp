@@ -19,11 +19,11 @@ const StudentProjectCard = ({ job }) => {
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="badge bg-[#00AEEF]/10 border-transparent text-[#0090C6]">{campaignTypeLabel(job.type)}</span>
+            <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{campaignTypeLabel(job.type)}</span>
             <StatusBadge status={job.status} />
           </div>
           <h3 className="font-heading font-bold text-xl text-[#0A1748]">
-            <Link to={path} className="hover:text-[#0090C6]">{job.title}</Link>
+            <Link to={path} className="hover:text-[#00729F]">{job.title}</Link>
           </h3>
           <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
             <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
@@ -38,7 +38,7 @@ const StudentProjectCard = ({ job }) => {
 
       {step.text && (
         <p className={`mt-4 text-sm rounded-lg p-3 flex items-start gap-2 ${step.action ? 'bg-[#E6F7FD] text-[#0A1748]' : 'bg-[#F5F7FC] text-[#5B6478]'}`}>
-          {step.action ? <Flag size={16} className="text-[#0090C6] shrink-0 mt-0.5" /> : <Clock size={16} className="shrink-0 mt-0.5" />}
+          {step.action ? <Flag size={16} className="text-[#00729F] shrink-0 mt-0.5" /> : <Clock size={16} className="shrink-0 mt-0.5" />}
           <span>{step.text}</span>
         </p>
       )}
@@ -47,7 +47,7 @@ const StudentProjectCard = ({ job }) => {
         {milestones.length > 0 && <span className="inline-flex items-center gap-1.5"><Flag size={13} className="text-[#00AEEF]" /> {approved} of {milestones.length} milestone{milestones.length === 1 ? '' : 's'} approved</span>}
         <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-[#00AEEF]" /> Team of {team.length}</span>
         {job.unread_messages > 0 && (
-          <span className="inline-flex items-center gap-1.5 font-semibold text-[#0090C6]">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-[#00729F]">
             <MessageSquare size={13} /> {job.unread_messages} new message{job.unread_messages === 1 ? '' : 's'}
           </span>
         )}

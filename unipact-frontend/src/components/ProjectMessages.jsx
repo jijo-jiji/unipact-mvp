@@ -5,7 +5,7 @@ import { formatDate, getErrorMessage } from '../utils/format';
 
 const ROLE_LABEL = { CLIENT: 'Client', STUDENT: 'Student', UNIPACT: 'UniPact' };
 const ROLE_CLASS = {
-  CLIENT: 'bg-[#00AEEF]/10 text-[#0090C6]',
+  CLIENT: 'bg-[#00AEEF]/10 text-[#00729F]',
   STUDENT: 'bg-emerald-50 text-emerald-700',
   UNIPACT: 'bg-[#0B1E63] text-white',
 };

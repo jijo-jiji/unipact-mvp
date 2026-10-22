@@ -69,7 +69,7 @@ const SubmitDeliverable = () => {
               ) : (
                 <span className="flex flex-col items-center gap-2 text-[#5B6478]">
                   <UploadCloud size={30} />
-                  <span className="text-sm"><span className="text-[#0090C6] font-semibold">Choose a file</span> to upload</span>
+                  <span className="text-sm"><span className="text-[#00729F] font-semibold">Choose a file</span> to upload</span>
                 </span>
               )}
             </label>

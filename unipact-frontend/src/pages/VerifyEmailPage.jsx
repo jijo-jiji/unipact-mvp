@@ -90,7 +90,7 @@ const VerifyEmailPage = () => {
         )}
 
         <p className="text-xs text-[#5B6478] mt-4">
-          Signed out? <Link to="/login" className="text-[#0090C6] underline">Sign in</Link> and we&apos;ll offer the link again.
+          Signed out? <Link to="/login" className="text-[#00729F] underline">Sign in</Link> and we&apos;ll offer the link again.
         </p>
       </div>
     </AuthShell>
