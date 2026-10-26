@@ -176,6 +176,20 @@ const ManageCampaign = () => {
     }
   };
 
+  // Approving releases money that can't be taken back, so it asks first
+  const confirmApproveMilestone = (m) => {
+    const revisionsLeft = m.max_revisions - m.revisions_used;
+    setConfirmState({
+      isOpen: true,
+      title: `Approve milestone ${m.step_number}?`,
+      message: `This approves "${m.title}" and releases ${formatMoney(m.amount)} from escrow to your team. A released payment can't be taken back.${
+        revisionsLeft > 0 ? ` If the work isn't right yet, cancel and request a revision instead (${revisionsLeft} of ${m.max_revisions} left).` : ''
+      }`,
+      confirmText: 'Approve and release',
+      onConfirm: () => reviewMilestone(m.id, 'approve'),
+    });
+  };
+
   // ---- V2.2.1 club award ----
   const executeAward = async (applicationId, clubName) => {
     try {
@@ -631,7 +645,7 @@ const ManageCampaign = () => {
                       {m.status === 'SUBMITTED' && (
                         <>
                           <div className="flex flex-wrap gap-2 pt-1">
-                            <button onClick={() => reviewMilestone(m.id, 'approve')} disabled={milestoneBusy === m.id} className="btn-primary btn-sm">
+                            <button onClick={() => confirmApproveMilestone(m)} disabled={milestoneBusy === m.id} className="btn-primary btn-sm">
                               {milestoneBusy === m.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Approve & release
                             </button>
                             {m.revisions_used < m.max_revisions && (
