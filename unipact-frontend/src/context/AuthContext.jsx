@@ -64,6 +64,13 @@ export const AuthProvider = ({ children }) => {
         return response.data;
     };
 
+    // An account an admin created: its owner sets a password from the emailed link and is signed in
+    const acceptAccountInvitation = async (data) => {
+        const response = await api.post('/users/invitation/accept/', data);
+        setUser(response.data.user);
+        return response.data;
+    };
+
     const logout = async () => {
         try {
             await api.post('/users/logout/');
@@ -95,6 +102,7 @@ export const AuthProvider = ({ children }) => {
         registerClub,
         registerStudent,
         claimClubInvitation,
+        acceptAccountInvitation,
         logout,
         checkUserStatus,
         updateAccount,

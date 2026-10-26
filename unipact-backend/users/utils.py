@@ -55,3 +55,36 @@ def read_email_verification_token(token, max_age=None):
 def email_verification_path(user):
     from urllib.parse import urlencode
     return f"/verify-email?{urlencode({'token': make_email_verification_token(user)})}"
+
+
+# --- Accounts an admin created ------------------------------------------------------
+# The account has no password until its owner picks one from the emailed link, so the admin never
+# knows it. The token signs the account's current (unusable) password hash: once a password is set
+# the hash changes and every link sent for that account stops working.
+ACCOUNT_INVITE_SALT = 'unipact.account-invite'
+
+
+def make_invitation_token(user):
+    from django.core import signing
+    return signing.dumps({'uid': user.pk, 'pw': user.password[-16:]}, salt=ACCOUNT_INVITE_SALT)
+
+
+def read_invitation_token(token, max_age=None):
+    """The account the link was sent for, or None if the link is invalid, expired or already used."""
+    from django.conf import settings
+    from django.core import signing
+    from .models import User
+
+    try:
+        data = signing.loads(token, salt=ACCOUNT_INVITE_SALT, max_age=max_age or settings.ACCOUNT_INVITE_TIMEOUT)
+    except signing.BadSignature:
+        return None
+    user = User.objects.filter(pk=data.get('uid'), is_active=True).first()
+    if not user or user.has_usable_password() or user.password[-16:] != data.get('pw'):
+        return None
+    return user
+
+
+def invitation_path(user):
+    from urllib.parse import urlencode
+    return f"/welcome?{urlencode({'token': make_invitation_token(user)})}"

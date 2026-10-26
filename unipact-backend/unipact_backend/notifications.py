@@ -166,6 +166,27 @@ def password_reset(user, reset_path):
     )
 
 
+def account_invitation(user, invite_path):
+    """An admin created this account: the owner picks their own password from the link."""
+    days = max(1, settings.ACCOUNT_INVITE_TIMEOUT // 86400)
+    if user.role == 'COMPANY':
+        about = ('Post projects for free, and UniPact proposes a team of verified university students for each one. '
+                 'Your payment is held in escrow and released only as you approve the work.')
+    else:
+        about = ('UniPact matches verified university students to paid client projects in their field. You see each '
+                 "offer's brief and pay before you accept it.")
+    send_email(
+        user.email, 'Your UniPact account is ready', 'Set up your UniPact account',
+        [f'Hi {display_name(user)}, the UniPact team has created an account for you with this email address '
+         f'({user.email}).',
+         about,
+         f'Choose a password to start using it. The link works once and expires in {days} days.'],
+        action_label='Set your password', action_path=invite_path,
+        note="If you weren't expecting this, you can ignore this email: the account can't be used until a password "
+             'is chosen. If the link has expired, use "Forgot password?" on the sign-in page for a new one.',
+    )
+
+
 def password_changed(user):
     send_email(
         user.email, 'Your password was changed', 'Your password was changed',

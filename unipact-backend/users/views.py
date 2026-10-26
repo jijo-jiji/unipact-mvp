@@ -6,7 +6,7 @@ from rest_framework import status, generics, views, permissions
 from rest_framework.response import Response
 from unipact_backend.throttling import LoginThrottle, RegisterThrottle, TokenRefreshThrottle, PasswordResetThrottle, PasswordChangeThrottle, EmailVerifyThrottle
 from unipact_backend import notifications
-from .utils import email_verification_path, log_event
+from .utils import email_verification_path, invitation_path, log_event, read_invitation_token
 from . import agreements
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, logout
@@ -289,6 +289,11 @@ class PasswordResetRequestView(views.APIView):
             query = urlencode({'uid': urlsafe_base64_encode(force_bytes(user.pk)), 'token': default_token_generator.make_token(user)})
             notifications.password_reset(user, f'/reset-password?{query}')
             log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Password reset requested: {user.email}")
+        elif user and user.role in (User.Role.STUDENT, User.Role.COMPANY):
+            # An account an admin created whose owner hasn't set a password yet: a fresh invitation
+            # does the same job, so an expired link doesn't need an admin to resend it
+            notifications.account_invitation(user, invitation_path(user))
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Account invitation re-sent from 'Forgot password': {user.email}")
 
         return Response({"message": "If an account exists for that email, we've sent a link to reset the password."})
 
@@ -1136,6 +1141,15 @@ class AdminEntityListView(generics.ListAPIView):
              raise exceptions.PermissionDenied("Admin access required.")
         return User.objects.filter(role__in=[User.Role.CLUB, User.Role.COMPANY, User.Role.STUDENT]).order_by('-date_joined')
 
+    def list(self, request, *args, **kwargs):
+        # How many of each type match the search, for the count on each type's tab
+        from django.db.models import Count
+        response = super().list(request, *args, **kwargs)
+        searched = filters.SearchFilter().filter_queryset(request, self.get_queryset(), self)
+        counts = dict(searched.order_by().values_list('role').annotate(n=Count('id')))
+        response.data['counts'] = {role: counts.get(role, 0) for role in (User.Role.STUDENT, User.Role.COMPANY, User.Role.CLUB)}
+        return response
+
 class AdminUserDetailView(views.APIView):
     """GET: everything UniPact holds about one student, company or club account, for an admin deciding
     whether to approve it. PATCH: correct the profile details that person entered."""
@@ -1173,6 +1187,8 @@ class AdminUserDetailView(views.APIView):
             "email_verified": user.email_verified,
             "date_joined": user.date_joined,
             "terms_accepted_at": user.terms_accepted_at,
+            # Created by an admin and its owner hasn't set a password from the emailed link yet
+            "invitation_pending": not user.has_usable_password(),
             "verification_status": account["verification_status"],
             # What the verify endpoint takes, so the account can be approved from its details
             "entity_type": user.role if profile is not None else None,
@@ -1217,6 +1233,133 @@ class AdminUserDetailView(views.APIView):
 
         user.refresh_from_db()
         return Response(self.payload(request, user))
+
+
+class AdminCreateAccountView(views.APIView):
+    """An admin sets up a student or company account. It has no password: the person gets an email with a
+    link to choose one (see AccountInvitationAcceptView), so the admin never knows it."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .serializers import AdminCreateAccountSerializer
+
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+        serializer = AdminCreateAccountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        email, role, verified = data['email'], data['role'], data['verified']
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=email, email=email, password=None, role=role,  # no password: an unusable one
+                first_name=(data.get('full_name') or '').strip()[:150],
+                is_verified=verified and role == User.Role.STUDENT,
+            )
+            if role == User.Role.STUDENT:
+                name = data['full_name'].strip()
+                StudentProfile.objects.create(
+                    user=user, full_name=name, university=data['university'].strip(),
+                    major=(data.get('major') or '').strip(), domain_focus=data['domain_focus'],
+                    skills=data.get('skills') or [],
+                    verification_status=StudentProfile.VerificationStatus.VERIFIED if verified
+                    else StudentProfile.VerificationStatus.PENDING_VERIFICATION,
+                )
+            else:
+                name = data['company_name'].strip()
+                CompanyProfile.objects.create(
+                    user=user, company_name=name, company_details=(data.get('company_details') or '').strip(),
+                    verification_status=CompanyProfile.VerificationStatus.VERIFIED if verified
+                    else CompanyProfile.VerificationStatus.HIGH_RISK if is_public_domain(email)
+                    else CompanyProfile.VerificationStatus.PENDING_REVIEW,
+                )
+            notifications.account_invitation(user, invitation_path(user))
+
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO,
+                  f"Admin {request.user.email} created a {role.lower()} account: {name} ({email})")
+        return Response({"id": user.id, "email": user.email, "role": user.role, "name": name},
+                        status=status.HTTP_201_CREATED)
+
+
+class AdminResendInvitationView(views.APIView):
+    """Sends the "set your password" email again, for an account whose owner hasn't used it yet."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        if request.user.role != User.Role.ADMIN:
+            raise exceptions.PermissionDenied("Admin access required.")
+        user = get_object_or_404(User, pk=user_id, role__in=[User.Role.STUDENT, User.Role.COMPANY])
+        if user.has_usable_password():
+            return Response({"error": "They've already set a password, so there's no invitation to resend."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not user.is_active:
+            return Response({"error": "This account is blocked. Unblock it before sending the invitation again."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        notifications.account_invitation(user, invitation_path(user))
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"Admin {request.user.email} re-sent the invitation to {user.email}")
+        return Response({"message": f"Invitation sent to {user.email}."})
+
+
+INVALID_ACCOUNT_INVITE_MESSAGE = (
+    "This link is invalid, has expired or has already been used. If you haven't set a password yet, "
+    'use "Forgot password?" on the sign-in page to get a new one.'
+)
+
+
+class AccountInvitationPreviewView(views.APIView):
+    """Who the "set your password" link is for, to greet them by name. The token stays in the request body."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [RegisterThrottle]
+
+    def post(self, request):
+        user = read_invitation_token(str(request.data.get('token') or '')[:512])
+        if not user:
+            return Response({"error": INVALID_ACCOUNT_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"email": user.email, "name": account_payload(user)["name"], "role": user.role})
+
+
+class AccountInvitationAcceptView(views.APIView):
+    """The owner of an account an admin created chooses their password and accepts the terms, which also
+    confirms their email address (the link reached their inbox), then they're signed in."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [RegisterThrottle]
+
+    def post(self, request):
+        from .serializers import AccountInvitationAcceptSerializer, check_new_password
+
+        serializer = AccountInvitationAcceptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = read_invitation_token(data['token'])
+        if not user:
+            return Response({"error": INVALID_ACCOUNT_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            check_new_password(data['password'], user.email)
+        except exceptions.ValidationError as exc:
+            return Response({"password": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Lock the account and read the link again, so a double-submit can't set two passwords
+            User.objects.select_for_update().filter(pk=user.pk).first()
+            user = read_invitation_token(data['token'])
+            if not user:
+                return Response({"error": INVALID_ACCOUNT_INVITE_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(data['password'])
+            user.email_verified = True
+            user.terms_accepted_at = timezone.now()
+            user.save(update_fields=['password', 'email_verified', 'terms_accepted_at'])
+            # Students accept the Talent Agreement in the same box, as on the sign-up form
+            if (user.role == User.Role.STUDENT
+                    and str(request.data.get('talent_agreement_version') or '') == agreements.CURRENT_VERSIONS[agreements.TALENT]):
+                agreements.record_acceptance(user, agreements.TALENT)
+
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"Account set up from an invitation: {user.email}")
+        response = Response({"message": "Your account is ready.", "user": account_payload(user)})
+        set_auth_cookies(response, get_tokens_for_user(user))
+        return response
 
 
 class AdminBlockUserView(views.APIView):

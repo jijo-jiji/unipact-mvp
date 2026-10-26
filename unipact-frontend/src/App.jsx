@@ -57,6 +57,7 @@ const ForgotPasswordPage = page(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
+const WelcomePage = page(() => import('./pages/WelcomePage'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -87,6 +88,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join-club" element={<JoinClubPage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/apply-software-developer" element={<SoftwareDeveloperApplyPage />} />
           <Route path="/apply-digital-marketing" element={<DigitalMarketingApplyPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />

@@ -9,6 +9,7 @@ from .views import (
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
     VerifyEmailView, ResendEmailVerificationView,
     AgreementStatusView, AgreementAcceptView, AdminUserDetailView,
+    AdminCreateAccountView, AdminResendInvitationView, AccountInvitationPreviewView, AccountInvitationAcceptView,
 )
 
 urlpatterns = [
@@ -26,6 +27,8 @@ urlpatterns = [
     path('password/forgot/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password/reset/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('email/verify/', VerifyEmailView.as_view(), name='verify_email'),
+    path('invitation/preview/', AccountInvitationPreviewView.as_view(), name='account_invitation_preview'),
+    path('invitation/accept/', AccountInvitationAcceptView.as_view(), name='account_invitation_accept'),
     path('email/verify/resend/', ResendEmailVerificationView.as_view(), name='resend_verify_email'),
     
     # Student Specific
@@ -46,7 +49,9 @@ urlpatterns = [
     
     # Checkpoint 2 Additions
     path('admin/entities/', AdminEntityListView.as_view(), name='admin_entities'),
+    path('admin/users/create/', AdminCreateAccountView.as_view(), name='admin_create_account'),
     path('admin/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
+    path('admin/users/<int:user_id>/invite/', AdminResendInvitationView.as_view(), name='admin_resend_invitation'),
     path('admin/users/<int:user_id>/block/', AdminBlockUserView.as_view(), name='admin_block_user'),
     path('admin/students/', AdminStudentPoolView.as_view(), name='admin_student_pool'),
     path('club/transfer-ownership/', TransferOwnershipView.as_view(), name='club_transfer_ownership'),

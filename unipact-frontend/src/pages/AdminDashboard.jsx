@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, CheckCircle2, XCircle, Search, Activity, Users, ChevronLeft, ChevronRight, Ban,
-  Briefcase, UserCheck, Check, Sparkles, Lock, FileText, Loader2, Inbox,
+  Briefcase, UserCheck, Check, Sparkles, Lock, FileText, Loader2, Inbox, GraduationCap, UserPlus, Send,
   CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye, MessageSquare,
 } from 'lucide-react';
 import api from '../api/client';
@@ -10,6 +10,7 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
 import AdminUserModal from '../components/AdminUserModal';
+import AdminCreateAccountModal from '../components/AdminCreateAccountModal';
 import AdminConversations from '../components/AdminConversations';
 import StatusBadge from '../components/StatusBadge';
 import PageLoader from '../components/PageLoader';
@@ -23,6 +24,13 @@ const TABS = [
   { key: 'messages', label: 'Messages', icon: <MessageSquare size={16} /> },
   { key: 'payouts', label: 'Payouts', icon: <CreditCard size={16} /> },
   { key: 'ledgers', label: 'Impact ledgers', icon: <Award size={16} /> },
+];
+
+// The Users tab shows one type of account at a time
+const USER_TYPES = [
+  { role: 'STUDENT', label: 'Students', icon: GraduationCap, details: 'University · track' },
+  { role: 'COMPANY', label: 'Companies', icon: Briefcase, details: 'Plan' },
+  { role: 'CLUB', label: 'Clubs', icon: Users, details: 'University · rank' },
 ];
 
 const LEDGER_CHECKS = [
@@ -80,7 +88,9 @@ const AdminDashboard = () => {
   const [entityLoading, setEntityLoading] = useState(false);
   const [entityPage, setEntityPage] = useState(1);
   const [pageInfo, setPageInfo] = useState({ next: false, prev: false, count: 0 });
-  const [entityFilters, setEntityFilters] = useState({ role: '', rank: '', tier: '', search: '' });
+  const [entityFilters, setEntityFilters] = useState({ role: 'STUDENT', rank: '', tier: '', search: '' });
+  const [entityCounts, setEntityCounts] = useState({ STUDENT: 0, COMPANY: 0, CLUB: 0 });
+  const [createAccountOpen, setCreateAccountOpen] = useState(false);
   const debouncedSearch = useDebounced(entityFilters.search);
 
   // Matchmaking
@@ -256,6 +266,7 @@ const AdminDashboard = () => {
       const res = await api.get('/users/admin/entities/', { params });
       setEntities(res.data.results || []);
       setPageInfo({ next: !!res.data.next, prev: !!res.data.previous, count: res.data.count || 0 });
+      if (res.data.counts) setEntityCounts(res.data.counts);
     } catch (err) {
       if (err.response?.status === 404 && entityPage > 1) {
         setEntityPage(1); // page no longer exists after filtering
@@ -653,23 +664,40 @@ const AdminDashboard = () => {
 
         {/* USERS */}
         {activeTab === 'entities' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div role="tablist" aria-label="Account types" className="flex gap-1 p-1 rounded-lg bg-white border border-[rgba(10,23,72,0.12)] overflow-x-auto">
+                {USER_TYPES.map(({ role, label, icon }) => {
+                  const selected = entityFilters.role === role;
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => updateFilters({ role, rank: '', tier: '' })}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold whitespace-nowrap transition-colors ${
+                        selected ? 'bg-[#0A1748] text-white' : 'text-[#5B6478] hover:text-[#0A1748]'
+                      }`}
+                    >
+                      {React.createElement(icon, { size: 15 })} {label}
+                      <span className={`text-xs px-1.5 rounded-full ${selected ? 'bg-white/15' : 'bg-[#F5F7FC]'}`}>{entityCounts[role] ?? 0}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={() => setCreateAccountOpen(true)} className="btn-primary self-start sm:self-auto">
+                <UserPlus size={16} /> Create account
+              </button>
+            </div>
+
             <div className="card p-5 flex flex-wrap gap-4 items-end">
               <div className="flex-1 min-w-[220px]">
-                <label className="field-label" htmlFor="entity-search">Search</label>
+                <label className="field-label" htmlFor="entity-search">Search {USER_TYPES.find((t) => t.role === entityFilters.role)?.label.toLowerCase()}</label>
                 <div className="relative">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5B6478]" />
                   <input id="entity-search" type="search" placeholder="Name or email" className="input pl-9" value={entityFilters.search} onChange={(e) => updateFilters({ search: e.target.value })} />
                 </div>
-              </div>
-              <div>
-                <label className="field-label" htmlFor="entity-role">Account type</label>
-                <select id="entity-role" className="input min-w-[170px]" value={entityFilters.role} onChange={(e) => updateFilters({ role: e.target.value, rank: '', tier: '' })}>
-                  <option value="">All accounts</option>
-                  <option value="STUDENT">Students</option>
-                  <option value="COMPANY">Companies</option>
-                  <option value="CLUB">Clubs</option>
-                </select>
               </div>
               {entityFilters.role === 'CLUB' && (
                 <div>
@@ -698,7 +726,7 @@ const AdminDashboard = () => {
                 {entityLoading ? (
                   <li className="p-10 text-center text-sm text-[#5B6478]"><Loader2 size={18} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading users…</li>
                 ) : entities.length === 0 ? (
-                  <li className="p-10 text-center text-sm text-[#5B6478]">No users match these filters.</li>
+                  <li className="p-10 text-center text-sm text-[#5B6478]">{entityFilters.search ? 'No one matches this search.' : 'No accounts of this type yet.'}</li>
                 ) : (
                   entities.map((ent) => (
                     <li key={ent.id} className="p-4 text-sm">
@@ -707,13 +735,14 @@ const AdminDashboard = () => {
                           <button type="button" onClick={() => setDetailUserId(ent.id)} className="font-semibold break-words text-left hover:text-[#00729F] hover:underline underline-offset-2">{ent.entity_name}</button>
                           <div className="text-[#5B6478] break-all">{ent.email}</div>
                         </div>
-                        <span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F] shrink-0">{ent.role.toLowerCase()}</span>
                       </div>
                       {ent.details && ent.details !== '-' && <div className="text-xs text-[#5B6478] mt-1.5">{ent.details}</div>}
                       <div className="flex items-center justify-between gap-3 mt-3">
-                        {ent.status === 'Active'
-                          ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>
-                          : <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>}
+                        {ent.status !== 'Active'
+                          ? <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>
+                          : ent.invited
+                            ? <span className="inline-flex items-center gap-1 text-amber-700" title="Created by an admin. They haven't set a password from the email yet."><Send size={14} /> Invited</span>
+                            : <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>}
                         <div className="flex gap-2">
                           <button type="button" onClick={() => setDetailUserId(ent.id)} className="btn-secondary btn-sm"><Eye size={13} /> View</button>
                           <button onClick={() => handleBlockUser(ent)} className={ent.status === 'Active' ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>
@@ -731,17 +760,16 @@ const AdminDashboard = () => {
                     <tr>
                       <th className="px-4 py-3 font-semibold">Name</th>
                       <th className="px-4 py-3 font-semibold">Email</th>
-                      <th className="px-4 py-3 font-semibold">Type</th>
-                      <th className="px-4 py-3 font-semibold">Details</th>
+                      <th className="px-4 py-3 font-semibold">{USER_TYPES.find((t) => t.role === entityFilters.role)?.details}</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
                       <th className="px-4 py-3 font-semibold text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[rgba(10,23,72,0.08)]">
                     {entityLoading ? (
-                      <tr><td colSpan="6" className="p-10 text-center text-[#5B6478]"><Loader2 size={18} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading users…</td></tr>
+                      <tr><td colSpan="5" className="p-10 text-center text-[#5B6478]"><Loader2 size={18} className="animate-spin inline mr-2 text-[#00AEEF]" /> Loading users…</td></tr>
                     ) : entities.length === 0 ? (
-                      <tr><td colSpan="6" className="p-10 text-center text-[#5B6478]">No users match these filters.</td></tr>
+                      <tr><td colSpan="5" className="p-10 text-center text-[#5B6478]">{entityFilters.search ? 'No one matches this search.' : 'No accounts of this type yet.'}</td></tr>
                     ) : (
                       entities.map((ent) => (
                         <tr key={ent.id} className="hover:bg-[#F5F7FC]/60">
@@ -749,12 +777,13 @@ const AdminDashboard = () => {
                             <button type="button" onClick={() => setDetailUserId(ent.id)} className="text-left hover:text-[#00729F] hover:underline underline-offset-2">{ent.entity_name}</button>
                           </td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.email}</td>
-                          <td className="px-4 py-3"><span className="badge bg-[#00AEEF]/10 border-transparent text-[#00729F]">{ent.role.toLowerCase()}</span></td>
                           <td className="px-4 py-3 text-[#5B6478]">{ent.details}</td>
                           <td className="px-4 py-3">
-                            {ent.status === 'Active'
-                              ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>
-                              : <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>}
+                            {ent.status !== 'Active'
+                              ? <span className="inline-flex items-center gap-1 text-red-600"><Ban size={14} /> Blocked</span>
+                              : ent.invited
+                                ? <span className="inline-flex items-center gap-1 text-amber-700" title="Created by an admin. They haven't set a password from the email yet."><Send size={14} /> Invited</span>
+                                : <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Active</span>}
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             <button type="button" onClick={() => setDetailUserId(ent.id)} className="btn-secondary btn-sm mr-2"><Eye size={13} /> View</button>
@@ -769,7 +798,7 @@ const AdminDashboard = () => {
                 </table>
               </div>
               <div className="px-4 py-3 border-t border-[rgba(10,23,72,0.08)] flex justify-between items-center text-sm text-[#5B6478]">
-                <span>{pageInfo.count} user{pageInfo.count === 1 ? '' : 's'} · page {entityPage}</span>
+                <span>{pageInfo.count} {pageInfo.count === 1 ? 'account' : 'accounts'} · page {entityPage}</span>
                 <div className="flex gap-2">
                   <button onClick={() => setEntityPage((p) => Math.max(1, p - 1))} disabled={!pageInfo.prev} className="btn-secondary btn-sm" aria-label="Previous page"><ChevronLeft size={15} /></button>
                   <button onClick={() => setEntityPage((p) => p + 1)} disabled={!pageInfo.next} className="btn-secondary btn-sm" aria-label="Next page"><ChevronRight size={15} /></button>
@@ -1460,6 +1489,20 @@ const AdminDashboard = () => {
           </form>
         )}
       </Modal>
+
+      {createAccountOpen && (
+        <AdminCreateAccountModal
+          isOpen
+          initialRole={entityFilters.role === 'COMPANY' ? 'COMPANY' : 'STUDENT'}
+          onClose={() => setCreateAccountOpen(false)}
+          onCreated={(account) => {
+            // Show the new account in its own type's list
+            if (account.role !== entityFilters.role) updateFilters({ role: account.role, rank: '', tier: '', search: '' });
+            else fetchEntities();
+          }}
+          onView={(id) => { setCreateAccountOpen(false); setDetailUserId(id); }}
+        />
+      )}
 
       {detailUserId && (
         <AdminUserModal

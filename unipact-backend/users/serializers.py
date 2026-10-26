@@ -205,7 +205,13 @@ class AdminEntityListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'role', 'entity_name', 'status', 'details', 'is_verified']
+        fields = ['id', 'email', 'role', 'entity_name', 'status', 'details', 'is_verified', 'invited']
+
+    invited = serializers.SerializerMethodField()
+
+    def get_invited(self, obj):
+        """Created by an admin and its owner hasn't set a password yet."""
+        return not obj.has_usable_password()
 
     def get_entity_name(self, obj):
         if obj.role == User.Role.CLUB and hasattr(obj, 'club_profile'):
@@ -433,6 +439,49 @@ class AdminClubEditSerializer(ClubSettingsSerializer):
             'club_name': {'allow_blank': False},
             'university': {'allow_blank': False},
         }
+
+
+class AdminCreateAccountSerializer(serializers.Serializer):
+    """An account an admin sets up for a student or a company. No password: its owner picks one from the
+    emailed link. Clubs sign up themselves (SRS v2.2.1)."""
+    role = serializers.ChoiceField(choices=[User.Role.STUDENT, User.Role.COMPANY])
+    email = serializers.EmailField()
+    # Admins usually create accounts for people they have already checked, so these start verified
+    verified = serializers.BooleanField(default=True)
+    # Student
+    full_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    university = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    major = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    domain_focus = serializers.ChoiceField(choices=StudentProfile.DomainFocus.choices, default=StudentProfile.DomainFocus.SOFTWARE_DEV)
+    skills = serializers.JSONField(required=False)
+    # Company
+    company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    company_details = serializers.CharField(required=False, allow_blank=True)
+
+    REQUIRED = {
+        User.Role.STUDENT: {'full_name': "Enter the student's full name.", 'university': 'Choose their university.'},
+        User.Role.COMPANY: {'company_name': "Enter the company's name."},
+    }
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('An account with this email already exists.')
+        return value
+
+    def validate_skills(self, value):
+        return clean_skills(value)
+
+    def validate(self, attrs):
+        missing = {field: [message] for field, message in self.REQUIRED[attrs['role']].items() if not str(attrs.get(field) or '').strip()}
+        if missing:
+            raise serializers.ValidationError(missing)
+        return attrs
+
+
+class AccountInvitationAcceptSerializer(TermsConsentMixin, serializers.Serializer):
+    token = serializers.CharField(max_length=512)
+    password = serializers.CharField(write_only=True)
 
 
 class ClaimProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):

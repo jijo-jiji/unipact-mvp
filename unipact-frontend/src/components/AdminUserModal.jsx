@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Ban, CheckCircle2, FileText, Loader2, MailCheck, MailWarning, Pencil, ShieldAlert, UserRound, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, FileText, Loader2, MailCheck, MailWarning, Pencil, Send, ShieldAlert, UserRound, XCircle } from 'lucide-react';
 import api from '../api/client';
 import Modal from './Modal';
 import StatusBadge from './StatusBadge';
@@ -56,6 +56,7 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [resending, setResending] = useState(false);
 
   // Mounted once per account (the page gives it a key), so there is nothing to reset between accounts
   const load = useCallback(async () => {
@@ -96,6 +97,19 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
       setFormError(getErrorMessage(err, 'Could not save these details.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // An account an admin created whose owner hasn't used the "set your password" email yet
+  const resendInvitation = async () => {
+    setResending(true);
+    try {
+      const res = await api.post(`/users/admin/users/${userId}/invite/`);
+      showToast(res.data.message, 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not send the invitation.'), 'error');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -140,6 +154,17 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
               ? <span className="badge bg-emerald-50 text-emerald-700 border-emerald-200"><MailCheck size={12} /> Email confirmed</span>
               : <span className="badge bg-amber-50 text-amber-800 border-amber-200"><MailWarning size={12} /> Email not confirmed</span>}
           </div>
+
+          {detail.invitation_pending && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mb-5 text-sm text-amber-900">
+              <span className="flex-1 min-w-[220px]">
+                Created by an admin. They haven&apos;t set a password from the invitation email yet, so they can&apos;t sign in.
+              </span>
+              <button type="button" onClick={resendInvitation} disabled={resending || !detail.is_active} className="btn-secondary btn-sm shrink-0">
+                {resending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Resend invitation
+              </button>
+            </div>
+          )}
 
           <Section title="Account">
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">

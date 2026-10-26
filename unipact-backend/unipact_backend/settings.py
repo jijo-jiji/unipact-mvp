@@ -411,6 +411,9 @@ PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
 CLUB_INVITE_TTL_DAYS = int(os.getenv('CLUB_INVITE_TTL_DAYS', '14'))
 # Seconds an "confirm your email" link stays valid (default 3 days)
 EMAIL_VERIFY_TIMEOUT = int(os.getenv('EMAIL_VERIFY_TIMEOUT', str(3 * 24 * 3600)))
+# Seconds the "set your password" link in an account an admin created stays valid (default 7 days).
+# "Forgot password?" sends a fresh one, so an expired link doesn't need an admin.
+ACCOUNT_INVITE_TIMEOUT = int(os.getenv('ACCOUNT_INVITE_TIMEOUT', str(7 * 24 * 3600)))
 
 
 # ------------------------------------------------------------------
