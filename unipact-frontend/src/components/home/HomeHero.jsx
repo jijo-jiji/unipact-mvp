@@ -1,28 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, LayoutDashboard } from 'lucide-react';
+import { WatchButton } from './HowToVideo';
 
-// The two renders of the hero picture (hero-render/README.md): "level", with the camera slightly below,
-// and "topdown", looking down onto the stand like Microsoft's Outlook picture. Each is sized to fill
-// the panel at every width without running off the screen; the top-down one is squarer, so it's
-// narrower. To switch, change HERO below.
-const RENDERS = {
-  level: {
-    name: 'hero-level',
-    height: 1034,
-    box: 'aspect-[5/4] sm:aspect-[16/11] lg:aspect-auto lg:h-[520px]',
-    size: 'w-full lg:w-[104%] xl:w-[116%] min-[1440px]:w-[124%]',
-    sizes: '(min-width: 1440px) 650px, (min-width: 1280px) 610px, (min-width: 1024px) 474px, 92vw',
-  },
-  topdown: {
-    name: 'hero-topdown',
-    height: 1278,
-    box: 'aspect-[10/9] sm:aspect-[4/3] lg:aspect-auto lg:h-[560px]',
-    size: 'w-[96%] sm:w-[78%] lg:w-[102%] xl:w-[108%] min-[1440px]:w-[112%]',
-    sizes: '(min-width: 1440px) 590px, (min-width: 1280px) 566px, (min-width: 1024px) 466px, (min-width: 640px) 78vw, 92vw',
-  },
+// The hero picture's render (hero-render/README.md), sized to fill the panel at every width without
+// running off the screen
+const HERO = {
+  name: 'hero-level',
+  height: 1034,
+  box: 'aspect-[5/4] sm:aspect-[16/11] lg:aspect-auto lg:h-[520px]',
+  size: 'w-full lg:w-[104%] xl:w-[116%] min-[1440px]:w-[124%]',
+  sizes: '(min-width: 1440px) 650px, (min-width: 1280px) 610px, (min-width: 1024px) 474px, 92vw',
 };
-const HERO = RENDERS.level;
 
 // The product as a 3D render: the client's project page in a browser window and the project's
 // conversation on the student's phone, standing on a stand, with two moments from the project floating
@@ -44,7 +33,7 @@ const HeroVisual = () => (
   </div>
 );
 
-const HomeHero = ({ dashboardPath }) => (
+const HomeHero = ({ dashboardPath, onWatch }) => (
   <section id="overview" className="relative overflow-hidden scroll-mt-[76px]">
     <div className="max-w-[1160px] mx-auto px-4 sm:px-8 pt-10 pb-14 sm:pt-14 lg:pt-16 lg:pb-20 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-12 lg:gap-12 items-center">
       <div>
@@ -63,21 +52,24 @@ const HomeHero = ({ dashboardPath }) => (
             <LayoutDashboard size={18} /> Go to your dashboard
           </Link>
         ) : (
-          <>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/register/company" className="btn-navy px-6 py-3 text-base rounded-md">Post a project</Link>
-              <Link to="/login" className="btn px-6 py-3 text-base rounded-md border-2 border-[#0A1748] text-[#0A1748] hover:bg-[#0A1748] hover:text-white">
-                Sign in
-              </Link>
-            </div>
-            <Link to="/register/student" className="group mt-7 inline-flex items-center gap-3 py-1 font-semibold text-[#0A1748]">
-              <span className="w-7 h-7 rounded-md bg-[#0B1E63] text-white flex items-center justify-center group-hover:bg-[#00AEEF] group-hover:text-[#0A1748] transition-colors">
+          <div className="flex flex-wrap gap-3">
+            <Link to="/register/company" className="btn-navy px-6 py-3 text-base rounded-md">Post a project</Link>
+            <Link to="/login" className="btn px-6 py-3 text-base rounded-md border-2 border-[#0A1748] text-[#0A1748] hover:bg-[#0A1748] hover:text-white">
+              Sign in
+            </Link>
+          </div>
+        )}
+        <div className="mt-7 flex flex-col sm:flex-row sm:flex-wrap items-start gap-x-8 gap-y-3">
+          <WatchButton onClick={onWatch}>Watch how it works</WatchButton>
+          {!dashboardPath && (
+            <Link to="/register/student" className="group inline-flex items-center gap-3 py-1 font-semibold text-[#0A1748]">
+              <span className="w-8 h-8 rounded-md bg-[#0B1E63] text-white flex items-center justify-center group-hover:bg-[#00AEEF] group-hover:text-[#0A1748] transition-colors">
                 <ChevronRight size={16} />
               </span>
               <span className="underline-offset-4 group-hover:underline">Student? Create a free account</span>
             </Link>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       <HeroVisual />

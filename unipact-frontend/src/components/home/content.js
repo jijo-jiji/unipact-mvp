@@ -79,6 +79,23 @@ export const TOUR = {
   },
 };
 
+// The walk-through videos: the same five steps, filmed on the app with the local demo data. The
+// preview is a small copy that loops silently under the steps' heading.
+export const VIDEOS = {
+  client: {
+    src: '/home/how-it-works-client.mp4',
+    poster: '/home/how-it-works-client.webp',
+    preview: '/home/how-it-works-client-preview.mp4',
+    label: 'Video: how clients use UniPact, in five captioned steps: post a brief, review the team, confirm and pay into escrow, talk to the team, and approve each milestone.',
+  },
+  student: {
+    src: '/home/how-it-works-student.mp4',
+    poster: '/home/how-it-works-student.webp',
+    preview: '/home/how-it-works-student-preview.mp4',
+    label: 'Video: how students use UniPact, in five captioned steps: create an account, accept a project offer, invite teammates, submit each milestone, and get paid.',
+  },
+};
+
 export const WORKSPACE = [
   {
     title: 'A dated record of every step',

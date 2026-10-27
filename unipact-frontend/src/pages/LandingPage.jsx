@@ -6,6 +6,7 @@ import AnnouncementBar from '../components/home/AnnouncementBar';
 import HomeHero from '../components/home/HomeHero';
 import SectionNav from '../components/home/SectionNav';
 import HowItWorks from '../components/home/HowItWorks';
+import { HowToVideo } from '../components/home/HowToVideo';
 import { ClosingCta, HomeFaq, PaymentsSection, WorkspaceSection } from '../components/home/HomeSections';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
@@ -32,6 +33,13 @@ const LandingPage = () => {
   const [tour, setTour] = useState(() => ({ audience: hash === '#for-students' ? 'student' : 'client', step: 0 }));
   const showAudience = (audience) => setTour((t) => (t.audience === audience ? t : { audience, step: 0 }));
   const showStep = (step) => setTour((t) => ({ ...t, step }));
+  // The walk-through video's side while it's open (null when closed); switching it switches the page too
+  const [video, setVideo] = useState(null);
+  const watch = () => setVideo(tour.audience);
+  const showVideo = (audience) => {
+    setVideo(audience);
+    showAudience(audience);
+  };
 
   const cta = dashboardPath
     ? { to: dashboardPath, label: 'Go to dashboard' }
@@ -45,13 +53,15 @@ const LandingPage = () => {
       <PublicNav links={MENU_LINKS} inlineLinks={false} />
 
       <main className="flex-1">
-        <HomeHero dashboardPath={dashboardPath} />
+        <HomeHero dashboardPath={dashboardPath} onWatch={watch} />
         <SectionNav audience={tour.audience} onAudience={showAudience} cta={cta} />
         <HowItWorks
           audience={tour.audience}
           step={tour.step}
           onAudience={showAudience}
           onStep={showStep}
+          onWatch={watch}
+          videoOpen={video !== null}
           signedIn={Boolean(user)}
         />
         <WorkspaceSection />
@@ -61,6 +71,7 @@ const LandingPage = () => {
       </main>
 
       <SiteFooter />
+      <HowToVideo audience={video} onAudience={showVideo} onClose={() => setVideo(null)} />
     </div>
   );
 };

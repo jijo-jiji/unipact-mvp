@@ -21,6 +21,8 @@ yarn-error.log*
 
 # Media, Videos, and Binaries
 *.mp4
+# except the front page's walk-through videos, which the site serves
+!unipact-frontend/public/home/how-it-works-*.mp4
 *.mov
 *.avi
 *.mkv

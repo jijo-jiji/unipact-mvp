@@ -4,13 +4,9 @@ The picture beside the front page's headline is a 3D render made in Blender. Its
 the HTML in `src/components/home/HeroScreens.jsx`, captured as textures. Re-render it when those
 change, for example after a redesign of the client's or the student's project page.
 
-There are two versions, both in `public/home`:
-
-- `hero-topdown-*.webp`: looking down onto the stand, like Microsoft's Outlook picture
-- `hero-level-*.webp`: the camera slightly below, the stand as a ledge (on the site now: its screens read more clearly)
-
-To switch, change `const HERO = RENDERS.level;` in `src/components/home/HomeHero.jsx` to
-`RENDERS.topdown` (each carries its own sizing).
+The picture is `public/home/hero-level-*.webp`: the camera slightly below, the stand as a ledge.
+`hero_scene.py` also has a `topdown` camera preset, looking down onto the stand like Microsoft's
+Outlook picture. It was tried on 22 October 2026 and not used, because its screens read less clearly.
 
 ## Re-rendering
 
@@ -26,7 +22,7 @@ backend's venv has it).
    node hero-render/capture-textures.cjs http://localhost:5173
    ```
 
-3. Render the two passes for a version (`level` or `topdown`): the scene on a transparent background,
+3. Render the two passes: the scene on a transparent background,
    then only the shadows it casts on the floor. Each takes about 30 seconds on an RTX 3060.
 
    ```
