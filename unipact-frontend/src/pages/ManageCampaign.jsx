@@ -333,7 +333,7 @@ const ManageCampaign = () => {
               </div>
               <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight">{campaign.title}</h1>
               <p className="text-sm text-[#5B6478] mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                <span>Budget <strong className="text-[#0B1E63]">{formatMoney(campaign.budget)}</strong></span>
+                <span>{campaign.is_volunteer ? <strong className="text-[#0B1E63]">Volunteer project (unpaid)</strong> : <>Budget <strong className="text-[#0B1E63]">{formatMoney(campaign.budget)}</strong></>}</span>
                 <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(campaign.deadline, 'flexible')}</span>
                 <span>Posted {formatDate(campaign.created_at)}</span>
               </p>

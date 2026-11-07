@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from users.models import User, CompanyProfile, StudentProfile
 from campaigns.models import Campaign, ClientAsset, StudentDeliverable
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 class V3TalentMarketplaceTests(APITestCase):
     def setUp(self):
@@ -41,7 +42,8 @@ class V3TalentMarketplaceTests(APITestCase):
             'major': 'Computer Science',
             'domain_focus': 'SOFTWARE_DEV',
             'club_affiliation_name': 'UM Computer Club',
-            'club_affiliation_role': 'President'
+            'club_affiliation_role': 'President',
+            **student_signup(),
         }
         res = self.client.post(url, payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)

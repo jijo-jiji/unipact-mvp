@@ -12,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from users.models import User, CompanyProfile, StudentProfile
 from campaigns.models import Campaign
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,18 +42,18 @@ class RateLimitTests(APITestCase):
     def test_registration_is_rate_limited(self):
         with rates(register='2/hour'):
             for i in range(2):
-                self.client.post(reverse('register_company'), {'accept_terms': True, 'email': f'r{i}@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
+                self.client.post(reverse('register_company'), {'accept_terms': True, 'email': f'r{i}@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R', **COMPANY_SIGNUP}, format='json')
                 self.client.cookies.clear()
-            res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 'r9@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R'}, format='json')
+            res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 'r9@corp.com', 'password': 'CorrectHorse42!', 'company_name': 'R', **COMPANY_SIGNUP}, format='json')
             self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class PasswordPolicyTests(APITestCase):
     def test_weak_passwords_rejected_on_every_signup(self):
         cases = [
-            ('register_company', {'accept_terms': True, 'email': 'w@corp.com', 'company_name': 'W'}),
+            ('register_company', {'accept_terms': True, 'email': 'w@corp.com', 'company_name': 'W', **COMPANY_SIGNUP}),
             ('register_club', {'accept_terms': True, 'email': 'w@club.my', 'club_name': 'W', 'university': 'UM'}),
-            ('register_student', {'accept_terms': True, 'email': 'w@siswa.my', 'full_name': 'W', 'university': 'UM'}),
+            ('register_student', {'accept_terms': True, 'email': 'w@siswa.my', 'full_name': 'W', 'university': 'UM', **student_signup()}),
         ]
         for url_name, payload in cases:
             for weak in ('1', '12345678', 'password123'):
@@ -62,7 +63,7 @@ class PasswordPolicyTests(APITestCase):
         self.assertFalse(User.objects.filter(email__startswith='w@').exists())
 
     def test_strong_password_accepted(self):
-        res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 's@corp.com', 'password': 'Blue-Kettle-Run-88', 'company_name': 'S'}, format='json')
+        res = self.client.post(reverse('register_company'), {'accept_terms': True, 'email': 's@corp.com', 'password': 'Blue-Kettle-Run-88', 'company_name': 'S', **COMPANY_SIGNUP}, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
 
@@ -98,7 +99,7 @@ class UploadValidationTests(APITestCase):
         self.client.force_authenticate(None)
         res = self.client.post(reverse('register_student'), {'accept_terms': True, 
             'email': 'doc@siswa.my', 'password': 'Blue-Kettle-Run-88', 'full_name': 'D', 'university': 'UM',
-            'verification_doc': SimpleUploadedFile('id.zip', b'PK\x03\x04'),
+            'verification_doc': SimpleUploadedFile('id.zip', b'PK\x03\x04'), **student_signup(),
         }, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(StudentProfile.objects.filter(user__email='doc@siswa.my').exists())

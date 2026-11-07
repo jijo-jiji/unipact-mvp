@@ -87,6 +87,18 @@ def _students(campaign):
 # Accounts
 # ------------------------------------------------------------------
 
+def university_email_verification(profile):
+    """Ask a student to confirm the university email they gave us, which shows they are enrolled."""
+    from users.utils import university_email_verification_path
+
+    send_email(
+        profile.university_email, 'Confirm your university email', 'Confirm your university email',
+        [f'Hi {profile.full_name}, please confirm this is your university email. It helps UniPact verify that you are a current student.',
+         'If you did not sign up for UniPact, you can ignore this email.'],
+        action_label='Confirm university email', action_path=university_email_verification_path(profile),
+    )
+
+
 def welcome(user, verify_path=None):
     role = user.role
     name = display_name(user)

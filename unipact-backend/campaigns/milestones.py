@@ -58,6 +58,8 @@ def approve_milestone(campaign, milestone_id, *, auto=False):
         amounts = split_by_percent(milestone.amount, [shares[s.id] for s in recipients]) if recipients else []
         payouts = []
         for student, amount in zip(recipients, amounts):
+            if amount <= 0:
+                continue  # a volunteer (unpaid) project: the milestone is approved, but there is nothing to pay
             has_bank = student.has_bank_details
             payout, _created = Payout.objects.get_or_create(
                 campaign=campaign, student=student, milestone=milestone,

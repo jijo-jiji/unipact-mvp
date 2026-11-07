@@ -245,7 +245,7 @@ const StudentProject = () => {
           <p className="text-sm text-[#5B6478] mt-1 flex flex-wrap gap-x-4 gap-y-1">
             <span>Client: <strong className="text-[#0A1748]">{campaign.company_name}</strong></span>
             <span>
-              Team pay: <strong className="text-[#0B1E63]">{formatMoney(campaign.student_pool ?? campaign.budget)}</strong>
+              {campaign.is_volunteer ? <strong className="text-[#0B1E63]">Volunteer project (unpaid)</strong> : <>Team pay: <strong className="text-[#0B1E63]">{formatMoney(campaign.student_pool ?? campaign.budget)}</strong></>}
               {campaign.student_pool && <span className="text-xs"> (after {campaign.service_fee_percent}% UniPact fee)</span>}
             </span>
             <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(campaign.deadline, 'flexible')}</span>

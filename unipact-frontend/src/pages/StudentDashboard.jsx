@@ -46,6 +46,28 @@ const SectionHeading = ({ title, description, action }) => (
   </div>
 );
 
+// Students who joined before WhatsApp, university email, study year and availability were asked for
+const REQUIRED_CONTACT = [
+  ['whatsapp_number', 'WhatsApp number'], ['university_email', 'university email'], ['year_of_study', 'year of study'],
+  ['current_semester', 'semester'], ['weekly_availability', 'weekly availability'],
+];
+const ProfileCompletionBanner = ({ profile }) => {
+  const missing = REQUIRED_CONTACT.filter(([field]) => !profile[field]).map(([, label]) => label);
+  if (['SOFTWARE_DEV', 'BOTH'].includes(profile.domain_focus) && !profile.portfolio_url) missing.push('portfolio link');
+  const unconfirmed = profile.university_email && !profile.university_email_verified;
+  if (missing.length === 0 && !unconfirmed) return null;
+  return (
+    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <span>
+        {missing.length > 0
+          ? <>Please add your {missing.join(', ')}. Admins use these to match you and reach you about projects.</>
+          : <>Please confirm your university email ({profile.university_email}): open the link we sent to it.</>}
+      </span>
+      <Link to="/settings" className="btn-secondary btn-sm self-start sm:self-auto shrink-0">Open Account settings</Link>
+    </div>
+  );
+};
+
 const StudentDashboard = () => {
   usePageTitle('Workspace');
   const { user } = useAuth();
@@ -167,6 +189,7 @@ const StudentDashboard = () => {
 
       <main className="max-w-[1160px] w-full mx-auto px-4 sm:px-8 py-8 space-y-8 flex-1">
         <EmailVerificationBanner />
+        {!isClub && <ProfileCompletionBanner profile={studentProfile} />}
 
         {/* Profile header */}
         <section className="card p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -543,7 +566,9 @@ const OfferCard = ({ job, busy, onAccept, onDecline }) => {
       <h3 className="font-heading font-bold text-xl text-[#0A1748]">{job.title}</h3>
       <p className="text-[#5B6478] text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>Client: <strong className="text-[#0A1748]">{job.company_name}</strong></span>
-        <span>Team pay: <strong className="text-[#0B1E63]">{formatMoney(job.student_pool ?? job.budget)}</strong>{job.student_pool && <span className="text-xs"> (after {job.service_fee_percent}% UniPact fee)</span>}</span>
+        {job.is_volunteer
+          ? <span><strong className="text-[#0B1E63]">Volunteer project</strong> (unpaid)</span>
+          : <span>Team pay: <strong className="text-[#0B1E63]">{formatMoney(job.student_pool ?? job.budget)}</strong>{job.student_pool && <span className="text-xs"> (after {job.service_fee_percent}% UniPact fee)</span>}</span>}
         <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> Due {formatDate(job.deadline, 'flexible')}</span>
       </p>
 

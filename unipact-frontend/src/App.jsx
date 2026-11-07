@@ -61,6 +61,7 @@ const WelcomePage = page(() => import('./pages/WelcomePage'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
+const VerifyUniversityEmailPage = page(() => import('./pages/VerifyUniversityEmailPage'));
 const PrivacyPolicyPage = page(() => import('./pages/LegalPages'), (m) => m.PrivacyPolicyPage);
 const TermsPage = page(() => import('./pages/LegalPages'), (m) => m.TermsPage);
 const ImpactLedgerPage = page(() => import('./pages/ImpactLedgerPage'));
@@ -92,6 +93,7 @@ function App() {
           <Route path="/apply-software-developer" element={<SoftwareDeveloperApplyPage />} />
           <Route path="/apply-digital-marketing" element={<DigitalMarketingApplyPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/verify-university-email" element={<VerifyUniversityEmailPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/agreements/talent" element={<TalentAgreementPage />} />

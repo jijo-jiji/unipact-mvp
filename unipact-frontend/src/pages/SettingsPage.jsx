@@ -8,7 +8,9 @@ import PasswordField from '../components/PasswordField';
 import StatusBadge from '../components/StatusBadge';
 import { getErrorMessage } from '../utils/format';
 import { meetsPasswordRules } from '../utils/password';
-import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES, MALAYSIAN_BANKS } from '../utils/constants';
+import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES, MALAYSIAN_BANKS, ORG_TYPES } from '../utils/constants';
+import StudentContactFields from '../components/StudentContactFields';
+import api from '../api/client';
 import { LEGAL } from '../utils/legal';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -30,12 +32,15 @@ const profileFromUser = (user) => {
       club_affiliation_role: p.club_affiliation_role || '', secondary_email: p.secondary_email || '',
       bank_name: p.bank_name || '', bank_account_number: p.bank_account_number || '',
       bank_account_holder_name: p.bank_account_holder_name || '', duitnow_id: p.duitnow_id || '',
+      whatsapp_number: p.whatsapp_number || '', university_email: p.university_email || '',
+      year_of_study: p.year_of_study ?? '', current_semester: p.current_semester ?? '',
+      weekly_availability: p.weekly_availability || '', linkedin_url: p.linkedin_url || '', portfolio_url: p.portfolio_url || '',
     };
   }
 
   if (user?.role === 'COMPANY') {
     const p = user.company_profile || {};
-    return { company_name: p.company_name || '', company_details: p.company_details || '' };
+    return { company_name: p.company_name || '', company_details: p.company_details || '', registration_number: p.registration_number || '' };
   }
   if (user?.role === 'CLUB' && user.club_profile) {
     const p = user.club_profile;
@@ -47,7 +52,39 @@ const profileFromUser = (user) => {
 const DOCUMENT_COPY = {
   STUDENT: { field: 'verification_document', label: 'Student ID or enrolment letter' },
   COMPANY: { field: 'ssm_document', label: 'SSM registration certificate' },
+  NGO: { field: 'ssm_document', label: 'ROS registration certificate' },
   CLUB: { field: 'verification_document', label: 'Club registration letter' },
+};
+
+// The university email shows a student is enrolled; this says whether it's confirmed and resends the link
+const UniversityEmailStatus = ({ profile }) => {
+  const [state, setState] = useState('idle'); // idle | sending | sent
+  const [error, setError] = useState('');
+  if (!profile?.university_email) return null;
+  if (profile.university_email_verified) {
+    return <p className="text-sm text-emerald-700 inline-flex items-center gap-1.5"><CheckCircle2 size={15} /> {profile.university_email} is confirmed.</p>;
+  }
+  const resend = async () => {
+    setState('sending');
+    setError('');
+    try {
+      await api.post('/users/university-email/verify/resend/');
+      setState('sent');
+    } catch (err) {
+      setError(getErrorMessage(err, 'We could not send a new link.'));
+      setState('idle');
+    }
+  };
+  return (
+    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-2">
+      <span>{state === 'sent' ? `We sent a new link to ${profile.university_email}.` : `Please confirm ${profile.university_email}: open the link we emailed to it.`}{error && ` ${error}`}</span>
+      {state !== 'sent' && (
+        <button type="button" onClick={resend} disabled={state === 'sending'} className="btn-secondary btn-sm">
+          {state === 'sending' ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} Send the link again
+        </button>
+      )}
+    </div>
+  );
 };
 
 const SupportLink = () => (
@@ -125,7 +162,9 @@ const SettingsPage = () => {
   const role = user?.role;
   // Club committee members joined by invitation: no club profile or documents of their own
   const isClubMember = role === 'CLUB' && !user?.club_profile;
-  const docCopy = isClubMember ? null : DOCUMENT_COPY[role];
+  const isNgo = role === 'COMPANY' && user?.company_profile?.org_type === 'NGO';
+  const orgCopy = ORG_TYPES[isNgo ? 'NGO' : 'COMPANY'];
+  const docCopy = isClubMember ? null : DOCUMENT_COPY[isNgo ? 'NGO' : role];
   const dirty = initial && profile && JSON.stringify(initial) !== JSON.stringify(profile);
   const set = (field) => (e) => setProfile((p) => ({ ...p, [field]: e.target.value }));
 
@@ -184,7 +223,10 @@ const SettingsPage = () => {
     setProfileError('');
     setSavingProfile(true);
     try {
-      const updated = await updateAccount(profile);
+      // An unchosen year or semester is sent as "not set", not as an empty string
+      const body = { ...profile };
+      ['year_of_study', 'current_semester'].forEach((key) => { if (key in body && body[key] === '') body[key] = null; });
+      const updated = await updateAccount(body);
       setProfile(profileFromUser(updated));
       showToast('Your profile has been saved.', 'success');
     } catch (err) {
@@ -401,6 +443,14 @@ const SettingsPage = () => {
                           <input id="s-club-role" value={profile.club_affiliation_role} onChange={set('club_affiliation_role')} className="input bg-white" />
                         </div>
                       </fieldset>
+                      <StudentContactFields
+                        values={profile}
+                        onChange={(name, value) => setProfile((p) => ({ ...p, [name]: value }))}
+                        domainFocus={profile.domain_focus}
+                        idPrefix="set"
+                        required={false}
+                      />
+                      <UniversityEmailStatus profile={user?.student_profile} />
                       <div className="md:w-1/2">
                         <label className="field-label" htmlFor="s-email2">Backup email (optional)</label>
                         <input id="s-email2" type="email" value={profile.secondary_email} onChange={set('secondary_email')} className="input" placeholder="personal@gmail.com" />
@@ -477,12 +527,14 @@ const SettingsPage = () => {
                   {role === 'COMPANY' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="field-label" htmlFor="c-name">Company name</label>
+                        <label className="field-label" htmlFor="c-name">{orgCopy.nameLabel}</label>
                         <input id="c-name" required value={profile.company_name} onChange={set('company_name')} className="input" autoComplete="organization" />
                       </div>
                       <div>
-                        <label className="field-label" htmlFor="c-ssm">SSM registration number</label>
-                        <input id="c-ssm" value={profile.company_details} onChange={set('company_details')} className="input" />
+                        <label className="field-label" htmlFor="c-ssm">{orgCopy.numberLabel}</label>
+                        <input id="c-ssm" value={profile.registration_number} onChange={set('registration_number')} placeholder={orgCopy.numberPlaceholder}
+                          readOnly={user?.verification_status === 'VERIFIED'} className="input font-mono" />
+                        <p className="field-hint">{user?.verification_status === 'VERIFIED' ? 'Verified. Contact UniPact support to change it.' : orgCopy.numberHint}</p>
                       </div>
                     </div>
                   )}

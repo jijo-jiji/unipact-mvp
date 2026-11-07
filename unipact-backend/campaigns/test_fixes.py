@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from users.models import User, CompanyProfile, StudentProfile
 from campaigns.models import Campaign, ClientAsset, ProjectTeamInvitation
 from payments.models import Transaction
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 
 def make_student(email, name, **extra):
@@ -247,7 +248,7 @@ class UserAndAdminFixTests(APITestCase):
         self.admin = User.objects.create_superuser(username='admin@x.my', email='admin@x.my', password='AdminPass123!', role=User.Role.ADMIN)
 
     def test_duplicate_company_email_returns_400(self):
-        payload = {'accept_terms': True, 'email': 'dup@corp.com', 'password': 'Pass12345!', 'company_name': 'Dup'}
+        payload = {'accept_terms': True, 'email': 'dup@corp.com', 'password': 'Pass12345!', 'company_name': 'Dup', **COMPANY_SIGNUP}
         self.assertEqual(self.client.post(reverse('register_company'), payload, format='json').status_code, status.HTTP_201_CREATED)
         self.client.cookies.clear()
         res = self.client.post(reverse('register_company'), payload, format='json')
@@ -257,7 +258,7 @@ class UserAndAdminFixTests(APITestCase):
     def test_student_registration_saves_skills_and_bio_from_multipart(self):
         res = self.client.post(reverse('register_student'), {'accept_terms': True, 
             'full_name': 'Aina', 'email': 'aina@siswa.my', 'password': 'Pass12345!', 'university': 'UM',
-            'skills': '["React", " Django "]', 'bio': 'Builder'
+            'skills': '["React", " Django "]', 'bio': 'Builder', **student_signup(),
         }, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         profile = StudentProfile.objects.get(user__email='aina@siswa.my')

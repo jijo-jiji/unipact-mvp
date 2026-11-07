@@ -7,7 +7,7 @@ from .views import (
     AdminEntityListView, AdminBlockUserView, AdminStudentPoolView,
     ClaimProfileView, ClaimInvitePreviewView, ClubInviteDetailView, TransferOwnershipView,
     AccountSettingsView, PasswordChangeView, PasswordResetRequestView, PasswordResetConfirmView,
-    VerifyEmailView, ResendEmailVerificationView,
+    VerifyEmailView, ResendEmailVerificationView, VerifyUniversityEmailView, ResendUniversityEmailView,
     AgreementStatusView, AgreementAcceptView, AdminUserDetailView,
     AdminCreateAccountView, AdminResendInvitationView, AccountInvitationPreviewView, AccountInvitationAcceptView,
 )
@@ -30,6 +30,8 @@ urlpatterns = [
     path('invitation/preview/', AccountInvitationPreviewView.as_view(), name='account_invitation_preview'),
     path('invitation/accept/', AccountInvitationAcceptView.as_view(), name='account_invitation_accept'),
     path('email/verify/resend/', ResendEmailVerificationView.as_view(), name='resend_verify_email'),
+    path('university-email/verify/', VerifyUniversityEmailView.as_view(), name='verify_university_email'),
+    path('university-email/verify/resend/', ResendUniversityEmailView.as_view(), name='resend_university_email'),
     
     # Student Specific
     path('student/<int:user_id>/profile/', StudentPublicProfileView.as_view(), name='student_public_profile'),

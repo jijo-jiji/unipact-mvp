@@ -33,8 +33,15 @@ class CompanyProfile(models.Model):
         VERIFIED = 'VERIFIED', _('Verified')
         REJECTED = 'REJECTED', _('Rejected')
 
+    class OrgType(models.TextChoices):
+        COMPANY = 'COMPANY', _('Company (SSM)')
+        NGO = 'NGO', _('NGO (ROS / KDN)')
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='company_profile')
     company_name = models.CharField(max_length=255)
+    org_type = models.CharField(max_length=10, choices=OrgType.choices, default=OrgType.COMPANY)
+    # SSM's 12-digit number for a company (e.g. 202603205508), or the ROS number for an NGO (e.g. PPM-011-10-25022025)
+    registration_number = models.CharField(max_length=30, blank=True)
     company_details = models.TextField(blank=True)
     tier = models.CharField(max_length=10, choices=Tier.choices, default=Tier.FREE)
     verification_status = models.CharField(
@@ -148,6 +155,23 @@ class StudentProfile(models.Model):
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
 
     # Malaysian Bank Account Details for Project Payouts
+    # Contact and availability, collected at sign-up so admins can match and reach students quickly
+    whatsapp_number = models.CharField(max_length=20, blank=True)  # stored as +60XXXXXXXXX
+    university_email = models.EmailField(blank=True)
+    university_email_verified_at = models.DateTimeField(null=True, blank=True)
+    year_of_study = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5
+    current_semester = models.PositiveSmallIntegerField(null=True, blank=True)  # 1, 2, or 3 for a short semester
+    linkedin_url = models.URLField(blank=True)
+    portfolio_url = models.URLField(blank=True)  # GitHub, Canva, Behance, Google Drive... any link that shows their work
+
+    class WeeklyAvailability(models.TextChoices):
+        UP_TO_5 = '1-5', _('1-5 hours a week')
+        UP_TO_10 = '6-10', _('6-10 hours a week')
+        UP_TO_15 = '11-15', _('11-15 hours a week')
+        OVER_15 = '16+', _('16+ hours a week')
+
+    weekly_availability = models.CharField(max_length=10, choices=WeeklyAvailability.choices, blank=True)
+
     bank_name = models.CharField(max_length=100, blank=True, null=True)
     bank_account_number = models.CharField(max_length=50, blank=True, null=True)
     bank_account_holder_name = models.CharField(max_length=255, blank=True, null=True)

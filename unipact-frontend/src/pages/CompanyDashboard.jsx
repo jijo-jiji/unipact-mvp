@@ -161,7 +161,7 @@ const CompanyDashboard = () => {
                         <p className="text-[#5B6478] text-sm mt-1 line-clamp-2">{camp.description}</p>
                       </div>
                       <div className="sm:text-right shrink-0">
-                        <div className="font-heading font-bold text-base text-[#0B1E63]">{formatMoney(camp.budget)}</div>
+                        <div className="font-heading font-bold text-base text-[#0B1E63]">{camp.is_volunteer ? 'Volunteer' : formatMoney(camp.budget)}</div>
                         <div className="text-[#5B6478] text-xs mt-0.5 inline-flex items-center gap-1"><CalendarDays size={12} /> {formatDate(camp.deadline, 'No deadline')}</div>
                       </div>
                     </div>

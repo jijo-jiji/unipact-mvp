@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { Code2, Video, Plus, Trash2, ArrowLeft, Upload, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import api from '../api/client';
 import WorkspaceNav from '../components/WorkspaceNav';
@@ -38,11 +39,14 @@ const CreateCampaign = () => {
   usePageTitle('Post a project');
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isNgo = user?.company_profile?.org_type === 'NGO';
 
   const [category, setCategory] = useState('SOFTWARE_DEVELOPMENT');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [budget, setBudget] = useState(2500);
+  const [isVolunteer, setIsVolunteer] = useState(false);
   const [deadline, setDeadline] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +82,7 @@ const CreateCampaign = () => {
     if (isDev && skills.length === 0) return setError('List at least one required skill.');
     if (!isDev && !campaignObjective.trim()) return setError('Please describe the campaign objective.');
     if (requirements.length === 0) return setError('Add at least one deliverable so students know what to hand in.');
-    if (Number(budget) < 100) return setError('The minimum project budget is RM 100.');
+    if (!isVolunteer && Number(budget) < 100) return setError('The minimum project budget is RM 100.');
 
     setLoading(true);
     try {
@@ -86,7 +90,8 @@ const CreateCampaign = () => {
         title: title.trim(),
         description: description.trim(),
         type: category,
-        budget: parseFloat(budget),
+        budget: isVolunteer ? 0 : parseFloat(budget),
+        is_volunteer: isVolunteer,
         deadline: deadline || null,
         requirements,
         software_sub_type: isDev ? softwareSubType : null,
@@ -227,7 +232,14 @@ const CreateCampaign = () => {
 
           <section className="card p-6 sm:p-8 space-y-4">
             <StepHeading number={3} title="Budget & timeline" />
+            {isNgo && (
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-[rgba(10,23,72,0.12)] bg-[#F5F7FC] cursor-pointer text-sm">
+                <input type="checkbox" checked={isVolunteer} onChange={(e) => setIsVolunteer(e.target.checked)} className="mt-0.5 w-5 h-5 shrink-0 accent-[#00AEEF]" />
+                <span><strong>This is an unpaid volunteer project.</strong> Students take part for the experience and the verified record. Nothing is charged and no one is paid.</span>
+              </label>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isVolunteer && (
               <div>
                 <label className="field-label" htmlFor="budget">Budget</label>
                 <div className="relative">
@@ -236,6 +248,7 @@ const CreateCampaign = () => {
                 </div>
                 <p className="field-hint">Minimum RM 100. This is what the student team is paid.</p>
               </div>
+              )}
               <div>
                 <label className="field-label" htmlFor="deadline">Deadline (optional)</label>
                 <input id="deadline" type="date" min={today()} value={deadline} onChange={(e) => setDeadline(e.target.value)} className="input" />

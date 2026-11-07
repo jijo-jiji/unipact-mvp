@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from . import formats
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -88,8 +89,20 @@ class CompanyProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, ser
 
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'email', 'password', 'verification_status', 'tier', 'ssm_document', 'logo']
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'email', 'password',
+                  'verification_status', 'tier', 'ssm_document', 'logo']
         read_only_fields = ['verification_status', 'tier']
+        extra_kwargs = {'registration_number': {'required': True, 'allow_blank': False}}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # A company has a 12-digit SSM number; an NGO a ROS (KDN) number such as PPM-011-10-25022025
+        check = formats.ros_number if attrs.get('org_type') == CompanyProfile.OrgType.NGO else formats.ssm_number
+        try:
+            attrs['registration_number'] = check(attrs.get('registration_number'))
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({'registration_number': exc.detail})
+        return attrs
 
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
@@ -119,6 +132,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     rating = serializers.SerializerMethodField()
+    university_email_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentProfile
@@ -127,12 +141,17 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'verification_status', 'verification_document', 'profile_photo', 'secondary_email',
             'club_affiliation_name', 'club_affiliation_role', 'skills',
             'bio', 'rating', 'email',
+            'whatsapp_number', 'university_email', 'university_email_verified', 'year_of_study', 'current_semester',
+            'weekly_availability', 'linkedin_url', 'portfolio_url',
             'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id'
         ]
         read_only_fields = ['verification_status']
 
     def get_rating(self, obj):
         return obj.public_rating()
+
+    def get_university_email_verified(self, obj):
+        return obj.university_email_verified_at is not None
 
 
 class StudentTeamMemberSerializer(serializers.ModelSerializer):
@@ -145,6 +164,7 @@ class StudentTeamMemberSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user_id', 'full_name', 'university', 'major', 'domain_focus',
             'verification_status', 'profile_photo', 'skills', 'bio', 'rating',
+            'year_of_study', 'linkedin_url', 'portfolio_url',
         ]
         read_only_fields = fields
 
@@ -152,7 +172,38 @@ class StudentTeamMemberSerializer(serializers.ModelSerializer):
         return obj.public_rating()
 
 
-class StudentRegistrationSerializer(TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):
+class StudentContactChecks:
+    """Format checks for the contact and availability fields, shared by sign-up and Account settings."""
+
+    def validate_whatsapp_number(self, value):
+        return formats.malaysian_mobile(value) if value else value
+
+    def validate_university_email(self, value):
+        if not value:
+            return value
+        email = formats.university_email(value)
+        others = StudentProfile.objects.filter(university_email__iexact=email)
+        if getattr(self, 'instance', None) is not None:
+            others = others.exclude(pk=self.instance.pk)
+        if others.exists():
+            raise serializers.ValidationError('Another UniPact account already uses this university email.')
+        return email
+
+    def validate_linkedin_url(self, value):
+        return formats.linkedin_url(value)
+
+    def validate_year_of_study(self, value):
+        if value is not None and not 1 <= value <= 5:
+            raise serializers.ValidationError('Choose your year of study (1 to 5).')
+        return value
+
+    def validate_current_semester(self, value):
+        if value is not None and not 1 <= value <= 3:
+            raise serializers.ValidationError('Choose semester 1, 2, or 3 for a short semester.')
+        return value
+
+
+class StudentRegistrationSerializer(StudentContactChecks, TermsConsentMixin, NewAccountSerializerMixin, serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     email = serializers.EmailField()
     secondary_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
@@ -167,6 +218,20 @@ class StudentRegistrationSerializer(TermsConsentMixin, NewAccountSerializerMixin
     bio = serializers.CharField(required=False, allow_blank=True)
     # Accepts a JSON list, a JSON-encoded string (multipart forms) or a comma-separated string
     skills = serializers.JSONField(required=False)
+    whatsapp_number = serializers.CharField(max_length=30)
+    university_email = serializers.EmailField()
+    year_of_study = serializers.IntegerField()
+    current_semester = serializers.IntegerField()
+    weekly_availability = serializers.ChoiceField(choices=StudentProfile.WeeklyAvailability.choices)
+    linkedin_url = serializers.URLField(required=False, allow_blank=True)
+    portfolio_url = serializers.URLField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Software clients want to see code; any link that shows the work counts (GitHub, Canva, Behance, Drive...)
+        if attrs.get('domain_focus', 'SOFTWARE_DEV') in ('SOFTWARE_DEV', 'BOTH') and not attrs.get('portfolio_url'):
+            raise serializers.ValidationError({'portfolio_url': ['Add a link that shows your work, such as your GitHub, a Canva portfolio or a Google Drive folder.']})
+        return attrs
 
     def validate_verification_doc(self, value):
         return validate_document_upload(value, 'Student ID document')
@@ -272,7 +337,8 @@ class AdminCompanyVerificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompanyProfile
-        fields = ['id', 'user_id', 'company_name', 'email', 'company_details', 'verification_status', 'ssm_document']
+        fields = ['id', 'user_id', 'company_name', 'email', 'company_details', 'org_type', 'registration_number',
+                  'verification_status', 'ssm_document']
 
 class AdminClubVerificationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
@@ -342,7 +408,7 @@ class PasswordChangeSerializer(serializers.Serializer):
 # Account settings (what each role may edit about itself)
 # ------------------------------------------------------------------
 
-class StudentSettingsSerializer(serializers.ModelSerializer):
+class StudentSettingsSerializer(StudentContactChecks, serializers.ModelSerializer):
     skills = serializers.JSONField(required=False)
 
     class Meta:
@@ -351,6 +417,8 @@ class StudentSettingsSerializer(serializers.ModelSerializer):
             'full_name', 'university', 'major', 'domain_focus', 'skills', 'bio',
             'club_affiliation_name', 'club_affiliation_role', 'secondary_email', 'verification_document',
             'profile_photo',
+            'whatsapp_number', 'university_email', 'year_of_study', 'current_semester', 'weekly_availability',
+            'linkedin_url', 'portfolio_url',
             'bank_name', 'bank_account_number', 'bank_account_holder_name', 'duitnow_id',
         ]
 
@@ -374,15 +442,34 @@ class StudentSettingsSerializer(serializers.ModelSerializer):
     def validate_profile_photo(self, value):
         return validate_image_upload(value, 'Profile picture')
 
+    def update(self, instance, validated_data):
+        # A new university email has to be confirmed again
+        changed_email = 'university_email' in validated_data and validated_data['university_email'] != instance.university_email
+        if changed_email:
+            instance.university_email_verified_at = None
+        profile = super().update(instance, validated_data)
+        if changed_email and profile.university_email:
+            from unipact_backend import notifications
+            notifications.university_email_verification(profile)
+        return profile
+
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'ssm_document', 'logo']
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'ssm_document', 'logo']
+        read_only_fields = ['org_type']
         extra_kwargs = {
             'company_name': {'allow_blank': False},
             'ssm_document': {'write_only': True},
         }
+
+    def validate_registration_number(self, value):
+        instance = self.instance
+        if instance and instance.verification_status == CompanyProfile.VerificationStatus.VERIFIED and value != instance.registration_number:
+            raise serializers.ValidationError('Your registration number is verified. Contact UniPact support to change it.')
+        check = formats.ros_number if instance and instance.org_type == CompanyProfile.OrgType.NGO else formats.ssm_number
+        return check(value)
 
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
@@ -419,6 +506,8 @@ class AdminStudentEditSerializer(StudentSettingsSerializer):
         fields = [
             'full_name', 'university', 'major', 'domain_focus', 'skills', 'bio',
             'club_affiliation_name', 'club_affiliation_role', 'secondary_email',
+            'whatsapp_number', 'university_email', 'year_of_study', 'current_semester', 'weekly_availability',
+            'linkedin_url', 'portfolio_url',
         ]
         extra_kwargs = {
             'full_name': {'allow_blank': False},
@@ -427,9 +516,27 @@ class AdminStudentEditSerializer(StudentSettingsSerializer):
 
 
 class AdminCompanyEditSerializer(CompanySettingsSerializer):
+    """Admins may also correct the organisation type and a verified registration number."""
     class Meta(CompanySettingsSerializer.Meta):
-        fields = ['company_name', 'company_details']
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number']
+        read_only_fields = []
         extra_kwargs = {'company_name': {'allow_blank': False}}
+
+    def validate_registration_number(self, value):
+        return value  # checked against the organisation type in validate()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'registration_number' in attrs or 'org_type' in attrs:
+            org_type = attrs.get('org_type', self.instance.org_type)
+            number = attrs.get('registration_number', self.instance.registration_number)
+            if number:
+                check = formats.ros_number if org_type == CompanyProfile.OrgType.NGO else formats.ssm_number
+                try:
+                    attrs['registration_number'] = check(number)
+                except serializers.ValidationError as exc:
+                    raise serializers.ValidationError({'registration_number': exc.detail})
+        return attrs
 
 
 class AdminClubEditSerializer(ClubSettingsSerializer):

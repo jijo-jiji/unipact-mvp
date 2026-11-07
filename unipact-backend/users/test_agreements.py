@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 from campaigns.models import Campaign, MatchOffer
 from users import agreements
 from users.models import AgreementAcceptance, CompanyProfile, StudentProfile, User
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 STRONG = 'Blue-Kettle-Run-88'
 TALENT_VERSION = agreements.CURRENT_VERSIONS[agreements.TALENT]
@@ -86,11 +87,11 @@ class AgreementAcceptanceTests(APITestCase):
 
     def test_signing_up_through_the_current_form_records_the_talent_agreement(self):
         base = {'password': STRONG, 'full_name': 'New', 'university': 'UM', 'accept_terms': 'true'}
-        self.client.post(reverse('register_student'), {**base, 'email': 'new@siswa.my', 'talent_agreement_version': TALENT_VERSION}, format='json')
+        self.client.post(reverse('register_student'), {**base, **student_signup(), 'email': 'new@siswa.my', 'talent_agreement_version': TALENT_VERSION}, format='json')
         self.assertTrue(AgreementAcceptance.objects.filter(user__email='new@siswa.my', agreement='TALENT', version=TALENT_VERSION).exists())
 
         # A form that didn't show the current agreement records nothing; that student is asked before a first job
-        self.client.post(reverse('register_student'), {**base, 'email': 'old@siswa.my'}, format='json')
+        self.client.post(reverse('register_student'), {**base, **student_signup(), 'email': 'old@siswa.my'}, format='json')
         self.assertFalse(AgreementAcceptance.objects.filter(user__email='old@siswa.my').exists())
 
     def test_a_new_version_asks_everyone_again(self):

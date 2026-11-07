@@ -4,7 +4,8 @@ import RegisterBackLink from '../components/RegisterBackLink';
 import { GraduationCap, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
-import { MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import { EMPTY_STUDENT_CONTACT, MALAYSIAN_UNIVERSITIES, STUDENT_CONTACT_FIELDS } from '../utils/constants';
+import StudentContactFields from '../components/StudentContactFields';
 import TermsConsent from '../components/TermsConsent';
 import { AGREEMENTS } from '../utils/agreements';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -24,7 +25,8 @@ const StudentRegister = () => {
     skills: '',
     bio: '',
     club_affiliation_name: '',
-    club_affiliation_role: ''
+    club_affiliation_role: '',
+    ...EMPTY_STUDENT_CONTACT,
   });
 
   const [docFile, setDocFile] = useState(null);
@@ -54,6 +56,11 @@ const StudentRegister = () => {
           const value = formData[key].trim ? formData[key].trim() : formData[key];
           if (value || key === 'major') payload.append(key, value);
         });
+
+      STUDENT_CONTACT_FIELDS.forEach((key) => {
+        const value = String(formData[key] ?? '').trim();
+        if (value) payload.append(key, value);
+      });
 
       const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
       payload.append('skills', JSON.stringify(skillsArray));
@@ -140,6 +147,13 @@ const StudentRegister = () => {
               <input id="major" name="major" required value={formData.major} onChange={handleChange} placeholder="e.g. BSc Computer Science" className="input" />
             </div>
           </div>
+
+          <StudentContactFields
+            values={formData}
+            onChange={(name, value) => setFormData((prev) => ({ ...prev, [name]: value }))}
+            domainFocus={formData.domain_focus}
+            idPrefix="reg"
+          />
 
           <div>
             <label className="field-label" htmlFor="skills">Skills</label>

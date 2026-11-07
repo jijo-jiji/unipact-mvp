@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 
 from campaigns.models import Campaign
 from users.models import User, CompanyProfile, StudentProfile
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 STRONG = 'Blue-Kettle-Run-88'
 
@@ -240,7 +241,7 @@ class AccountSettingsTests(APITestCase):
 
 class TermsConsentTests(APITestCase):
     def test_signup_requires_consent_and_records_it(self):
-        base = {'email': 'c@siswa.my', 'password': STRONG, 'full_name': 'C', 'university': 'UM'}
+        base = {'email': 'c@siswa.my', 'password': STRONG, 'full_name': 'C', 'university': 'UM', **student_signup()}
         refused = self.client.post(reverse('register_student'), base, format='json')
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('accept_terms', refused.data)
@@ -251,7 +252,7 @@ class TermsConsentTests(APITestCase):
         self.assertIsNotNone(User.objects.get(email='c@siswa.my').terms_accepted_at)
 
     def test_company_signup_requires_consent(self):
-        res = self.client.post(reverse('register_company'), {'email': 'x@corp.com', 'password': STRONG, 'company_name': 'X', 'accept_terms': False}, format='json')
+        res = self.client.post(reverse('register_company'), {'email': 'x@corp.com', 'password': STRONG, 'company_name': 'X', 'accept_terms': False, **COMPANY_SIGNUP}, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('accept_terms', res.data)
 
@@ -269,7 +270,7 @@ class NotificationEmailTests(APITestCase):
 
     def test_registration_sends_welcome(self):
         with self.captureOnCommitCallbacks(execute=True):
-            self.client.post(reverse('register_student'), {'accept_terms': True, 'email': 'new@siswa.my', 'password': STRONG, 'full_name': 'New', 'university': 'UM'}, format='json')
+            self.client.post(reverse('register_student'), {'accept_terms': True, 'email': 'new@siswa.my', 'password': STRONG, 'full_name': 'New', 'university': 'UM', **student_signup()}, format='json')
         self.assertEqual(mail.outbox[0].to, ['new@siswa.my'])
         self.assertIn('Confirm your email', mail.outbox[0].subject)
         self.assertIn('Welcome to UniPact', mail.outbox[0].body)

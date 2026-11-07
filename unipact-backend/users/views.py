@@ -703,6 +703,9 @@ class StudentPublicProfileView(views.APIView):
             'skills': profile.skills,
             'bio': profile.bio,
             'rating': profile.public_rating(),
+            'year_of_study': profile.year_of_study,
+            'linkedin_url': profile.linkedin_url,
+            'portfolio_url': profile.portfolio_url,
             'verification_status': profile.verification_status,
             'club_affiliation_name': profile.club_affiliation_name,
             'club_affiliation_role': profile.club_affiliation_role,
@@ -799,6 +802,8 @@ class RegisterCompanyView(generics.CreateAPIView):
                 user=user,
                 company_name=company_name,
                 company_details=company_details,
+                org_type=serializer.validated_data.get('org_type', CompanyProfile.OrgType.COMPANY),
+                registration_number=serializer.validated_data['registration_number'],
                 verification_status=ver_status
             )
 
@@ -937,7 +942,14 @@ class RegisterStudentView(generics.CreateAPIView):
                 club_affiliation_role=club_role,
                 skills=skills,
                 bio=bio,
-                verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION
+                verification_status=StudentProfile.VerificationStatus.PENDING_VERIFICATION,
+                whatsapp_number=serializer.validated_data['whatsapp_number'],
+                university_email=serializer.validated_data['university_email'],
+                year_of_study=serializer.validated_data['year_of_study'],
+                current_semester=serializer.validated_data['current_semester'],
+                weekly_availability=serializer.validated_data['weekly_availability'],
+                linkedin_url=serializer.validated_data.get('linkedin_url', ''),
+                portfolio_url=serializer.validated_data.get('portfolio_url', ''),
             )
 
             doc = request.FILES.get('verification_doc') or request.FILES.get('verification_document')
@@ -954,6 +966,7 @@ class RegisterStudentView(generics.CreateAPIView):
 
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f"New Student Talent Joined: {full_name} ({university})")
         notifications.welcome(user, email_verification_path(user))
+        notifications.university_email_verification(profile)
 
         response = Response({
             "message": "Student talent registered successfully. Account pending Admin verification.",
@@ -1050,6 +1063,9 @@ class AdminVerifyEntityView(views.APIView):
         if entity_type == 'COMPANY':
             try:
                 profile = CompanyProfile.objects.get(id=entity_id)
+                if action == 'approve' and profile.org_type == CompanyProfile.OrgType.NGO and not profile.ssm_document:
+                    return Response({"error": "This NGO hasn't uploaded its ROS registration certificate yet. Ask them to add it under Account settings, then verify."},
+                                    status=status.HTTP_400_BAD_REQUEST)
                 if action == 'approve':
                     profile.verification_status = CompanyProfile.VerificationStatus.VERIFIED
                 elif action == 'reject':
@@ -1412,3 +1428,38 @@ class AgreementAcceptView(views.APIView):
         log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO,
                   f"{request.user.email} accepted the {agreements.TITLES[agreement]} ({agreements.CURRENT_VERSIONS[agreement]})")
         return Response(agreements.status_for(request.user))
+
+
+class VerifyUniversityEmailView(views.APIView):
+    """Confirms a student's university email from the link we sent to it. Visiting it twice is fine."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [EmailVerifyThrottle]
+
+    def post(self, request):
+        from .utils import read_university_email_token
+
+        profile = read_university_email_token(str(request.data.get('token', '')))
+        if not profile:
+            return Response({"error": "This confirmation link is invalid or has expired. Ask for a new one from your dashboard."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not profile.university_email_verified_at:
+            profile.university_email_verified_at = timezone.now()
+            profile.save(update_fields=['university_email_verified_at'])
+            log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"University email confirmed: {profile.university_email}")
+        return Response({"message": "Thanks, your university email is confirmed.", "email": profile.university_email})
+
+
+class ResendUniversityEmailView(views.APIView):
+    """Sends the signed-in student a fresh link for their university email."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [EmailVerifyThrottle]
+
+    def post(self, request):
+        profile = getattr(request.user, 'student_profile', None) if request.user.role == User.Role.STUDENT else None
+        if not profile or not profile.university_email:
+            return Response({"error": "Add your university email in Account settings first."}, status=status.HTTP_400_BAD_REQUEST)
+        if profile.university_email_verified_at:
+            return Response({"message": "Your university email is already confirmed."})
+        notifications.university_email_verification(profile)
+        return Response({"message": f"We sent a new link to {profile.university_email}."})

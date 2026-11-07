@@ -600,7 +600,8 @@ const AdminDashboard = () => {
                               {entity.email}
                               {entity.university && ` · ${entity.university}`}
                               {entity.type === 'STUDENT' && entity.domain_focus && ` · ${domainLabel(entity.domain_focus)}`}
-                              {entity.company_details && ` · SSM ${entity.company_details}`}
+                              {entity.type === 'COMPANY' && (entity.registration_number || entity.company_details) && ` · ${entity.org_type === 'NGO' ? 'NGO, ROS' : 'SSM'} ${entity.registration_number || entity.company_details}`}
+                              {entity.type === 'COMPANY' && entity.org_type === 'NGO' && !entity.ssm_document && ' · ROS certificate not uploaded yet'}
                             </div>
                           </div>
                           <StatusBadge status={entity.verification_status} />
@@ -850,7 +851,7 @@ const AdminDashboard = () => {
                           <h3 className="font-semibold">{camp.title}</h3>
                           <StatusBadge status={camp.status} />
                         </div>
-                        <div className="text-sm text-[#5B6478]">{camp.company_name} · {formatMoney(camp.budget)} · {campaignTypeLabel(camp.type)}</div>
+                        <div className="text-sm text-[#5B6478]">{camp.company_name} · {camp.is_volunteer ? 'Volunteer (unpaid)' : formatMoney(camp.budget)} · {campaignTypeLabel(camp.type)}</div>
                         {camp.assigned_students_details?.length > 0 && (
                           <div className="mt-2 text-xs text-emerald-700 flex items-center gap-1">
                             <UserCheck size={13} className="shrink-0" /> {camp.assigned_students_details.map((s) => s.full_name).join(', ')}

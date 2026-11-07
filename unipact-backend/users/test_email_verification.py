@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 from campaigns.models import Campaign, MatchOffer
 from users.models import User, CompanyProfile, StudentProfile
 from users.utils import make_email_verification_token, read_email_verification_token
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 STRONG = 'Blue-Kettle-Run-88'
 
@@ -55,7 +56,7 @@ class EmailVerificationEndpointTests(APITestCase):
         with self.captureOnCommitCallbacks(execute=True):
             res = self.client.post(reverse('register_student'), {
                 'email': 'newbie@siswa.my', 'password': STRONG, 'full_name': 'Newbie',
-                'university': 'UM', 'accept_terms': 'true',
+                'university': 'UM', 'accept_terms': 'true', **student_signup(),
             }, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
@@ -205,7 +206,7 @@ class ConfirmationEmailContentTests(APITestCase):
         with self.captureOnCommitCallbacks(execute=True):
             res = self.client.post(reverse('register_company'), {
                 'email': 'hr@acme.com.my', 'password': STRONG, 'company_name': 'Acme',
-                'ssm_number': '202501001234', 'accept_terms': 'true',
+                'registration_number': '202501001234', 'accept_terms': 'true',
             }, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         return next(m for m in mail.outbox if m.to == ['hr@acme.com.my'])

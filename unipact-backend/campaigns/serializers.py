@@ -104,7 +104,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             'campaign_objective', 'target_platforms', 'match_notes', 'is_match_finalized',
             'assigned_students', 'assigned_students_details', 'client_assets', 'student_deliverables',
             'team_invitations', 'milestones', 'match_offers', 'my_offer', 'awaiting_student_acceptance',
-            'payment_structure', 'platform_fee_percent', 'student_pool', 'service_fee_percent',
+            'payment_structure', 'platform_fee_percent', 'student_pool', 'service_fee_percent', 'is_volunteer',
             'unread_messages',
         ]
         # Talent assignment is admin-only (via /match/), never writable by the posting company.
@@ -113,6 +113,20 @@ class CampaignSerializer(serializers.ModelSerializer):
 
     # Workspace data that only the owner, assigned talent and admins may see
     PRIVATE_FIELDS = ('client_assets', 'student_deliverables', 'team_invitations')
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        volunteer = attrs.get('is_volunteer', getattr(self.instance, 'is_volunteer', False))
+        if volunteer:
+            # Unpaid projects are for NGOs: students give their time, so there is nothing to charge or pay out
+            request = self.context.get('request')
+            owner = getattr(self.instance, 'company', None) or getattr(getattr(request, 'user', None), 'company_profile', None)
+            if owner is not None and owner.org_type != owner.OrgType.NGO:
+                raise serializers.ValidationError({'is_volunteer': ['Only NGOs can post unpaid volunteer projects.']})
+            attrs['budget'] = 0
+        elif 'budget' in attrs and attrs['budget'] is not None and attrs['budget'] <= 0:
+            raise serializers.ValidationError({'budget': ['Enter the project budget in ringgit.']})
+        return attrs
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

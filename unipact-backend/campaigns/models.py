@@ -28,6 +28,8 @@ class Campaign(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     type = models.CharField(max_length=30, choices=Type.choices)
+    # An NGO's unpaid project: students take part for the experience, so nothing is charged or paid out
+    is_volunteer = models.BooleanField(default=False)
     budget = models.DecimalField(max_digits=10, decimal_places=2)
     requirements = models.JSONField(default=list) # Stores list of deliverables/conditions
     deadline = models.DateField(null=True, blank=True)

@@ -191,6 +191,12 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
                   <Row label="Course / major">{profile.major}</Row>
                   <Row label="Main track">{domainLabel(profile.domain_focus)}</Row>
                   <Row label="Backup email">{profile.secondary_email}</Row>
+                  <Row label="WhatsApp">{profile.whatsapp_number && <a href={`https://wa.me/${profile.whatsapp_number.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-[#00729F] underline">{profile.whatsapp_number}</a>}</Row>
+                  <Row label="University email">{profile.university_email && `${profile.university_email} ${profile.university_email_verified ? '(confirmed)' : '(not confirmed yet)'}`}</Row>
+                  <Row label="Year and semester">{profile.year_of_study && `Year ${profile.year_of_study}, ${profile.current_semester === 3 ? 'short semester' : `semester ${profile.current_semester}`}`}</Row>
+                  <Row label="Weekly availability">{profile.weekly_availability && `${profile.weekly_availability} hours`}</Row>
+                  <Row label="Portfolio">{profile.portfolio_url && <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="text-[#00729F] underline break-all">{profile.portfolio_url}</a>}</Row>
+                  <Row label="LinkedIn">{profile.linkedin_url && <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="text-[#00729F] underline break-all">{profile.linkedin_url}</a>}</Row>
                   <Row label="Club or society">
                     {profile.club_affiliation_name && [profile.club_affiliation_name, profile.club_affiliation_role].filter(Boolean).join(' · ')}
                   </Row>
@@ -228,10 +234,11 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
           {detail.role === 'COMPANY' && profile && (
             <Section title="Company profile">
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                <Row label="Company name">{profile.company_name}</Row>
-                <Row label="SSM registration number">{profile.company_details}</Row>
+                <Row label="Type">{profile.org_type === 'NGO' ? 'NGO (ROS / KDN)' : 'Company (SSM)'}</Row>
+                <Row label={profile.org_type === 'NGO' ? 'Organisation name' : 'Company name'}>{profile.company_name}</Row>
+                <Row label={profile.org_type === 'NGO' ? 'ROS registration number' : 'SSM registration number'}>{profile.registration_number || profile.company_details}</Row>
                 <Row label="Plan">{profile.tier === 'PRO' ? 'Pro' : 'Free'}</Row>
-                <Row label="SSM document"><DocumentLink href={profile.ssm_document} /></Row>
+                <Row label={profile.org_type === 'NGO' ? 'ROS certificate' : 'SSM document'}><DocumentLink href={profile.ssm_document} /></Row>
                 <Row label="Logo"><DocumentLink href={profile.logo} label="View logo" /></Row>
               </dl>
             </Section>

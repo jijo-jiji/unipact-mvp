@@ -45,6 +45,7 @@ class LoginTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 from .models import ShadowUser
+from unipact_backend.testing import COMPANY_SIGNUP, student_signup
 
 class ShadowUserTests(APITestCase):
     def setUp(self):
@@ -84,7 +85,8 @@ class RegistrationTests(APITestCase):
             'email': 'jane@acme.corp',
             'password': 'securepassword123',
             'company_name': 'Acme Corp',
-            'company_details': 'Best tech in town'
+            'company_details': 'Best tech in town',
+            **COMPANY_SIGNUP,
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -102,6 +104,7 @@ class RegistrationTests(APITestCase):
             'email': 'jane@gmail.com',
             'password': 'securepassword123',
             'company_name': 'Jane Startup',
+            **COMPANY_SIGNUP,
             'company_details': 'My cool startup'
         }
         response = self.client.post(url, data, format='json')

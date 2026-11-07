@@ -57,6 +57,33 @@ def email_verification_path(user):
     return f"/verify-email?{urlencode({'token': make_email_verification_token(user)})}"
 
 
+# A student's university email is confirmed the same way, with its own salt so one link can't stand in for the other
+UNIVERSITY_EMAIL_SALT = 'unipact.university-email-verify'
+
+
+def university_email_verification_path(profile):
+    from urllib.parse import urlencode
+    from django.core import signing
+    token = signing.dumps({'sid': profile.pk, 'email': profile.university_email}, salt=UNIVERSITY_EMAIL_SALT)
+    return f"/verify-university-email?{urlencode({'token': token})}"
+
+
+def read_university_email_token(token, max_age=None):
+    """The student profile the link belongs to, or None if it is invalid, expired or for an email since changed."""
+    from django.conf import settings
+    from django.core import signing
+    from .models import StudentProfile
+
+    try:
+        data = signing.loads(token, salt=UNIVERSITY_EMAIL_SALT, max_age=max_age or settings.EMAIL_VERIFY_TIMEOUT)
+    except signing.BadSignature:
+        return None
+    profile = StudentProfile.objects.filter(pk=data.get('sid'), user__is_active=True).first()
+    if not profile or profile.university_email.lower() != str(data.get('email', '')).lower():
+        return None
+    return profile
+
+
 # --- Accounts an admin created ------------------------------------------------------
 # The account has no password until its owner picks one from the emailed link, so the admin never
 # knows it. The token signs the account's current (unusable) password hash: once a password is set
