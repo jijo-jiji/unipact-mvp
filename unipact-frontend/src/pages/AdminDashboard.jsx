@@ -10,6 +10,7 @@ import WorkspaceNav from '../components/WorkspaceNav';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/Modal';
 import AdminUserModal from '../components/AdminUserModal';
+import AdminQuotationPanel from '../components/AdminQuotationPanel';
 import AdminCreateAccountModal from '../components/AdminCreateAccountModal';
 import AdminConversations from '../components/AdminConversations';
 import StatusBadge from '../components/StatusBadge';
@@ -102,6 +103,13 @@ const AdminDashboard = () => {
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [matchNotes, setMatchNotes] = useState('');
+  // Students are matched once the client accepts a quotation; an admin may override for a special case
+  const [quotationAccepted, setQuotationAccepted] = useState(true);
+  const [matchWithoutQuotation, setMatchWithoutQuotation] = useState(false);
+  const onQuotationsLoaded = useCallback((list) => {
+    setQuotationAccepted(list.some((q) => q.status === 'ACCEPTED'));
+    setMatchWithoutQuotation(false);
+  }, []);
   const [matchSubmitting, setMatchSubmitting] = useState(false);
   const [milestoneRows, setMilestoneRows] = useState([{ title: 'Delivery', percentage: 100 }]);
   const [savingMilestonePlan, setSavingMilestonePlan] = useState(false);
@@ -439,7 +447,9 @@ const AdminDashboard = () => {
       // The plan on screen goes with the match. Without a saved plan the client is asked to confirm a
       // team they can't confirm ("UniPact hasn't set up a milestone plan").
       if (planUnsaved) await postMilestonePlan();
-      const res = await api.post(`/campaigns/${selectedCampaign.id}/match/`, { student_ids: selectedStudentIds, match_notes: matchNotes });
+      const res = await api.post(`/campaigns/${selectedCampaign.id}/match/`, {
+        student_ids: selectedStudentIds, match_notes: matchNotes, without_quotation: matchWithoutQuotation,
+      });
       showToast(res.data?.message || `Offer sent for "${selectedCampaign.title}".`, 'success');
       if (campaignFilter === 'OPEN') setCampaignFilter('MATCHED');
       else await fetchMatchmakingData();
@@ -899,6 +909,8 @@ const AdminDashboard = () => {
                     </dl>
                   </div>
 
+                  <AdminQuotationPanel key={selectedCampaign.id} campaign={selectedCampaign} onQuotationsLoaded={onQuotationsLoaded} />
+
                   <div>
                     <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                       <h3 className="font-semibold flex items-center gap-2"><Users size={15} className="text-[#00AEEF]" /> Student talent ({students.length})</h3>
@@ -1137,6 +1149,12 @@ const AdminDashboard = () => {
                       </p>
                     )}
                     {!canAssign && <p className="text-sm text-[#5B6478]">This project is {selectedCampaign.status.toLowerCase().replace('_', ' ')}, so the team can no longer be changed.</p>}
+                    {canAssign && !quotationAccepted && !selectedCampaign.is_volunteer && (
+                      <label className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 cursor-pointer">
+                        <input type="checkbox" checked={matchWithoutQuotation} onChange={(e) => setMatchWithoutQuotation(e.target.checked)} className="mt-0.5 accent-[#00AEEF]" />
+                        <span>The client hasn&apos;t accepted a quotation yet, so students can&apos;t be matched. Tick to <strong>match without an accepted quotation</strong> for a special case.</span>
+                      </label>
+                    )}
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button onClick={handleAssignMatch} disabled={!canAssign || matchSubmitting || selectedStudentIds.length === 0} className="btn-primary flex-1">
                         {matchSubmitting ? <Loader2 size={15} className="animate-spin" /> : <UserCheck size={15} />}

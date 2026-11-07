@@ -22,6 +22,7 @@ class Campaign(models.Model):
 
     class PaymentStructure(models.TextChoices):
         UPFRONT = 'UPFRONT', 'Upfront (full project fee before work starts)'
+        MILESTONE = 'MILESTONE', 'Per milestone (each milestone paid before work on it starts)'
         MANUAL = 'MANUAL', 'Manual (admin logs client payments as they arrive)'
 
     company = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name='campaigns')

@@ -88,7 +88,23 @@ def approve_milestone(campaign, milestone_id, *, auto=False):
     log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
               f"Milestone '{milestone.title}' {how} for '{campaign.title}' - RM {milestone.amount} released to escrow-pending payouts")
     notifications.milestone_approved(campaign, milestone, payouts, auto=auto)
+    invoice_next_milestone(campaign)
     return milestone, payouts
+
+
+def invoice_next_milestone(campaign):
+    """Pay-per-milestone projects: once a milestone is approved, the next one is invoiced, and work on it
+    starts when it is paid."""
+    from payments.invoices import request_bank_transfer
+    from .billing import amount_due_now, current_milestone
+
+    campaign.refresh_from_db()
+    if campaign.payment_structure != Campaign.PaymentStructure.MILESTONE or campaign.is_volunteer:
+        return None
+    due, upcoming = amount_due_now(campaign), current_milestone(campaign)
+    if due <= 0 or upcoming is None:
+        return None
+    return request_bank_transfer(campaign, due, description=f'Milestone {upcoming.step_number}: {upcoming.title}', milestone=upcoming)
 
 
 def auto_accept_due(now=None):

@@ -235,6 +235,10 @@ PROJECT_CHAT_DAYS_AFTER_COMPLETION = int(os.getenv('PROJECT_CHAT_DAYS_AFTER_COMP
 # The shortest gap between two "you have new messages" emails to the same person about the same project
 PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES = int(os.getenv('PROJECT_MESSAGE_EMAIL_INTERVAL_MINUTES', '60'))
 
+# Students are matched only once the client has accepted a quotation (off under the test runner, so tests
+# that aren't about quotations needn't create one; the quotation tests switch it on)
+QUOTATION_BEFORE_MATCHING = env_bool('QUOTATION_BEFORE_MATCHING', default=not TESTING)
+
 # Whether students must have accepted the Talent Agreement before taking a job, and clients the Client
 # Service Agreement before confirming a team or paying (users/agreements.py). Off under the test runner
 # so unrelated tests don't each have to accept one; the agreement tests switch it on.

@@ -12,3 +12,15 @@ export const downloadInvoice = async (invoice) => {
   link.remove();
   URL.revokeObjectURL(url);
 };
+
+export const downloadQuotation = async (quotation) => {
+  const res = await api.get(`/payments/quotations/${quotation.id}/pdf/`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${quotation.number || 'draft-quotation'}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};

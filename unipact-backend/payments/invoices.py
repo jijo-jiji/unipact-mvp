@@ -22,7 +22,12 @@ def open_invoice(campaign):
     return campaign.invoices.filter(status=Invoice.Status.ISSUED).first()
 
 
-def issue_project_invoice(campaign, amount):
+def accepted_po_number(campaign):
+    accepted = campaign.quotations.filter(status='ACCEPTED').order_by('-responded_at').first()
+    return accepted.po_number if accepted else ''
+
+
+def issue_project_invoice(campaign, amount, description='', milestone=None):
     """Return (invoice, created). The open invoice is reused while it is for the same amount, so asking
     again doesn't send a second one; a different amount (after a part payment) replaces it."""
     from campaigns.models import Campaign
@@ -49,13 +54,16 @@ def issue_project_invoice(campaign, amount):
             bank_name=settings.UNIPACT_BANK_NAME,
             bank_account_name=settings.UNIPACT_BANK_ACCOUNT_NAME,
             bank_account_number=settings.UNIPACT_BANK_ACCOUNT_NUMBER,
+            po_number=accepted_po_number(campaign),
+            description=description[:255],
+            milestone=milestone,
         )
         invoice.number = f"INV-{invoice.issued_at:%Y}-{invoice.pk:05d}"
         invoice.save(update_fields=['number'])
     return invoice, True
 
 
-def request_bank_transfer(campaign, outstanding):
+def request_bank_transfer(campaign, outstanding, description='', milestone=None):
     """The client chose to pay by bank transfer. Email them an invoice now if UniPact's bank details are
     set up; otherwise ask the admins to invoice by hand, as before. Returns the invoice or None."""
     from unipact_backend import notifications
@@ -64,7 +72,7 @@ def request_bank_transfer(campaign, outstanding):
         notifications.project_fee_due(campaign, outstanding)
         return None
 
-    invoice, created = issue_project_invoice(campaign, outstanding)
+    invoice, created = issue_project_invoice(campaign, outstanding, description, milestone)
     if created:
         notifications.project_invoice(invoice, render_invoice_pdf(invoice))
         notifications.project_invoice_sent(invoice)
@@ -131,10 +139,12 @@ def render_invoice_pdf(invoice):
     header.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0)]))
 
     bill_to = [p('BILL TO', label), p(invoice.bill_to_name, strong), p(invoice.bill_to_email, small)]
+    if invoice.po_number:
+        bill_to.append(p(f"Your PO no.  {invoice.po_number}", strong))
 
     items = Table([
         [p('Description', label), Paragraph('Amount', ParagraphStyle('ar', parent=label, alignment=TA_RIGHT))],
-        [[p(f'Project fee: {invoice.project_title}', strong),
+        [[p(f'Project fee: {invoice.project_title}' + (f' ({invoice.description})' if invoice.description else ''), strong),
           p(f"Held by UniPact in escrow. UniPact's {invoice.service_fee_percent.normalize():f}% service fee ({money(fee)}) is kept for "
             f"matching and managing the project; {money(team)} is paid to the student team as you approve each milestone.", small)],
          p(money(invoice.amount), right)],

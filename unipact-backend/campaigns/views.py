@@ -343,6 +343,15 @@ class AdminMatchmakingAssignView(APIView):
         if campaign.status not in (Campaign.Status.OPEN, Campaign.Status.MATCHED):
             return Response({"error": "Only open or matched projects can be (re)assigned."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Students are only offered work the client has agreed to pay for: the quotation comes first.
+        # Volunteer projects have nothing to quote; an admin can override for a special case.
+        override = str(request.data.get('without_quotation', '')).lower() in ('true', '1')
+        if (settings.QUOTATION_BEFORE_MATCHING and not campaign.is_volunteer and not override
+                and not campaign.quotations.filter(status='ACCEPTED').exists()):
+            return Response({"error": "The client hasn't accepted a quotation for this project yet. Send one first, "
+                                      "or tick 'Match without an accepted quotation' for a special case.",
+                             "code": "quotation_required"}, status=status.HTTP_400_BAD_REQUEST)
+
         if not isinstance(student_ids, list) or not student_ids:
             return Response({"error": "At least one student ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -481,10 +490,12 @@ class FinalizeMatchView(APIView):
 
         # Monetization Gate: the client must fund the full project fee before work starts,
         # unless UniPact is billing this client manually (e.g. a monthly bundle arrangement).
-        if campaign.payment_structure == Campaign.PaymentStructure.UPFRONT:
+        if campaign.payment_structure in (Campaign.PaymentStructure.UPFRONT, Campaign.PaymentStructure.MILESTONE):
             # Compare what was actually paid against the budget - a payment merely existing isn't
             # enough, since the create-intent endpoint accepts any client-supplied amount.
-            outstanding = campaign.budget - paid_project_fees(campaign)
+            # Upfront: the whole fee. Per milestone: the first milestone's share (Client Service Agreement 3.2)
+            from .billing import amount_due_now
+            outstanding = amount_due_now(campaign)
 
             if outstanding > 0:
                 # Must be explicitly requested - never assumed. An admin's "Lock & start" click
@@ -609,6 +620,10 @@ class StudentSubmitMilestoneView(APIView):
             raise exceptions.PermissionDenied("You are not on this project's team.")
 
         milestone = get_object_or_404(Milestone, pk=milestone_id, campaign=campaign)
+        from .billing import milestone_waiting_for_payment
+        if milestone_waiting_for_payment(campaign, milestone):
+            return Response({"error": "The client hasn't paid for this milestone yet. UniPact will let you know when it's paid and you can start.",
+                             "code": "milestone_unpaid"}, status=status.HTTP_400_BAD_REQUEST)
         if milestone.status not in (Milestone.Status.PENDING, Milestone.Status.IN_PROGRESS, Milestone.Status.REVISION_REQUESTED):
             return Response({"error": f"This milestone is {milestone.get_status_display()} and can't be submitted right now."}, status=status.HTTP_400_BAD_REQUEST)
 

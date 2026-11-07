@@ -506,6 +506,39 @@ def project_fee_due(campaign, outstanding):
     )
 
 
+def quotation_sent(quotation, pdf):
+    """The client's quotation, with the PDF attached and a link to accept it."""
+    campaign = quotation.campaign
+    send_email(
+        campaign.company.user.email, f'Quotation {quotation.number} for "{campaign.title}"', 'Your quotation from UniPact',
+        [f'Thanks for meeting us about "{campaign.title}". Here is our quotation.',
+         'Accept it on your project page; you can add your purchase order (PO) number there. Once it is accepted, '
+         'we pick your student team.'],
+        details=[('Quotation', quotation.number), ('Total', f'RM {quotation.total}'),
+                 ('Payment', quotation.get_payment_terms_display()), ('Valid until', quotation.valid_until.strftime('%d %b %Y'))],
+        action_label='Review the quotation', action_path=f'/manage-campaign/{campaign.id}',
+        attachments=[(f'{quotation.number}.pdf', pdf, 'application/pdf')],
+    )
+
+
+def quotation_answered(quotation):
+    """Tell the admins the client accepted the quotation (so the team can be picked) or wants changes."""
+    from users.models import User  # local import: notifications is imported by the users app
+
+    campaign = quotation.campaign
+    accepted = quotation.status == 'ACCEPTED'
+    send_email(
+        list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True)) + [settings.SUPPORT_EMAIL],
+        f'Quotation {quotation.number} {"accepted" if accepted else "needs changes"}: "{campaign.title}"',
+        'A client accepted a quotation' if accepted else 'A client asked for changes to a quotation',
+        [f'{campaign.company.company_name} accepted the quotation. You can now match students to the project.' if accepted
+         else f'{campaign.company.company_name} asked for changes: "{quotation.change_request}". Send them a revised quotation.'],
+        details=[('Project', campaign.title), ('Quotation', quotation.number), ('Total', f'RM {quotation.total}'),
+                 ('Accepted by', quotation.accepted_name or None), ('PO number', quotation.po_number or None)],
+        action_label='Open admin dashboard', action_path='/admin',
+    )
+
+
 def project_invoice(invoice, pdf):
     """The client chose bank transfer: their invoice, with UniPact's bank details and the PDF attached."""
     send_email(

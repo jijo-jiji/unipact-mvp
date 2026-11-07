@@ -5,12 +5,13 @@ from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import NotFound, ValidationError
 from django.shortcuts import get_object_or_404
 from users.models import User, SystemLog, CompanyProfile
 from users.utils import log_event
 from users import agreements
 from campaigns.models import Campaign
-from .serializers import TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer, InvoiceSerializer
+from .serializers import QuotationSerializer, TransactionSerializer, TreasurySummarySerializer, SubscriptionSerializer, PayoutSerializer, InvoiceSerializer
 from .models import Transaction, Subscription, Payout, Invoice
 from .invoices import request_bank_transfer, settle_invoices, render_invoice_pdf
 from .services import MockStripeService
@@ -467,11 +468,15 @@ class ToyyibPayCreateBillView(APIView):
             except toyyibpay.ToyyibPayError:
                 pass
 
+        from campaigns.billing import amount_due_now
         outstanding = campaign.budget - paid_project_fees(campaign)
-        if outstanding <= 0:
+        due = amount_due_now(campaign)
+        if outstanding <= 0 or (not balance_payment and due <= 0):
             return Response({"status": "paid", "outstanding": "0.00"})
 
-        amount = outstanding
+        # Confirming a team: what's due now. A started project: the client may pay part or all of the balance,
+        # defaulting to what's due now on a pay-per-milestone project
+        amount = due if (not balance_payment or due > 0) else outstanding
         if balance_payment and request.data.get('amount') not in (None, ''):
             try:
                 amount = Decimal(str(request.data.get('amount')))
@@ -571,10 +576,15 @@ class RequestInvoiceView(APIView):
         campaign, error = _owned_campaign(request, campaign_id)
         if error:
             return error
-        outstanding = campaign.budget - paid_project_fees(campaign)
+        from campaigns.billing import amount_due_now, current_milestone
+        due = amount_due_now(campaign)
+        outstanding = due if (campaign.status == Campaign.Status.MATCHED or due > 0) else campaign.budget - paid_project_fees(campaign)
         if outstanding <= 0 or not (campaign.status == Campaign.Status.MATCHED or _balance_payable(campaign)):
             return Response({"error": "There's nothing to invoice on this project."}, status=status.HTTP_400_BAD_REQUEST)
-        invoice = request_bank_transfer(campaign, outstanding)
+        upcoming = current_milestone(campaign) if campaign.payment_structure == Campaign.PaymentStructure.MILESTONE else None
+        invoice = request_bank_transfer(campaign, outstanding,
+                                        description=f'Milestone {upcoming.step_number}: {upcoming.title}' if upcoming else '',
+                                        milestone=upcoming)
         log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO,
                   f"Invoice requested: RM {outstanding} for '{campaign.title}' ({campaign.company.company_name})")
         return Response({"outstanding": outstanding, "invoice": InvoiceSerializer(invoice).data if invoice else None})
@@ -611,4 +621,137 @@ class InvoicePdfView(APIView):
             return Response({"error": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
         response = HttpResponse(render_invoice_pdf(invoice), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{invoice.number}.pdf"'
+        return response
+
+
+
+# ------------------------------------------------------------------
+# Quotations: agreed with the client after meeting them, before students are matched
+# ------------------------------------------------------------------
+
+def _quotation_for(request, quotation_id, *, client_action=False):
+    """The quotation, if this user may see it: an admin, or the client it is for (never a draft)."""
+    from .models import Quotation
+    quotation = get_object_or_404(Quotation.objects.select_related('campaign__company__user'), pk=quotation_id)
+    is_admin = request.user.role == User.Role.ADMIN
+    is_owner = (request.user.role == User.Role.COMPANY
+                and quotation.campaign.company == getattr(request.user, 'company_profile', None))
+    if not (is_owner and quotation.status != 'DRAFT') and not (is_admin and not client_action):
+        raise NotFound("Quotation not found.")  # don't confirm another client's quotation exists
+    return quotation
+
+
+class AdminQuotationListCreateView(APIView):
+    """POST (admin): draft a quotation for a project, and send it straight away with "send": true."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from . import quotations
+        from .models import Quotation
+
+        if request.user.role != User.Role.ADMIN:
+            return Response({"error": "Only UniPact admins can write quotations."}, status=status.HTTP_403_FORBIDDEN)
+        campaign = get_object_or_404(Campaign, pk=request.data.get('campaign_id'))
+        if campaign.is_match_finalized or campaign.is_volunteer:
+            return Response({"error": "This project doesn't need a quotation."}, status=status.HTTP_400_BAD_REQUEST)
+        quotation = Quotation(campaign=campaign, created_by=request.user)
+        self.fill(quotation, request.data)
+        quotation.save()
+        if str(request.data.get('send', '')).lower() in ('true', '1'):
+            quotations.send(quotation)
+        return Response(QuotationSerializer(quotation).data, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def fill(quotation, data):
+        from datetime import date
+        from . import quotations
+
+        quotation.line_items, quotation.total = quotations.clean_line_items(data.get('line_items'))
+        quotation.payment_terms = data.get('payment_terms') or quotation.Terms.SINGLE
+        if quotation.payment_terms not in quotation.Terms.values:
+            raise ValidationError({'payment_terms': ['Choose one payment or paying by milestone.']})
+        quotation.milestones = quotations.clean_milestones(quotation.payment_terms, data.get('milestones'))
+        quotation.scope_notes = str(data.get('scope_notes') or '').strip()[:4000]
+        try:
+            valid = data.get('valid_until')
+            quotation.valid_until = date.fromisoformat(valid) if valid else quotations.default_valid_until()
+        except (TypeError, ValueError):
+            raise ValidationError({'valid_until': ['Use a date like 2026-12-31.']})
+        if quotation.valid_until < timezone.localdate():
+            raise ValidationError({'valid_until': ['Choose a date from today onwards.']})
+
+
+class AdminQuotationDetailView(APIView):
+    """PATCH (admin): edit a draft. POST .../send/: send it to the client."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, quotation_id):
+        quotation = _quotation_for(request, quotation_id)
+        if request.user.role != User.Role.ADMIN or quotation.status != 'DRAFT':
+            return Response({"error": "Only a draft can be edited. Write a revision instead."}, status=status.HTTP_400_BAD_REQUEST)
+        AdminQuotationListCreateView.fill(quotation, request.data)
+        quotation.save()
+        return Response(QuotationSerializer(quotation).data)
+
+
+class AdminQuotationSendView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, quotation_id):
+        from . import quotations
+
+        quotation = _quotation_for(request, quotation_id)
+        if request.user.role != User.Role.ADMIN or quotation.status != 'DRAFT':
+            return Response({"error": "Only a draft can be sent."}, status=status.HTTP_400_BAD_REQUEST)
+        quotations.send(quotation)
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.INFO,
+                  f"Quotation {quotation.number} sent: RM {quotation.total} for '{quotation.campaign.title}'")
+        return Response(QuotationSerializer(quotation).data)
+
+
+class QuotationAcceptView(APIView):
+    """POST (client): accept the price, optionally with a PO number and the PO document."""
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request, quotation_id):
+        from unipact_backend.validators import validate_document_upload
+        from . import quotations
+
+        quotation = _quotation_for(request, quotation_id, client_action=True)
+        # Agreeing a price is entering the Client Service Agreement, so that comes first
+        agreements.require(request.user, agreements.CLIENT)
+        name = str(request.data.get('accepted_name') or '').strip()
+        if len(name) < 3:
+            return Response({"accepted_name": ["Type your full name to accept."]}, status=status.HTTP_400_BAD_REQUEST)
+        po_document = request.FILES.get('po_document')
+        if po_document:
+            validate_document_upload(po_document, 'Purchase order')
+        quotation = quotations.accept(quotation, request.user, name, request.data.get('po_number', ''), po_document)
+        log_event(SystemLog.Category.FINANCIAL, SystemLog.Level.SUCCESS,
+                  f"Quotation {quotation.number} accepted by {name} ({quotation.campaign.company.company_name}), RM {quotation.total}")
+        return Response(QuotationSerializer(quotation).data)
+
+
+class QuotationRequestChangesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, quotation_id):
+        from . import quotations
+
+        quotation = _quotation_for(request, quotation_id, client_action=True)
+        quotation = quotations.request_changes(quotation, request.user, request.data.get('message', ''))
+        return Response(QuotationSerializer(quotation).data)
+
+
+class QuotationPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, quotation_id):
+        from django.http import HttpResponse
+        from .quotations import render_quotation_pdf
+
+        quotation = _quotation_for(request, quotation_id)
+        response = HttpResponse(render_quotation_pdf(quotation), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{quotation.number or "draft-quotation"}.pdf"'
         return response

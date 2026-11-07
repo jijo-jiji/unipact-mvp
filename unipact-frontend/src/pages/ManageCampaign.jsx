@@ -13,6 +13,7 @@ import AgreementModal from '../components/AgreementModal';
 import { agreementRequiredBy } from '../utils/agreements';
 import { downloadInvoice } from '../utils/invoices';
 import ImpactStatementCard from '../components/ImpactStatementCard';
+import QuotationCard from '../components/QuotationCard';
 import ProjectProgress from '../components/ProjectProgress';
 import ProjectOverview from '../components/ProjectOverview';
 import ProjectPayments from '../components/ProjectPayments';
@@ -146,7 +147,8 @@ const ManageCampaign = () => {
   };
 
   // ---- Paying the balance on a project that has already started (e.g. a client who pays monthly) ----
-  const balance = Number(campaign?.escrow?.outstanding || 0);
+  const dueNow = Number(campaign?.escrow?.due_now || 0);
+  const balance = campaign?.payment_structure === 'MILESTONE' && dueNow > 0 ? dueNow : Number(campaign?.escrow?.outstanding || 0);
   const balancePayable = Boolean(campaign?.is_match_finalized) && ['IN_PROGRESS', 'COMPLETED'].includes(campaign?.status) && balance > 0;
   const openBalancePayment = () => setOnlinePayment({
     amount: balance,
@@ -344,11 +346,15 @@ const ManageCampaign = () => {
           </div>
         </section>
 
+        <QuotationCard campaign={campaign} onChanged={fetchCampaign} onAgreementRequired={(agreement) => setAgreementGate({ agreement, retry: fetchCampaign })} />
+
         {/* Next step callout */}
         {campaign.status === 'OPEN' && team.length === 0 && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[rgba(10,23,72,0.12)] text-sm">
             <Sparkles size={18} className="text-[#00AEEF] shrink-0 mt-0.5" />
-            <span><strong>What happens next:</strong> a UniPact admin reviews verified students and proposes the best match. You&apos;ll see the team here to confirm.</span>
+            <span><strong>What happens next:</strong> {(campaign.quotations || []).some((q) => q.status === 'ACCEPTED') || campaign.is_volunteer
+              ? 'a UniPact admin reviews verified students and proposes the best match. You\'ll see the team here to confirm.'
+              : 'UniPact will meet you to agree the scope, then send you a quotation here. Once you accept it, we propose your student team.'}</span>
           </div>
         )}
         {campaign.status === 'MATCHED' && campaign.awaiting_student_acceptance && (
@@ -390,6 +396,8 @@ const ManageCampaign = () => {
                 ['Account name', invoice.bank_account_name],
                 ['Account number', invoice.bank_account_number],
                 ['Payment reference', invoice.number],
+                ...(invoice.description ? [['For', invoice.description]] : []),
+                ...(invoice.po_number ? [['Your PO number', invoice.po_number]] : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between sm:block gap-3">
                   <dt className="text-[#5B6478]">{label}</dt>
@@ -422,7 +430,7 @@ const ManageCampaign = () => {
             <div className="flex items-start gap-3 text-sm">
               <Wallet size={20} className="text-[#00AEEF] shrink-0 mt-0.5" />
               <div>
-                <strong className="block text-base">{formatMoney(balance)} still to pay</strong>
+                <strong className="block text-base">{formatMoney(balance)} {campaign.payment_structure === 'MILESTONE' && dueNow > 0 ? 'due for the next milestone' : 'still to pay'}</strong>
                 <span className="text-[#5B6478]">
                   You&apos;ve paid {formatMoney(campaign.escrow.client_paid)} of the {formatMoney(campaign.budget)} project fee.
                   Your team is paid from what&apos;s in escrow, so a milestone can be approved once enough has been paid in.

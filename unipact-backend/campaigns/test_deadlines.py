@@ -179,6 +179,7 @@ class PostgresRowLockTests(APITestCase):
         from campaigns.models import MatchOffer
         from payments import toyyibpay
         from users.models import ShadowUser
+        from payments.models import Quotation
 
         campaign = Campaign(pk=1)
         locking_queries = {
@@ -191,6 +192,8 @@ class PostgresRowLockTests(APITestCase):
             'record a payout': Payout.objects.select_for_update().select_related('student', 'student__user', 'campaign').filter(pk=1),
             'record a client payment': Campaign.objects.select_for_update().select_related('company').filter(pk=1),
             'club invitation': ShadowUser.objects.select_for_update().select_related('invited_by__user').filter(pk=1),
+            'accept a quotation: project': Campaign.objects.select_for_update().filter(pk=1),
+            'accept a quotation': Quotation.objects.select_for_update().filter(pk=1),
         }
         for name, queryset in locking_queries.items():
             sql = self.postgres_sql(queryset)

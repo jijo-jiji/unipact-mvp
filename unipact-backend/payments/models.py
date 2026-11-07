@@ -129,9 +129,60 @@ class Invoice(models.Model):
     bank_name = models.CharField(max_length=100)
     bank_account_name = models.CharField(max_length=255)
     bank_account_number = models.CharField(max_length=50)
+    # The client's purchase order, from the quotation they accepted, so their accounts team can match it
+    po_number = models.CharField(max_length=60, blank=True)
+    # What this invoice is for when it isn't the whole project, e.g. "Milestone 2: Design"
+    description = models.CharField(max_length=255, blank=True)
+    milestone = models.ForeignKey('campaigns.Milestone', on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
 
     class Meta:
         ordering = ['-issued_at']
 
     def __str__(self):
         return f"{self.number} - RM {self.amount} - {self.status}"
+
+
+class Quotation(models.Model):
+    """UniPact's price for a project, agreed with the client after meeting them and before any students are
+    matched. Accepting it fixes the project fee and how it is invoiced. A revision replaces the previous one."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        SENT = 'SENT', 'Sent to client'
+        ACCEPTED = 'ACCEPTED', 'Accepted'
+        CHANGES_REQUESTED = 'CHANGES_REQUESTED', 'Client asked for changes'
+        SUPERSEDED = 'SUPERSEDED', 'Replaced by a revision'
+
+    class Terms(models.TextChoices):
+        SINGLE = 'SINGLE', 'One payment before work starts'
+        MILESTONES = 'MILESTONES', 'Paid milestone by milestone'
+
+    number = models.CharField(max_length=30, unique=True, blank=True)
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='quotations')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    # [{"description": "...", "quantity": "1", "unit_price": "1500.00"}]
+    line_items = models.JSONField(default=list)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_terms = models.CharField(max_length=12, choices=Terms.choices, default=Terms.SINGLE)
+    # With MILESTONES: [{"title": "Design", "percentage": "40"}], the plan the work and invoices follow
+    milestones = models.JSONField(default=list, blank=True)
+    scope_notes = models.TextField(blank=True)
+    valid_until = models.DateField()
+
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='quotations_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    # The client's answer
+    responded_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='quotations_accepted')
+    accepted_name = models.CharField(max_length=150, blank=True)  # the name typed when accepting
+    po_number = models.CharField(max_length=60, blank=True)
+    po_document = models.FileField(upload_to='client_po/', blank=True, null=True)
+    change_request = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.number or 'Draft quotation'} - RM {self.total} - {self.status}"

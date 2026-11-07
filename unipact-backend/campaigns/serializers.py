@@ -203,12 +203,23 @@ class CampaignDetailSerializer(CampaignSerializer):
     report_url = serializers.SerializerMethodField()
     escrow = serializers.SerializerMethodField()
     invoice = serializers.SerializerMethodField()
+    quotations = serializers.SerializerMethodField()
 
     class Meta(CampaignSerializer.Meta):
         # started_at / completed_at date the project page's phase history
-        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow', 'invoice',
+        fields = CampaignSerializer.Meta.fields + ['applications', 'my_application', 'report_url', 'escrow', 'invoice', 'quotations',
                                                    'started_at', 'completed_at']
         read_only_fields = CampaignSerializer.Meta.read_only_fields + ['started_at', 'completed_at']
+
+    def get_quotations(self, obj):
+        request = self.context.get('request')
+        if not request or not can_view_workspace(request.user, obj) or request.user.role == 'STUDENT':
+            return []
+        from payments.serializers import QuotationSerializer
+        quotations = obj.quotations.all()
+        if request.user.role != 'ADMIN':
+            quotations = quotations.exclude(status='DRAFT')
+        return QuotationSerializer(quotations, many=True).data
 
     def get_invoice(self, obj):
         # The bank-transfer invoice still awaiting payment, for the owning client and admins only

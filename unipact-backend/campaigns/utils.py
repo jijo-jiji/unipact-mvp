@@ -60,6 +60,7 @@ def escrow_summary(campaign):
         **campaign_escrow(campaign),
         'client_paid': paid,
         'outstanding': max(campaign.budget - paid, Decimal('0.00')),
+        'due_now': _due_now(campaign),
         'payments': [
             {'id': p.id, 'amount': p.amount, 'reference': p.reference, 'created_at': p.created_at, 'is_test': p.is_test}
             for p in payments
@@ -179,3 +180,8 @@ def generate_campaign_report(campaign):
     report, created = Report.objects.get_or_create(campaign=campaign)
     report.generated_pdf.save(f"report_{campaign.id}.pdf", ContentFile(pdf_content))
     return report
+
+
+def _due_now(campaign):
+    from .billing import amount_due_now
+    return amount_due_now(campaign)
