@@ -6,6 +6,28 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import CompanyProfile, ClubProfile, StudentProfile, ShadowUser, SystemLog
 from unipact_backend.validators import validate_document_upload, validate_image_upload
 
+
+def clean_registration(org_type, number):
+    """A company gives its SSM number and an NGO its ROS number. A student club has neither (its proof is a
+    proposal signed by its advisor and deputy dean), so it keeps no number."""
+    if org_type == CompanyProfile.OrgType.CLUB:
+        return ''
+    check = formats.ros_number if org_type == CompanyProfile.OrgType.NGO else formats.ssm_number
+    try:
+        return check(number)
+    except serializers.ValidationError as exc:
+        raise serializers.ValidationError({'registration_number': exc.detail})
+
+
+def clean_club_university(org_type, university):
+    """A student club must name its university; other clients don't keep one."""
+    if org_type != CompanyProfile.OrgType.CLUB:
+        return ''
+    university = (university or '').strip()
+    if not university:
+        raise serializers.ValidationError({'university': ["Enter your club's university."]})
+    return university
+
 User = get_user_model()
 
 
@@ -89,19 +111,18 @@ class CompanyProfileSerializer(TermsConsentMixin, NewAccountSerializerMixin, ser
 
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'email', 'password',
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'university', 'email', 'password',
                   'verification_status', 'tier', 'ssm_document', 'logo']
         read_only_fields = ['verification_status', 'tier']
-        extra_kwargs = {'registration_number': {'required': True, 'allow_blank': False}}
+        extra_kwargs = {'registration_number': {'required': False, 'allow_blank': True}}
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # A company has a 12-digit SSM number; an NGO a ROS (KDN) number such as PPM-011-10-25022025
-        check = formats.ros_number if attrs.get('org_type') == CompanyProfile.OrgType.NGO else formats.ssm_number
-        try:
-            attrs['registration_number'] = check(attrs.get('registration_number'))
-        except serializers.ValidationError as exc:
-            raise serializers.ValidationError({'registration_number': exc.detail})
+        # A company has a 12-digit SSM number, an NGO a ROS (KDN) number such as PPM-011-10-25022025,
+        # and a student club its university instead
+        org_type = attrs.get('org_type', CompanyProfile.OrgType.COMPANY)
+        attrs['registration_number'] = clean_registration(org_type, attrs.get('registration_number'))
+        attrs['university'] = clean_club_university(org_type, attrs.get('university'))
         return attrs
 
     def validate_ssm_document(self, value):
@@ -291,7 +312,11 @@ class AdminEntityListSerializer(serializers.ModelSerializer):
         if obj.role == User.Role.CLUB and hasattr(obj, 'club_profile'):
             return f"{obj.club_profile.university} · Rank {obj.club_profile.rank}"
         elif obj.role == User.Role.COMPANY and hasattr(obj, 'company_profile'):
-            return f"{str(obj.company_profile.tier).title()} plan"
+            # Which kind of client: a company, an NGO or a student club, with its number or university
+            profile = obj.company_profile
+            kind = {CompanyProfile.OrgType.NGO: 'NGO', CompanyProfile.OrgType.CLUB: 'Student club'}.get(profile.org_type, 'Company')
+            extra = profile.university if profile.org_type == CompanyProfile.OrgType.CLUB else profile.registration_number
+            return f"{kind} · {extra}" if extra else kind
         elif obj.role == User.Role.STUDENT and hasattr(obj, 'student_profile'):
             profile = obj.student_profile
             return f"{profile.university} · {profile.get_domain_focus_display()}"
@@ -338,7 +363,7 @@ class AdminCompanyVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyProfile
         fields = ['id', 'user_id', 'company_name', 'email', 'company_details', 'org_type', 'registration_number',
-                  'verification_status', 'ssm_document']
+                  'university', 'verification_status', 'ssm_document']
 
 class AdminClubVerificationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
@@ -457,7 +482,7 @@ class StudentSettingsSerializer(StudentContactChecks, serializers.ModelSerialize
 class CompanySettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyProfile
-        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'ssm_document', 'logo']
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'university', 'ssm_document', 'logo']
         read_only_fields = ['org_type']
         extra_kwargs = {
             'company_name': {'allow_blank': False},
@@ -468,8 +493,18 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
         instance = self.instance
         if instance and instance.verification_status == CompanyProfile.VerificationStatus.VERIFIED and value != instance.registration_number:
             raise serializers.ValidationError('Your registration number is verified. Contact UniPact support to change it.')
-        check = formats.ros_number if instance and instance.org_type == CompanyProfile.OrgType.NGO else formats.ssm_number
-        return check(value)
+        org_type = instance.org_type if instance else CompanyProfile.OrgType.COMPANY
+        try:
+            return clean_registration(org_type, value)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError(exc.detail['registration_number'])
+
+    def validate_university(self, value):
+        org_type = self.instance.org_type if self.instance else CompanyProfile.OrgType.COMPANY
+        try:
+            return clean_club_university(org_type, value)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError(exc.detail['university'])
 
     def validate_ssm_document(self, value):
         return validate_document_upload(value, 'SSM document')
@@ -518,24 +553,24 @@ class AdminStudentEditSerializer(StudentSettingsSerializer):
 class AdminCompanyEditSerializer(CompanySettingsSerializer):
     """Admins may also correct the organisation type and a verified registration number."""
     class Meta(CompanySettingsSerializer.Meta):
-        fields = ['company_name', 'company_details', 'org_type', 'registration_number']
+        fields = ['company_name', 'company_details', 'org_type', 'registration_number', 'university']
         read_only_fields = []
         extra_kwargs = {'company_name': {'allow_blank': False}}
 
     def validate_registration_number(self, value):
         return value  # checked against the organisation type in validate()
 
+    def validate_university(self, value):
+        return value  # checked against the organisation type in validate()
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        if 'registration_number' in attrs or 'org_type' in attrs:
+        if {'registration_number', 'org_type', 'university'} & set(attrs):
             org_type = attrs.get('org_type', self.instance.org_type)
             number = attrs.get('registration_number', self.instance.registration_number)
-            if number:
-                check = formats.ros_number if org_type == CompanyProfile.OrgType.NGO else formats.ssm_number
-                try:
-                    attrs['registration_number'] = check(number)
-                except serializers.ValidationError as exc:
-                    raise serializers.ValidationError({'registration_number': exc.detail})
+            if number or org_type == CompanyProfile.OrgType.CLUB:
+                attrs['registration_number'] = clean_registration(org_type, number)
+            attrs['university'] = clean_club_university(org_type, attrs.get('university', self.instance.university))
         return attrs
 
 
@@ -561,9 +596,12 @@ class AdminCreateAccountSerializer(serializers.Serializer):
     major = serializers.CharField(max_length=255, required=False, allow_blank=True)
     domain_focus = serializers.ChoiceField(choices=StudentProfile.DomainFocus.choices, default=StudentProfile.DomainFocus.SOFTWARE_DEV)
     skills = serializers.JSONField(required=False)
-    # Company
+    # Company, NGO or student club (the university field above is the club's)
     company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     company_details = serializers.CharField(required=False, allow_blank=True)
+    org_type = serializers.ChoiceField(choices=CompanyProfile.OrgType.choices, default=CompanyProfile.OrgType.COMPANY)
+    # Optional here: the admin may not have it yet, and the client can add it in their settings
+    registration_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
 
     REQUIRED = {
         User.Role.STUDENT: {'full_name': "Enter the student's full name.", 'university': 'Choose their university.'},
@@ -583,6 +621,11 @@ class AdminCreateAccountSerializer(serializers.Serializer):
         missing = {field: [message] for field, message in self.REQUIRED[attrs['role']].items() if not str(attrs.get(field) or '').strip()}
         if missing:
             raise serializers.ValidationError(missing)
+        if attrs['role'] == User.Role.COMPANY:
+            org_type = attrs['org_type']
+            number = (attrs.get('registration_number') or '').strip()
+            attrs['registration_number'] = clean_registration(org_type, number) if number else ''
+            attrs['university'] = clean_club_university(org_type, attrs.get('university'))
         return attrs
 
 

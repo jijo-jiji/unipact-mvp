@@ -30,8 +30,9 @@ const TABS = [
 // The Users tab shows one type of account at a time
 const USER_TYPES = [
   { role: 'STUDENT', label: 'Students', icon: GraduationCap, details: 'University · track' },
-  { role: 'COMPANY', label: 'Companies', icon: Briefcase, details: 'Plan' },
-  { role: 'CLUB', label: 'Clubs', icon: Users, details: 'University · rank' },
+  { role: 'COMPANY', label: 'Clients', icon: Briefcase, details: 'Type' },
+  // The postponed club sponsorship accounts (SRS v2.2.1); clubs hiring students are clients above
+  { role: 'CLUB', label: 'Sponsorship clubs', icon: Users, details: 'University · rank' },
 ];
 
 const LEDGER_CHECKS = [
@@ -610,8 +611,10 @@ const AdminDashboard = () => {
                               {entity.email}
                               {entity.university && ` · ${entity.university}`}
                               {entity.type === 'STUDENT' && entity.domain_focus && ` · ${domainLabel(entity.domain_focus)}`}
-                              {entity.type === 'COMPANY' && (entity.registration_number || entity.company_details) && ` · ${entity.org_type === 'NGO' ? 'NGO, ROS' : 'SSM'} ${entity.registration_number || entity.company_details}`}
+                              {entity.type === 'COMPANY' && entity.org_type === 'CLUB' && ' · Student club'}
+                              {entity.type === 'COMPANY' && entity.org_type !== 'CLUB' && (entity.registration_number || entity.company_details) && ` · ${entity.org_type === 'NGO' ? 'NGO, ROS' : 'SSM'} ${entity.registration_number || entity.company_details}`}
                               {entity.type === 'COMPANY' && entity.org_type === 'NGO' && !entity.ssm_document && ' · ROS certificate not uploaded yet'}
+                              {entity.type === 'COMPANY' && entity.org_type === 'CLUB' && !entity.ssm_document && ' · signed proposal not uploaded yet'}
                             </div>
                           </div>
                           <StatusBadge status={entity.verification_status} />

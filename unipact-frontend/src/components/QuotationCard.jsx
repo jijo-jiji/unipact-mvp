@@ -127,6 +127,7 @@ const QuotationCard = ({ campaign, onChanged, onAgreementRequired }) => {
                 <label className="field-label" htmlFor="q-name">Your full name</label>
                 <input id="q-name" required minLength={3} value={name} onChange={(e) => setName(e.target.value)} className="input" autoComplete="name" />
               </div>
+              {campaign.company_org_type !== 'CLUB' && (<>
               <div>
                 <label className="field-label" htmlFor="q-po">Purchase order (PO) number (optional)</label>
                 <input id="q-po" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="input font-mono" placeholder="PO-2026-0042" />
@@ -136,6 +137,7 @@ const QuotationCard = ({ campaign, onChanged, onAgreementRequired }) => {
                 <label className="field-label" htmlFor="q-po-file">PO document (optional)</label>
                 <input id="q-po-file" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setPoFile(e.target.files?.[0] || null)} className="input file:mr-3 file:rounded file:border-0 file:bg-[#0B1E63] file:text-white file:px-3 file:py-1 file:text-xs" />
               </div>
+              </>)}
             </>
           ) : (
             <div>

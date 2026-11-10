@@ -5,7 +5,7 @@ import { Building2, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/format';
 import TermsConsent from '../components/TermsConsent';
-import { ORG_TYPES } from '../utils/constants';
+import { MALAYSIAN_UNIVERSITIES, ORG_TYPES } from '../utils/constants';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const PUBLIC_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];
@@ -14,7 +14,7 @@ const CompanyRegister = () => {
   const navigate = useNavigate();
   const { registerCompany } = useAuth();
 
-  const [formData, setFormData] = useState({ email: '', password: '', companyName: '', registrationNumber: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', companyName: '', registrationNumber: '', university: '' });
   const [orgType, setOrgType] = useState('COMPANY');
   const org = ORG_TYPES[orgType];
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -42,7 +42,8 @@ const CompanyRegister = () => {
         password: formData.password,
         company_name: formData.companyName.trim(),
         org_type: orgType,
-        registration_number: formData.registrationNumber.trim(),
+        registration_number: orgType === 'CLUB' ? '' : formData.registrationNumber.trim(),
+        university: orgType === 'CLUB' ? formData.university.trim() : '',
         accept_terms: acceptTerms,
       });
       navigate('/company/dashboard', { replace: true });
@@ -78,23 +79,26 @@ const CompanyRegister = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           <fieldset>
             <legend className="field-label">I&apos;m signing up for</legend>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup">
               {Object.keys(ORG_TYPES).map((key) => (
                 <label key={key} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer text-sm font-semibold ${orgType === key ? 'border-[#00AEEF] bg-[#00AEEF]/5 text-[#0090C6]' : 'border-[rgba(10,23,72,0.15)] bg-white'}`}>
                   <input type="radio" name="org_type" value={key} checked={orgType === key} onChange={() => setOrgType(key)} className="accent-[#00AEEF]" />
-                  {key === 'COMPANY' ? 'A company (SSM)' : 'An NGO (ROS / KDN)'}
+                  {ORG_TYPES[key].choiceLabel}
                 </label>
               ))}
             </div>
             {orgType === 'NGO' && (
               <p className="field-hint mt-2">After signing up, upload your ROS registration certificate in Account settings. We verify NGOs once it&apos;s in. NGOs can also post unpaid volunteer projects.</p>
             )}
+            {orgType === 'CLUB' && (
+              <p className="field-hint mt-2">For a university club or society hiring students. After signing up, upload your project proposal signed by your advisor and deputy dean in Account settings. We verify clubs once it&apos;s in.</p>
+            )}
           </fieldset>
 
           <div>
             <label className="field-label" htmlFor="company-email">Work email</label>
             <input id="company-email" type="email" required autoComplete="email" placeholder="you@company.com" value={formData.email} onChange={update('email')} className="input" />
-            {isPublicDomain && (
+            {isPublicDomain && orgType !== 'CLUB' && (
               <div className="mt-2 bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2.5 text-amber-900 text-sm">
                 <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
                 <span>Personal email addresses need manual review before you can post projects. Use your company email to get started faster.</span>
@@ -107,11 +111,19 @@ const CompanyRegister = () => {
               <label className="field-label" htmlFor="company-name">{org.nameLabel}</label>
               <input id="company-name" required autoComplete="organization" placeholder={org.namePlaceholder} value={formData.companyName} onChange={update('companyName')} className="input" />
             </div>
-            <div>
-              <label className="field-label" htmlFor="company-ssm">{org.numberLabel}</label>
-              <input id="company-ssm" required placeholder={org.numberPlaceholder} value={formData.registrationNumber} onChange={update('registrationNumber')} className="input font-mono" />
-              <p className="field-hint">{org.numberHint}</p>
-            </div>
+            {orgType === 'CLUB' ? (
+              <div>
+                <label className="field-label" htmlFor="company-university">University</label>
+                <input id="company-university" required list="register-club-universities" value={formData.university} onChange={update('university')} className="input" />
+                <datalist id="register-club-universities">{MALAYSIAN_UNIVERSITIES.map((u) => <option key={u} value={u} />)}</datalist>
+              </div>
+            ) : (
+              <div>
+                <label className="field-label" htmlFor="company-ssm">{org.numberLabel}</label>
+                <input id="company-ssm" required placeholder={org.numberPlaceholder} value={formData.registrationNumber} onChange={update('registrationNumber')} className="input font-mono" />
+                <p className="field-hint">{org.numberHint}</p>
+              </div>
+            )}
           </div>
 
           <div>

@@ -141,6 +141,80 @@ class OrganisationSignupTests(APITestCase):
         self.assertEqual(self.client.post(url, {'action': 'approve'}, format='json').status_code, status.HTTP_200_OK)
 
 
+class StudentClubClientTests(APITestCase):
+    """A university club hiring students: no SSM or ROS number, its university instead, and a proposal signed
+    by its advisor and deputy dean as proof."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(username='admin@x.my', email='admin@x.my', password=STRONG, role=User.Role.ADMIN)
+
+    def sign_up(self, **fields):
+        data = {'accept_terms': 'true', 'email': 'robotics.utm@gmail.com', 'password': STRONG,
+                'company_name': 'UTM Robotics Club', 'org_type': 'CLUB', **fields}
+        return self.client.post(reverse('register_company'), data, format='json')
+
+    def test_a_club_gives_its_university_not_a_registration_number(self):
+        self.assertIn('university', self.sign_up().data)
+        res = self.sign_up(university='Universiti Teknologi Malaysia (UTM)', registration_number='anything')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        club = CompanyProfile.objects.get()
+        self.assertEqual((club.org_type, club.registration_number, club.university),
+                         ('CLUB', '', 'Universiti Teknologi Malaysia (UTM)'))
+        self.assertEqual(club.verification_status, 'PENDING_REVIEW')  # a personal email isn't flagged for a club
+
+    def test_companies_keep_no_university(self):
+        self.client.post(reverse('register_company'), {'accept_terms': 'true', 'email': 'hr@acme.com.my', 'password': STRONG,
+                                                       'company_name': 'Acme', 'university': 'UM', **COMPANY_SIGNUP}, format='json')
+        self.assertEqual(CompanyProfile.objects.get().university, '')
+
+    def test_a_club_is_verified_only_with_its_signed_proposal(self):
+        from django.core.files.base import ContentFile
+        self.sign_up(university='Universiti Malaya (UM)')
+        club = CompanyProfile.objects.get()
+        self.client.force_authenticate(self.admin)
+        url = reverse('admin_verify', kwargs={'entity_type': 'COMPANY', 'entity_id': club.id})
+        refused = self.client.post(url, {'action': 'approve'}, format='json')
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('proposal', refused.data['error'])
+        club.ssm_document.save('proposal.pdf', ContentFile(b'%PDF-1.4'))
+        self.assertEqual(self.client.post(url, {'action': 'approve'}, format='json').status_code, status.HTTP_200_OK)
+
+    def test_admins_record_clubs_and_ngos_they_signed_up(self):
+        self.client.force_authenticate(self.admin)
+        create = lambda **f: self.client.post(reverse('admin_create_account'), {'role': 'COMPANY', 'company_name': 'Org', **f}, format='json')
+        self.assertIn('university', create(email='club@gmail.com', org_type='CLUB').data)
+        self.assertEqual(create(email='club@gmail.com', org_type='CLUB', university='UiTM').status_code, status.HTTP_201_CREATED)
+        self.assertIn('registration_number', create(email='ngo@kasih.my', org_type='NGO', registration_number='202603205508').data)
+        self.assertEqual(create(email='ngo@kasih.my', org_type='NGO', registration_number='PPM-011-10-25022025').status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create(email='hr@acme.my').status_code, status.HTTP_201_CREATED)  # number can be added later
+        made = {p.user.email: (p.org_type, p.registration_number, p.university) for p in CompanyProfile.objects.all()}
+        self.assertEqual(made, {'club@gmail.com': ('CLUB', '', 'UiTM'), 'ngo@kasih.my': ('NGO', 'PPM-011-10-25022025', ''),
+                                'hr@acme.my': ('COMPANY', '', '')})
+
+    def test_admins_can_correct_a_client_into_a_club(self):
+        self.client.post(reverse('register_company'), {'accept_terms': 'true', 'email': 'hr@acme.com.my', 'password': STRONG,
+                                                       'company_name': 'Acme', **COMPANY_SIGNUP}, format='json')
+        profile = CompanyProfile.objects.get()
+        self.client.force_authenticate(self.admin)
+        url = reverse('admin_user_detail', kwargs={'user_id': profile.user_id})
+        self.assertIn('university', self.client.patch(url, {'org_type': 'CLUB'}, format='json').data)
+        self.assertEqual(self.client.patch(url, {'org_type': 'CLUB', 'university': 'UM'}, format='json').status_code, status.HTTP_200_OK)
+        profile.refresh_from_db()
+        self.assertEqual((profile.org_type, profile.registration_number, profile.university), ('CLUB', '', 'UM'))
+
+    def test_clubs_cannot_post_volunteer_projects(self):
+        self.sign_up(university='UM')
+        club = CompanyProfile.objects.get()
+        club.verification_status = 'VERIFIED'
+        club.save()
+        club.user.email_verified = True
+        club.user.save()
+        self.client.force_authenticate(club.user)
+        res = self.client.post(reverse('campaign_list_create'), {'title': 'Event site', 'description': 'd', 'type': 'SOFTWARE_DEVELOPMENT',
+                                                                 'budget': '300.00', 'is_volunteer': True}, format='json')
+        self.assertIn('is_volunteer', res.data)
+
+
 class VolunteerProjectTests(APITestCase):
     def make_org(self, email, org_type):
         user = User.objects.create_user(username=email, email=email, password=STRONG, role=User.Role.COMPANY, email_verified=True)

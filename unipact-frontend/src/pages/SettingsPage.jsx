@@ -40,7 +40,9 @@ const profileFromUser = (user) => {
 
   if (user?.role === 'COMPANY') {
     const p = user.company_profile || {};
-    return { company_name: p.company_name || '', company_details: p.company_details || '', registration_number: p.registration_number || '' };
+    return p.org_type === 'CLUB'
+      ? { company_name: p.company_name || '', company_details: p.company_details || '', university: p.university || '' }
+      : { company_name: p.company_name || '', company_details: p.company_details || '', registration_number: p.registration_number || '' };
   }
   if (user?.role === 'CLUB' && user.club_profile) {
     const p = user.club_profile;
@@ -53,6 +55,7 @@ const DOCUMENT_COPY = {
   STUDENT: { field: 'verification_document', label: 'Student ID or enrolment letter' },
   COMPANY: { field: 'ssm_document', label: 'SSM registration certificate' },
   NGO: { field: 'ssm_document', label: 'ROS registration certificate' },
+  CLUB_CLIENT: { field: 'ssm_document', label: 'Project proposal signed by your advisor and deputy dean' },
   CLUB: { field: 'verification_document', label: 'Club registration letter' },
 };
 
@@ -162,9 +165,9 @@ const SettingsPage = () => {
   const role = user?.role;
   // Club committee members joined by invitation: no club profile or documents of their own
   const isClubMember = role === 'CLUB' && !user?.club_profile;
-  const isNgo = role === 'COMPANY' && user?.company_profile?.org_type === 'NGO';
-  const orgCopy = ORG_TYPES[isNgo ? 'NGO' : 'COMPANY'];
-  const docCopy = isClubMember ? null : DOCUMENT_COPY[isNgo ? 'NGO' : role];
+  const orgType = role === 'COMPANY' ? (user?.company_profile?.org_type || 'COMPANY') : null;
+  const orgCopy = ORG_TYPES[orgType] || ORG_TYPES.COMPANY;
+  const docCopy = isClubMember ? null : DOCUMENT_COPY[orgType === 'NGO' ? 'NGO' : orgType === 'CLUB' ? 'CLUB_CLIENT' : role];
   const dirty = initial && profile && JSON.stringify(initial) !== JSON.stringify(profile);
   const set = (field) => (e) => setProfile((p) => ({ ...p, [field]: e.target.value }));
 
@@ -530,12 +533,20 @@ const SettingsPage = () => {
                         <label className="field-label" htmlFor="c-name">{orgCopy.nameLabel}</label>
                         <input id="c-name" required value={profile.company_name} onChange={set('company_name')} className="input" autoComplete="organization" />
                       </div>
-                      <div>
-                        <label className="field-label" htmlFor="c-ssm">{orgCopy.numberLabel}</label>
-                        <input id="c-ssm" value={profile.registration_number} onChange={set('registration_number')} placeholder={orgCopy.numberPlaceholder}
-                          readOnly={user?.verification_status === 'VERIFIED'} className="input font-mono" />
-                        <p className="field-hint">{user?.verification_status === 'VERIFIED' ? 'Verified. Contact UniPact support to change it.' : orgCopy.numberHint}</p>
-                      </div>
+                      {orgType === 'CLUB' ? (
+                        <div>
+                          <label className="field-label" htmlFor="c-uni">University</label>
+                          <input id="c-uni" required list="settings-universities-client" value={profile.university} onChange={set('university')} className="input" />
+                          <datalist id="settings-universities-client">{MALAYSIAN_UNIVERSITIES.map((u) => <option key={u} value={u} />)}</datalist>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="field-label" htmlFor="c-ssm">{orgCopy.numberLabel}</label>
+                          <input id="c-ssm" value={profile.registration_number} onChange={set('registration_number')} placeholder={orgCopy.numberPlaceholder}
+                            readOnly={user?.verification_status === 'VERIFIED'} className="input font-mono" />
+                          <p className="field-hint">{user?.verification_status === 'VERIFIED' ? 'Verified. Contact UniPact support to change it.' : orgCopy.numberHint}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 

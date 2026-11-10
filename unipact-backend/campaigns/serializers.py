@@ -79,6 +79,8 @@ class MilestoneSerializer(serializers.ModelSerializer):
 
 class CampaignSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.company_name', read_only=True)
+    # Company, NGO or student club: clubs aren't asked for a purchase order
+    company_org_type = serializers.CharField(source='company.org_type', read_only=True)
     guild = serializers.SerializerMethodField()
     applicants = serializers.IntegerField(source='applications.count', read_only=True)
     assigned_students_details = StudentTeamMemberSerializer(source='assigned_students', many=True, read_only=True)
@@ -98,7 +100,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Campaign
         fields = [
-            'id', 'company', 'company_name', 'title', 'description', 'type', 'budget',
+            'id', 'company', 'company_name', 'company_org_type', 'title', 'description', 'type', 'budget',
             'requirements', 'deadline', 'status', 'created_at', 'guild', 'applicants',
             'software_sub_type', 'required_skills', 'project_outcome',
             'campaign_objective', 'target_platforms', 'match_notes', 'is_match_finalized',

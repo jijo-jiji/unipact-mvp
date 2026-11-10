@@ -791,8 +791,10 @@ class RegisterCompanyView(generics.CreateAPIView):
                 terms_accepted_at=timezone.now(),
             )
 
-            # Determine Verification Status
-            if is_public_domain(email):
+            # Determine Verification Status. Student clubs often use personal email and are checked by hand
+            # (from their signed proposal) anyway, so a personal address doesn't flag them as high risk.
+            org_type = serializer.validated_data.get('org_type', CompanyProfile.OrgType.COMPANY)
+            if is_public_domain(email) and org_type != CompanyProfile.OrgType.CLUB:
                 ver_status = CompanyProfile.VerificationStatus.HIGH_RISK
             else:
                 ver_status = CompanyProfile.VerificationStatus.PENDING_REVIEW
@@ -802,8 +804,9 @@ class RegisterCompanyView(generics.CreateAPIView):
                 user=user,
                 company_name=company_name,
                 company_details=company_details,
-                org_type=serializer.validated_data.get('org_type', CompanyProfile.OrgType.COMPANY),
+                org_type=org_type,
                 registration_number=serializer.validated_data['registration_number'],
+                university=serializer.validated_data['university'],
                 verification_status=ver_status
             )
 
@@ -1066,6 +1069,9 @@ class AdminVerifyEntityView(views.APIView):
                 if action == 'approve' and profile.org_type == CompanyProfile.OrgType.NGO and not profile.ssm_document:
                     return Response({"error": "This NGO hasn't uploaded its ROS registration certificate yet. Ask them to add it under Account settings, then verify."},
                                     status=status.HTTP_400_BAD_REQUEST)
+                if action == 'approve' and profile.org_type == CompanyProfile.OrgType.CLUB and not profile.ssm_document:
+                    return Response({"error": "This student club hasn't uploaded its signed project proposal yet (signed by its advisor and deputy dean). Ask them to add it under Account settings, then verify."},
+                                    status=status.HTTP_400_BAD_REQUEST)
                 if action == 'approve':
                     profile.verification_status = CompanyProfile.VerificationStatus.VERIFIED
                 elif action == 'reject':
@@ -1285,8 +1291,11 @@ class AdminCreateAccountView(views.APIView):
                 name = data['company_name'].strip()
                 CompanyProfile.objects.create(
                     user=user, company_name=name, company_details=(data.get('company_details') or '').strip(),
+                    org_type=data['org_type'], registration_number=data['registration_number'],
+                    university=data['university'],
                     verification_status=CompanyProfile.VerificationStatus.VERIFIED if verified
-                    else CompanyProfile.VerificationStatus.HIGH_RISK if is_public_domain(email)
+                    else CompanyProfile.VerificationStatus.HIGH_RISK
+                    if is_public_domain(email) and data['org_type'] != CompanyProfile.OrgType.CLUB
                     else CompanyProfile.VerificationStatus.PENDING_REVIEW,
                 )
             notifications.account_invitation(user, invitation_path(user))

@@ -2,22 +2,22 @@ import React, { useState } from 'react';
 import { AlertCircle, Briefcase, CheckCircle2, GraduationCap, Loader2, Mail, UserPlus } from 'lucide-react';
 import api from '../api/client';
 import Modal from './Modal';
-import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES, ORG_TYPES } from '../utils/constants';
 import { getErrorMessage } from '../utils/format';
 
 const TYPES = [
   { role: 'STUDENT', label: 'Student', icon: GraduationCap },
-  { role: 'COMPANY', label: 'Company', icon: Briefcase },
+  { role: 'COMPANY', label: 'Client', icon: Briefcase },
 ];
 
 const EMPTY = {
   email: '', full_name: '', university: '', major: '', domain_focus: 'SOFTWARE_DEV', skills: '',
-  company_name: '', company_details: '', verified: true,
+  company_name: '', company_details: '', org_type: 'COMPANY', registration_number: '', verified: true,
 };
 
 const REQUIRED = {
   STUDENT: { full_name: "Enter the student's full name.", email: 'Enter their email address.', university: 'Choose their university.' },
-  COMPANY: { company_name: "Enter the company's name.", email: 'Enter their email address.' },
+  COMPANY: { company_name: 'Enter their name.', email: 'Enter their email address.' },
 };
 
 // The first message the server gave for each field, so it can sit under that field
@@ -61,8 +61,10 @@ const AdminCreateAccountModal = ({ isOpen, initialRole = 'STUDENT', onClose, onC
     e.preventDefault();
     setError('');
     // Everything missing at once (the server stops at the first kind of problem it finds)
+    const required = role === 'COMPANY' && form.org_type === 'CLUB'
+      ? { ...REQUIRED.COMPANY, university: "Choose the club's university." } : REQUIRED[role];
     const missing = Object.fromEntries(
-      Object.entries(REQUIRED[role]).filter(([field]) => !String(form[field] || '').trim()),
+      Object.entries(required).filter(([field]) => !String(form[field] || '').trim()),
     );
     if (Object.keys(missing).length) return setErrors(missing);
     setBusy(true);
@@ -73,7 +75,12 @@ const AdminCreateAccountModal = ({ isOpen, initialRole = 'STUDENT', onClose, onC
           university: form.university.trim(), major: form.major.trim(), domain_focus: form.domain_focus,
           skills: form.skills.split(',').map((s) => s.trim()).filter(Boolean),
         }
-      : { role, email: form.email.trim(), verified: form.verified, company_name: form.company_name.trim(), company_details: form.company_details.trim() };
+      : {
+          role, email: form.email.trim(), verified: form.verified, company_name: form.company_name.trim(),
+          company_details: form.company_details.trim(), org_type: form.org_type,
+          registration_number: form.org_type === 'CLUB' ? '' : form.registration_number.trim(),
+          university: form.org_type === 'CLUB' ? form.university.trim() : '',
+        };
     try {
       const res = await api.post('/users/admin/users/create/', payload);
       setCreated(res.data);
@@ -91,7 +98,7 @@ const AdminCreateAccountModal = ({ isOpen, initialRole = 'STUDENT', onClose, onC
 
   return (
     <Modal isOpen={isOpen} onClose={close} dismissible={!busy} maxWidth="max-w-xl" icon={<UserPlus size={20} />}
-      title="Create an account" subtitle="For a student or a company you've already spoken to.">
+      title="Create an account" subtitle="For a student or a client (company, NGO or student club) you've already spoken to.">
       {created ? (
         <div className="text-center py-2">
           <span className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4"><CheckCircle2 size={28} /></span>
@@ -166,9 +173,33 @@ const AdminCreateAccountModal = ({ isOpen, initialRole = 'STUDENT', onClose, onC
           ) : (
             <>
               <div>
-                <label className="field-label" htmlFor="ca-company">Company name</label>
-                <input id="ca-company" required value={form.company_name} onChange={set('company_name')} className="input" autoComplete="off" />
-                {fieldError('company_name')}
+                <label className="field-label" htmlFor="ca-org-type">Type of client</label>
+                <select id="ca-org-type" value={form.org_type} onChange={set('org_type')} className="input">
+                  {Object.entries(ORG_TYPES).map(([value, o]) => <option key={value} value={value}>{o.choiceLabel}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label" htmlFor="ca-company">{ORG_TYPES[form.org_type].nameLabel}</label>
+                  <input id="ca-company" required value={form.company_name} onChange={set('company_name')} className="input" autoComplete="off"
+                    placeholder={ORG_TYPES[form.org_type].namePlaceholder} />
+                  {fieldError('company_name')}
+                </div>
+                {form.org_type === 'CLUB' ? (
+                  <div>
+                    <label className="field-label" htmlFor="ca-club-university">University</label>
+                    <input id="ca-club-university" list="ca-club-universities" required value={form.university} onChange={set('university')} className="input" autoComplete="off" />
+                    <datalist id="ca-club-universities">{MALAYSIAN_UNIVERSITIES.map((u) => <option key={u} value={u} />)}</datalist>
+                    {fieldError('university')}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="field-label" htmlFor="ca-number">{ORG_TYPES[form.org_type].numberLabel} <span className="font-normal text-[#5B6478]">(optional)</span></label>
+                    <input id="ca-number" value={form.registration_number} onChange={set('registration_number')} className="input font-mono"
+                      placeholder={ORG_TYPES[form.org_type].numberPlaceholder} autoComplete="off" />
+                    {fieldError('registration_number')}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="field-label" htmlFor="ca-email">Email</label>
@@ -176,8 +207,8 @@ const AdminCreateAccountModal = ({ isOpen, initialRole = 'STUDENT', onClose, onC
                 {fieldError('email')}
               </div>
               <div>
-                <label className="field-label" htmlFor="ca-details">Company details <span className="font-normal text-[#5B6478]">(optional)</span></label>
-                <textarea id="ca-details" rows={2} value={form.company_details} onChange={set('company_details')} className="input" placeholder="SSM registration number, address" />
+                <label className="field-label" htmlFor="ca-details">Notes <span className="font-normal text-[#5B6478]">(optional)</span></label>
+                <textarea id="ca-details" rows={2} value={form.company_details} onChange={set('company_details')} className="input" placeholder="Address, contact person, how we met" />
               </div>
             </>
           )}

@@ -36,12 +36,18 @@ class CompanyProfile(models.Model):
     class OrgType(models.TextChoices):
         COMPANY = 'COMPANY', _('Company (SSM)')
         NGO = 'NGO', _('NGO (ROS / KDN)')
+        # A university student club or society hiring UniPact students (not the CLUB role, which is the
+        # postponed SRS v2.2.1 club sponsorship side). Clubs have no SSM or ROS number.
+        CLUB = 'CLUB', _('Student club / society')
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='company_profile')
     company_name = models.CharField(max_length=255)
     org_type = models.CharField(max_length=10, choices=OrgType.choices, default=OrgType.COMPANY)
     # SSM's 12-digit number for a company (e.g. 202603205508), or the ROS number for an NGO (e.g. PPM-011-10-25022025)
     registration_number = models.CharField(max_length=30, blank=True)
+    # A student club's university; its proof is a project proposal signed by its advisor and deputy dean,
+    # uploaded as ssm_document
+    university = models.CharField(max_length=255, blank=True)
     company_details = models.TextField(blank=True)
     tier = models.CharField(max_length=10, choices=Tier.choices, default=Tier.FREE)
     verification_status = models.CharField(

@@ -4,13 +4,13 @@ import api from '../api/client';
 import Modal from './Modal';
 import StatusBadge from './StatusBadge';
 import { useToast } from '../context/ToastContext';
-import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES } from '../utils/constants';
+import { DOMAIN_OPTIONS, MALAYSIAN_UNIVERSITIES, ORG_TYPES, orgTypeLabel } from '../utils/constants';
 import { domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
 
 // What an admin may correct, per account type. Email, bank details and documents stay with the owner.
 const EDITABLE = {
   STUDENT: ['full_name', 'university', 'major', 'domain_focus', 'skills', 'bio', 'club_affiliation_name', 'club_affiliation_role', 'secondary_email'],
-  COMPANY: ['company_name', 'company_details'],
+  COMPANY: ['company_name', 'org_type', 'registration_number', 'university'],
   CLUB: ['club_name', 'university'],
 };
 
@@ -234,11 +234,13 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
           {detail.role === 'COMPANY' && profile && (
             <Section title="Company profile">
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                <Row label="Type">{profile.org_type === 'NGO' ? 'NGO (ROS / KDN)' : 'Company (SSM)'}</Row>
-                <Row label={profile.org_type === 'NGO' ? 'Organisation name' : 'Company name'}>{profile.company_name}</Row>
-                <Row label={profile.org_type === 'NGO' ? 'ROS registration number' : 'SSM registration number'}>{profile.registration_number || profile.company_details}</Row>
+                <Row label="Type">{orgTypeLabel(profile.org_type)}</Row>
+                <Row label={(ORG_TYPES[profile.org_type] || ORG_TYPES.COMPANY).nameLabel}>{profile.company_name}</Row>
+                {profile.org_type === 'CLUB'
+                  ? <Row label="University">{profile.university}</Row>
+                  : <Row label={(ORG_TYPES[profile.org_type] || ORG_TYPES.COMPANY).numberLabel}>{profile.registration_number || profile.company_details}</Row>}
                 <Row label="Plan">{profile.tier === 'PRO' ? 'Pro' : 'Free'}</Row>
-                <Row label={profile.org_type === 'NGO' ? 'ROS certificate' : 'SSM document'}><DocumentLink href={profile.ssm_document} /></Row>
+                <Row label={(ORG_TYPES[profile.org_type] || ORG_TYPES.COMPANY).documentLabel}><DocumentLink href={profile.ssm_document} /></Row>
                 <Row label="Logo"><DocumentLink href={profile.logo} label="View logo" /></Row>
               </dl>
             </Section>
@@ -355,13 +357,28 @@ const AdminUserModal = ({ userId, onClose, onChanged, onVerdict, verdictBusy = f
           {detail.role === 'COMPANY' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="field-label" htmlFor="au-company">Company name</label>
-                <input id="au-company" required value={form.company_name} onChange={set('company_name')} className="input" />
+                <label className="field-label" htmlFor="au-type">Type</label>
+                <select id="au-type" value={form.org_type || 'COMPANY'} onChange={set('org_type')} className="input">
+                  {Object.entries(ORG_TYPES).map(([value, o]) => <option key={value} value={value}>{o.label}</option>)}
+                </select>
               </div>
               <div>
-                <label className="field-label" htmlFor="au-ssm">SSM registration number</label>
-                <input id="au-ssm" value={form.company_details} onChange={set('company_details')} className="input" />
+                <label className="field-label" htmlFor="au-company">{(ORG_TYPES[form.org_type] || ORG_TYPES.COMPANY).nameLabel}</label>
+                <input id="au-company" required value={form.company_name} onChange={set('company_name')} className="input" />
               </div>
+              {form.org_type === 'CLUB' ? (
+                <div>
+                  <label className="field-label" htmlFor="au-club-uni">University</label>
+                  <input id="au-club-uni" required list="au-club-universities" value={form.university} onChange={set('university')} className="input" />
+                  <datalist id="au-club-universities">{MALAYSIAN_UNIVERSITIES.map((u) => <option key={u} value={u} />)}</datalist>
+                </div>
+              ) : (
+                <div>
+                  <label className="field-label" htmlFor="au-ssm">{(ORG_TYPES[form.org_type] || ORG_TYPES.COMPANY).numberLabel}</label>
+                  <input id="au-ssm" value={form.registration_number} onChange={set('registration_number')} className="input font-mono"
+                    placeholder={(ORG_TYPES[form.org_type] || ORG_TYPES.COMPANY).numberPlaceholder} />
+                </div>
+              )}
             </div>
           )}
 

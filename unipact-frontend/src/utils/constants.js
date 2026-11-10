@@ -62,19 +62,25 @@ export const WEEKLY_AVAILABILITY_OPTIONS = [
   { value: '16+', label: '16+ hours a week' },
 ];
 
-// Client sign-up: a company registered with SSM, or an NGO registered with ROS (KDN)
+// Client sign-up: a company registered with SSM, an NGO registered with ROS (KDN), or a university student
+// club (no registration number: its proof is a proposal signed by its advisor and deputy dean)
 export const ORG_TYPES = {
   COMPANY: {
-    label: 'Company', nameLabel: 'Company name', namePlaceholder: 'TechCorp Sdn Bhd',
+    label: 'Company', choiceLabel: 'A company (SSM)', nameLabel: 'Company name', namePlaceholder: 'TechCorp Sdn Bhd',
     numberLabel: 'SSM registration number', numberPlaceholder: '202603205508',
     numberHint: 'The 12-digit number on your SSM certificate.', documentLabel: 'SSM registration certificate',
   },
   NGO: {
-    label: 'NGO', nameLabel: 'Organisation name', namePlaceholder: 'Pertubuhan Kebajikan Kasih',
+    label: 'NGO', choiceLabel: 'An NGO (ROS / KDN)', nameLabel: 'Organisation name', namePlaceholder: 'Pertubuhan Kebajikan Kasih',
     numberLabel: 'ROS (KDN) registration number', numberPlaceholder: 'PPM-011-10-25022025',
     numberHint: 'As on your ROS certificate, e.g. PPM-011-10-25022025.', documentLabel: 'ROS registration certificate',
   },
+  CLUB: {
+    label: 'Student club', choiceLabel: 'A student club', nameLabel: 'Club or society name', namePlaceholder: 'UTM Robotics Club',
+    numberLabel: null, documentLabel: 'Signed project proposal (advisor and deputy dean)',
+  },
 };
+export const orgTypeLabel = (orgType) => (ORG_TYPES[orgType] || ORG_TYPES.COMPANY).label;
 
 export const EMPTY_STUDENT_CONTACT = {
   whatsapp_number: '', university_email: '', year_of_study: '', current_semester: '',
