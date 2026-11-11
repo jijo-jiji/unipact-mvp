@@ -99,7 +99,7 @@ const WorkshopCheckIn = ({ mode = 'checkin' }) => {
         const res = await api.post(`/impact/w/${code}/checkin/`, body);
         setDone({
           title: res.data.already ? "You're already checked in" : "You're checked in",
-          text: `Enjoy ${workshop.title}! We'll send a short feedback form at the end.`,
+          text: `Enjoy ${workshop.title}! We'll share a short feedback form at the end.`,
           hasAccount: res.data.has_account,
         });
       }
