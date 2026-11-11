@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, CheckCircle2, XCircle, Search, Activity, Users, ChevronLeft, ChevronRight, Ban,
   Briefcase, UserCheck, Check, Sparkles, Lock, FileText, Loader2, Inbox, GraduationCap, UserPlus, Send,
-  CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye, MessageSquare,
+  CreditCard, Wallet, Clock, AlertCircle, Flag, X, Award, Eye, MessageSquare, HeartHandshake,
 } from 'lucide-react';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -13,6 +13,7 @@ import AdminUserModal from '../components/AdminUserModal';
 import AdminQuotationPanel from '../components/AdminQuotationPanel';
 import AdminCreateAccountModal from '../components/AdminCreateAccountModal';
 import AdminConversations from '../components/AdminConversations';
+import AdminImpactPanel from '../components/AdminImpactPanel';
 import StatusBadge from '../components/StatusBadge';
 import PageLoader from '../components/PageLoader';
 import { campaignTypeLabel, domainLabel, formatDate, formatMoney, getErrorMessage } from '../utils/format';
@@ -25,6 +26,7 @@ const TABS = [
   { key: 'messages', label: 'Messages', icon: <MessageSquare size={16} /> },
   { key: 'payouts', label: 'Payouts', icon: <CreditCard size={16} /> },
   { key: 'ledgers', label: 'Impact ledgers', icon: <Award size={16} /> },
+  { key: 'impact', label: 'Impact counter', icon: <HeartHandshake size={16} /> },
 ];
 
 // The Users tab shows one type of account at a time
@@ -1185,6 +1187,8 @@ const AdminDashboard = () => {
             </section>
           </div>
         )}
+
+        {activeTab === 'impact' && <AdminImpactPanel />}
 
         {/* PAYOUTS MANAGEMENT */}
         {activeTab === 'payouts' && (

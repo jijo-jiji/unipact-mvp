@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/campaigns/', include('campaigns.urls')),
     path('api/payments/', include('payments.urls')),
+    path('api/impact/', include('impact.urls')),
 ]
 
 # Serve uploaded files (deliverables, client assets, reports) during development only.

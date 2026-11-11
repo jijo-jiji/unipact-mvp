@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'users',
     'campaigns',
     'payments',
+    'impact',
 
     'rest_framework_simplejwt',
     'django_filters',
