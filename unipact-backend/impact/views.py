@@ -11,8 +11,8 @@ from users.models import StudentProfile, SystemLog, User
 from users.utils import log_event
 
 from . import stats
-from .models import B40Record, ImpactBaseline, Workshop
-from .serializers import B40RecordSerializer, ImpactBaselineSerializer, WorkshopSerializer
+from .models import B40Record, ImpactSettings, Workshop
+from .serializers import B40RecordSerializer, ImpactSettingsSerializer, WorkshopSerializer
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -30,20 +30,19 @@ class PublicImpactView(APIView):
 
 
 class AdminImpactView(APIView):
-    """GET: every figure split into recorded / off-platform, plus the off-platform numbers to edit.
-    PATCH: update the off-platform numbers or publish/unpublish the counter."""
+    """GET: every figure, plus the counter's settings. PATCH: set the counting start date or
+    publish/unpublish the counter."""
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
-        return Response({'stats': stats.compute(), 'baseline': ImpactBaselineSerializer(ImpactBaseline.load()).data})
+        return Response({'stats': stats.compute(), 'settings': ImpactSettingsSerializer(ImpactSettings.load()).data})
 
     def patch(self, request):
-        baseline = ImpactBaseline.load()
-        serializer = ImpactBaselineSerializer(baseline, data=request.data, partial=True)
+        serializer = ImpactSettingsSerializer(ImpactSettings.load(), data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by=request.user)
-        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f'Impact figures updated by {request.user.email}')
-        return Response({'stats': stats.compute(), 'baseline': serializer.data})
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO, f'Impact counter settings updated by {request.user.email}')
+        return Response({'stats': stats.compute(), 'settings': serializer.data})
 
 
 class AdminWorkshopListView(generics.ListCreateAPIView):
@@ -67,8 +66,13 @@ class AdminB40ListView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
+        # Paid since the counting start date, so each line adds up to the counter's figure
+        paid = Q(student__payouts__status=Payout.Status.PAID, student__payouts__paid_at__isnull=False)
+        start = ImpactSettings.load().counting_starts_on
+        if start:
+            paid &= Q(student__payouts__paid_at__date__gte=start)
         records = B40Record.objects.select_related('student').annotate(
-            amount_paid=Sum('student__payouts__amount', filter=Q(student__payouts__status=Payout.Status.PAID)),
+            amount_paid=Sum('student__payouts__amount', filter=paid),
         ).order_by('student__full_name')
         for record in records:
             record.amount_paid = record.amount_paid or Decimal('0.00')

@@ -11,7 +11,7 @@ const KINDS = [
   ['OTHER', 'Other'],
 ];
 
-// Recorded = counted from the platform's own records; off-platform = entered below
+// Every figure is counted from UniPact's own records; nothing is entered by hand
 const ROWS = [
   ['workshops_held', 'Workshops held', false],
   ['workshop_attendees', 'Workshop attendees', false],
@@ -29,7 +29,8 @@ const AdminImpactPanel = () => {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
-  const [baseline, setBaseline] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [startDate, setStartDate] = useState('');
   const [workshops, setWorkshops] = useState([]);
   const [b40, setB40] = useState([]);
   const [students, setStudents] = useState([]);
@@ -43,7 +44,8 @@ const AdminImpactPanel = () => {
         api.get('/impact/admin/'), api.get('/impact/admin/workshops/'), api.get('/impact/admin/b40/'), api.get('/users/admin/students/'),
       ]);
       setStats(impactRes.data.stats);
-      setBaseline(impactRes.data.baseline);
+      setConfig(impactRes.data.settings);
+      setStartDate(impactRes.data.settings.counting_starts_on || '');
       setWorkshops(workshopRes.data);
       setB40(b40Res.data);
       setStudents(studentRes.data);
@@ -61,15 +63,16 @@ const AdminImpactPanel = () => {
     return students.filter((s) => !marked.has(s.id));
   }, [students, b40]);
 
-  const saveBaseline = async (changes) => {
+  const saveSettings = async (changes) => {
     setSaving(true);
     try {
       const res = await api.patch('/impact/admin/', changes);
       setStats(res.data.stats);
-      setBaseline(res.data.baseline);
-      showToast('Impact figures saved.', 'success');
+      setConfig(res.data.settings);
+      setStartDate(res.data.settings.counting_starts_on || '');
+      showToast('Impact counter updated.', 'success');
     } catch (err) {
-      showToast(getErrorMessage(err, 'Could not save the figures.'), 'error');
+      showToast(getErrorMessage(err, 'Could not update the counter.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -122,7 +125,7 @@ const AdminImpactPanel = () => {
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#00AEEF]" /></div>;
   }
-  if (!stats || !baseline) return <p className="text-[#5B6478]">The impact figures could not be loaded.</p>;
+  if (!stats || !config) return <p className="text-[#5B6478]">The impact figures could not be loaded.</p>;
 
   const show = (value, money) => (money ? formatMoney(value) : value);
 
@@ -134,17 +137,17 @@ const AdminImpactPanel = () => {
           <div>
             <h2 className="font-heading font-bold text-xl">Front-page impact counter</h2>
             <p className="text-sm text-[#5B6478] mt-1 max-w-[620px]">
-              Only the totals of the first five rows go on the front page, never names. Check every number against
-              receipts before publishing.
+              Counted only from records on UniPact: workshops logged below, payouts marked as disbursed and
+              completed projects. Only the totals of the first five rows go on the front page, never names.
             </p>
           </div>
           <button
             type="button"
-            className={baseline.show_on_homepage ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm'}
+            className={config.show_on_homepage ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm'}
             disabled={saving}
-            onClick={() => saveBaseline({ show_on_homepage: !baseline.show_on_homepage })}
+            onClick={() => saveSettings({ show_on_homepage: !config.show_on_homepage })}
           >
-            {baseline.show_on_homepage ? <><EyeOff size={14} /> Hide from front page</> : <><Eye size={14} /> Publish on front page</>}
+            {config.show_on_homepage ? <><EyeOff size={14} /> Hide from front page</> : <><Eye size={14} /> Publish on front page</>}
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -152,63 +155,51 @@ const AdminImpactPanel = () => {
             <thead className="text-left text-[#5B6478]">
               <tr>
                 <th className="py-2 pr-4 font-medium">Figure</th>
-                <th className="py-2 px-4 font-medium text-right">Recorded on UniPact</th>
-                <th className="py-2 px-4 font-medium text-right">Off-platform</th>
-                <th className="py-2 pl-4 font-medium text-right">Total</th>
+                <th className="py-2 pl-4 font-medium text-right">Count</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(10,23,72,0.08)]">
               {ROWS.map(([key, label, money]) => (
                 <tr key={key}>
                   <td className="py-2 pr-4">{label}</td>
-                  <td className="py-2 px-4 text-right tabular-nums">{show(stats[key].recorded, money)}</td>
-                  <td className="py-2 px-4 text-right tabular-nums text-[#5B6478]">{show(stats[key].off_platform, money)}</td>
-                  <td className="py-2 pl-4 text-right tabular-nums font-semibold">{show(stats[key].total, money)}</td>
+                  <td className="py-2 pl-4 text-right tabular-nums font-semibold">{show(stats[key], money)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="text-xs text-[#5B6478] mt-3">
-          Recorded figures count disbursed payouts only, workshops dated today or earlier, and completed projects.
+          {config.counting_starts_on
+            ? `Counting records from ${formatDate(config.counting_starts_on)}. `
+            : 'Counting all records. '}
+          Payouts count once disbursed, workshops once their date has passed.
         </p>
       </section>
 
-      {/* Off-platform figures */}
+      {/* Counting start date */}
       <section className="card p-5 sm:p-6 bg-white border border-[rgba(10,23,72,0.1)]">
-        <h2 className="font-heading font-bold text-xl">Off-platform figures</h2>
-        <p className="text-sm text-[#5B6478] mt-1 mb-4">Work from before UniPact kept records, such as projects run over WhatsApp. Added to the recorded figures, so leave out anyone already paid through UniPact or they will be counted twice.</p>
+        <h2 className="font-heading font-bold text-xl">Start counting from</h2>
+        <p className="text-sm text-[#5B6478] mt-1 mb-4 max-w-[680px]">
+          Leave out anything older than this date, such as test projects or payouts from before the team recorded
+          everything on UniPact. Leave it empty to count every record.
+        </p>
         <form
-          className="grid sm:grid-cols-3 gap-4"
+          className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            saveBaseline({
-              b40_students_paid: Number(baseline.b40_students_paid) || 0,
-              b40_amount_paid: baseline.b40_amount_paid || 0,
-              projects_delivered: Number(baseline.projects_delivered) || 0,
-              note: baseline.note,
-            });
+            saveSettings({ counting_starts_on: startDate || null });
           }}
         >
           <label className="block">
-            <span className="field-label">B40 students paid</span>
-            <input className="input" type="number" min="0" value={baseline.b40_students_paid} onChange={(e) => setBaseline({ ...baseline, b40_students_paid: e.target.value })} />
+            <span className="field-label">Start date</span>
+            <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
-          <label className="block">
-            <span className="field-label">Paid to them (RM)</span>
-            <input className="input" type="number" min="0" step="0.01" value={baseline.b40_amount_paid} onChange={(e) => setBaseline({ ...baseline, b40_amount_paid: e.target.value })} />
-          </label>
-          <label className="block">
-            <span className="field-label">Projects delivered</span>
-            <input className="input" type="number" min="0" value={baseline.projects_delivered} onChange={(e) => setBaseline({ ...baseline, projects_delivered: e.target.value })} />
-          </label>
-          <label className="block sm:col-span-3">
-            <span className="field-label">Where these numbers come from</span>
-            <textarea className="input" rows={2} value={baseline.note} placeholder="e.g. Annur and Estradoor projects, paid by bank transfer, receipts in the shared drive" onChange={(e) => setBaseline({ ...baseline, note: e.target.value })} />
-          </label>
-          <div className="sm:col-span-3">
-            <button type="submit" className="btn btn-navy btn-sm" disabled={saving}>Save figures</button>
-          </div>
+          <button type="submit" className="btn btn-navy btn-sm" disabled={saving}>Save date</button>
+          {config.counting_starts_on && (
+            <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={() => saveSettings({ counting_starts_on: null })}>
+              Count everything
+            </button>
+          )}
         </form>
       </section>
 

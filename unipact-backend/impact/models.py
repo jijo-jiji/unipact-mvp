@@ -1,9 +1,8 @@
 """
 The public "Our impact" figures: workshops held and B40 students paid.
 
-Each number is counted from real records (workshops logged here, payouts marked PAID) plus an
-admin-entered figure for work done before or outside the platform. Both parts are shown to admins
-separately, so a figure on the front page can always be traced back to where it came from.
+Every number is counted from records on UniPact (workshops logged here, payouts marked PAID,
+completed projects), so each figure on the front page can be traced back to the rows behind it.
 """
 from django.conf import settings
 from django.db import models
@@ -44,21 +43,19 @@ class B40Record(models.Model):
         return f'B40: {self.student.full_name}'
 
 
-class ImpactBaseline(models.Model):
-    """One row: figures from before the platform kept records (projects run over WhatsApp, cash paid
-    directly). Added on top of the counted figures; keep it to what you can back with receipts."""
-    b40_students_paid = models.PositiveIntegerField(default=0)
-    b40_amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    projects_delivered = models.PositiveIntegerField(default=0)
-    note = models.TextField(blank=True)
-    show_on_homepage = models.BooleanField(default=False)  # off until the numbers are agreed
+class ImpactSettings(models.Model):
+    """One row. The counter only uses records made on UniPact; numbers counted by hand before the
+    platform are deliberately left out. `counting_starts_on` lets the team start from a clean date
+    and ignore anything older (test projects, early payouts recorded inconsistently)."""
+    counting_starts_on = models.DateField(null=True, blank=True)
+    show_on_homepage = models.BooleanField(default=False)  # off until the team agrees the numbers
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod
     def load(cls):
-        baseline, _ = cls.objects.get_or_create(pk=1)
-        return baseline
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
     def save(self, *args, **kwargs):
         self.pk = 1

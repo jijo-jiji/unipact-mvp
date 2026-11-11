@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import B40Record, ImpactBaseline, Workshop
+from .models import B40Record, ImpactSettings, Workshop
 
 
 class WorkshopSerializer(serializers.ModelSerializer):
@@ -12,16 +12,11 @@ class WorkshopSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'kind_label', 'created_at']
 
 
-class ImpactBaselineSerializer(serializers.ModelSerializer):
+class ImpactSettingsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ImpactBaseline
-        fields = ['b40_students_paid', 'b40_amount_paid', 'projects_delivered', 'note', 'show_on_homepage', 'updated_at']
+        model = ImpactSettings
+        fields = ['counting_starts_on', 'show_on_homepage', 'updated_at']
         read_only_fields = ['updated_at']
-
-    def validate_b40_amount_paid(self, value):
-        if value < 0:
-            raise serializers.ValidationError('The amount cannot be negative.')
-        return value
 
 
 class B40RecordSerializer(serializers.ModelSerializer):
