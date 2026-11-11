@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Plus, QrCode, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
+import AdminWorkshopModal from './AdminWorkshopModal';
 import { formatDate, formatMoney, getErrorMessage } from '../utils/format';
 
 const KINDS = [
@@ -35,6 +36,7 @@ const AdminImpactPanel = () => {
   const [b40, setB40] = useState([]);
   const [students, setStudents] = useState([]);
   const [modules, setModules] = useState([]);
+  const [openWorkshop, setOpenWorkshop] = useState(null);
   const [saving, setSaving] = useState(false);
   const [workshop, setWorkshop] = useState(emptyWorkshop);
   const [pick, setPick] = useState({ student_id: '', evidence_note: '' });
@@ -217,7 +219,7 @@ const AdminImpactPanel = () => {
             </select>
             <input className="input" type="date" required value={workshop.held_on} onChange={(e) => setWorkshop({ ...workshop, held_on: e.target.value })} aria-label="Date" />
             <input className="input" placeholder="Location" value={workshop.location} onChange={(e) => setWorkshop({ ...workshop, location: e.target.value })} />
-            <input className="input" type="number" min="0" placeholder="Attendees" value={workshop.attendees} onChange={(e) => setWorkshop({ ...workshop, attendees: e.target.value })} />
+            <input className="input" type="number" min="0" placeholder="Attendees (if not using check-in)" value={workshop.attendees} onChange={(e) => setWorkshop({ ...workshop, attendees: e.target.value })} />
             {modules.length > 0 && (
               <fieldset className="sm:col-span-2">
                 <legend className="field-label">Modules taught</legend>
@@ -250,12 +252,17 @@ const AdminImpactPanel = () => {
                 <li key={w.id} className="py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{w.title}</p>
-                    <p className="text-sm text-[#5B6478]">{formatDate(w.held_on)} · {w.kind_label} · {w.attendees} attendees{w.location ? ` · ${w.location}` : ''}</p>
+                    <p className="text-sm text-[#5B6478]">{formatDate(w.held_on)} · {w.kind_label} · {w.checkin_count > 0 ? `${w.checkin_count} checked in` : `${w.attendees} attendees`}{w.location ? ` · ${w.location}` : ''}</p>
                     {w.module_titles?.length > 0 && <p className="text-xs text-[#5B6478] mt-0.5">Modules: {w.module_titles.join(', ')}</p>}
                   </div>
-                  <button type="button" className="text-[#5B6478] hover:text-red-600 p-1" onClick={() => removeWorkshop(w.id)} aria-label={`Remove ${w.title}`}>
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpenWorkshop(w)}>
+                      <QrCode size={14} /> Check-in & results
+                    </button>
+                    <button type="button" className="text-[#5B6478] hover:text-red-600 p-1" onClick={() => removeWorkshop(w.id)} aria-label={`Remove ${w.title}`}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -295,6 +302,9 @@ const AdminImpactPanel = () => {
           )}
         </section>
       </div>
+      {openWorkshop && (
+        <AdminWorkshopModal key={openWorkshop.id} workshop={openWorkshop} onClose={() => setOpenWorkshop(null)} onChanged={load} />
+      )}
     </div>
   );
 };

@@ -4,8 +4,14 @@ The public "Our impact" figures: workshops held and B40 students paid.
 Every number is counted from records on UniPact (workshops logged here, payouts marked PAID,
 completed projects), so each figure on the front page can be traced back to the rows behind it.
 """
+import secrets
+
 from django.conf import settings
 from django.db import models
+
+
+def new_checkin_code():
+    return secrets.token_urlsafe(6)
 
 
 class Topic(models.TextChoices):
@@ -64,6 +70,11 @@ class Workshop(models.Model):
     attendees = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True)
     modules = models.ManyToManyField(LearningModule, blank=True, related_name='workshops')  # what was taught
+    # The check-in link (/w/<code>) attendees open from a QR code on the day, and the feedback form after
+    checkin_code = models.CharField(max_length=20, unique=True, default=new_checkin_code)
+    checkin_open = models.BooleanField(default=True)
+    feedback_open = models.BooleanField(default=True)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # venue, food, speaker...
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -103,3 +114,34 @@ class ImpactSettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+
+
+class WorkshopAttendee(models.Model):
+    """One person who checked in at a workshop. Linked to their student account by email, now or when
+    they sign up later, so the platform can follow them from the workshop to paid work."""
+    class B40(models.TextChoices):
+        YES = 'YES', 'Yes'
+        NO = 'NO', 'No'
+        UNSAID = 'UNSAID', 'Prefer not to say'
+
+    workshop = models.ForeignKey(Workshop, on_delete=models.CASCADE, related_name='checkins')
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField()  # stored lower-case
+    phone = models.CharField(max_length=20, blank=True)
+    university = models.CharField(max_length=255, blank=True)
+    b40_self_declared = models.CharField(max_length=10, choices=B40.choices, default=B40.UNSAID)
+    confidence_before = models.PositiveSmallIntegerField()  # 1-5, asked at check-in
+    confidence_after = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5, asked in the feedback form
+    recommend_score = models.PositiveSmallIntegerField(null=True, blank=True)  # 0-10
+    feedback_comment = models.TextField(blank=True)
+    student = models.ForeignKey('users.StudentProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='workshop_checkins')
+    consented_at = models.DateTimeField()
+    checked_in_at = models.DateTimeField(auto_now_add=True)
+    feedback_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['checked_in_at']
+        constraints = [models.UniqueConstraint(fields=['workshop', 'email'], name='one_checkin_per_email_per_workshop')]
+
+    def __str__(self):
+        return f'{self.full_name} at {self.workshop.title}'

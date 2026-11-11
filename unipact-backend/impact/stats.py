@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.utils import timezone
 
 from campaigns.models import Campaign
@@ -28,7 +28,9 @@ def compute():
     zero = Decimal('0.00')
     return {
         'workshops_held': held.count(),
-        'workshop_attendees': held.aggregate(n=Sum('attendees'))['n'] or 0,
+        'workshop_attendees': sum(
+            w['n'] or w['attendees'] for w in held.annotate(n=Count('checkins')).values('n', 'attendees')
+        ),
         'b40_students_paid': b40_paid.values('student').distinct().count(),
         'b40_amount_paid': b40_paid.aggregate(n=Sum('amount'))['n'] or zero,
         'projects_delivered': delivered.count(),

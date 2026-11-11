@@ -45,6 +45,7 @@ const StudentDashboard = page(() => import('./pages/StudentDashboard'));
 const StudentProject = page(() => import('./pages/StudentProject'));
 const StudentProjects = page(() => import('./pages/StudentProjects'));
 const LearningLibrary = page(() => import('./pages/LearningLibrary'));
+const WorkshopCheckIn = page(() => import('./pages/WorkshopCheckIn'));
 const QuestDetails = page(() => import('./pages/QuestDetails'));
 const QuestBoard = page(() => import('./pages/QuestBoard'));
 const SubmitDeliverable = page(() => import('./pages/SubmitDeliverable'));
@@ -96,6 +97,9 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/verify-university-email" element={<VerifyUniversityEmailPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          {/* Workshop check-in (from the QR code on the day) and the feedback form after */}
+          <Route path="/w/:code" element={<WorkshopCheckIn />} />
+          <Route path="/w/:code/feedback" element={<WorkshopCheckIn mode="feedback" />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/agreements/talent" element={<TalentAgreementPage />} />
           <Route path="/agreements/client" element={<ClientAgreementPage />} />

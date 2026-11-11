@@ -11,10 +11,17 @@ from users.models import StudentProfile, SystemLog, User
 from users.utils import log_event
 
 from . import stats
-from .models import B40Record, ImpactSettings, LearningModule, ModuleItem, Workshop
+from .models import B40Record, ImpactSettings, LearningModule, ModuleItem, Workshop, WorkshopAttendee
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
+from django.utils import timezone
+
+from unipact_backend.throttling import WorkshopCheckinThrottle
+
+from .linking import student_for_email
+from .results import workshop_results
 from .serializers import (
+    CheckinSerializer, FeedbackSerializer,
     B40RecordSerializer, ImpactSettingsSerializer, LearningModuleSerializer, ModuleItemSerializer, WorkshopSerializer,
 )
 
@@ -62,7 +69,87 @@ class AdminWorkshopListView(generics.ListCreateAPIView):
 class AdminWorkshopDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsPlatformAdmin]
     serializer_class = WorkshopSerializer
-    queryset = Workshop.objects.all()
+    queryset = Workshop.objects.prefetch_related('modules')
+
+
+class AdminWorkshopResultsView(APIView):
+    """What one workshop led to, with every attendee (names are admin-only)."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        return Response(workshop_results(get_object_or_404(Workshop, pk=pk)))
+
+
+class AdminWorkshopAttendeeDeleteView(APIView):
+    """Remove a check-in, e.g. a duplicate or someone asking for their details to be deleted."""
+    permission_classes = [IsPlatformAdmin]
+
+    def delete(self, request, pk):
+        get_object_or_404(WorkshopAttendee, pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Public pages attendees open from the QR code ---
+
+class PublicWorkshopView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, code):
+        w = get_object_or_404(Workshop.objects.prefetch_related('modules'), checkin_code=code)
+        return Response({
+            'title': w.title, 'kind_label': w.get_kind_display(), 'held_on': w.held_on, 'location': w.location,
+            'checkin_open': w.checkin_open, 'feedback_open': w.feedback_open,
+            'modules': [m.title for m in w.modules.all() if m.is_published],
+        })
+
+
+class WorkshopCheckinView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [WorkshopCheckinThrottle]
+
+    def post(self, request, code):
+        workshop = get_object_or_404(Workshop, checkin_code=code)
+        if not workshop.checkin_open:
+            return Response({'error': 'Check-in for this workshop is closed.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = CheckinSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        student = student_for_email(data['email'])
+        attendee, created = WorkshopAttendee.objects.get_or_create(
+            workshop=workshop, email=data['email'],
+            defaults={
+                'full_name': data['full_name'].strip(), 'phone': data.get('phone', '').strip(),
+                'university': data.get('university', '').strip(), 'b40_self_declared': data['b40_self_declared'],
+                'confidence_before': data['confidence_before'], 'consented_at': timezone.now(), 'student': student,
+            },
+        )
+        return Response({'checked_in': True, 'already': not created, 'has_account': attendee.student_id is not None},
+                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class WorkshopFeedbackView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [WorkshopCheckinThrottle]
+
+    def post(self, request, code):
+        workshop = get_object_or_404(Workshop, checkin_code=code)
+        if not workshop.feedback_open:
+            return Response({'error': 'Feedback for this workshop is closed.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = FeedbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        attendee = WorkshopAttendee.objects.filter(workshop=workshop, email=data['email']).first()
+        if attendee is None:
+            return Response({'email': ['Use the same email you checked in with.']}, status=status.HTTP_400_BAD_REQUEST)
+        attendee.confidence_after = data['confidence_after']
+        attendee.recommend_score = data['recommend_score']
+        attendee.feedback_comment = data.get('comment', '').strip()
+        attendee.feedback_at = timezone.now()
+        attendee.save(update_fields=['confidence_after', 'recommend_score', 'feedback_comment', 'feedback_at'])
+        return Response({'saved': True, 'has_account': attendee.student_id is not None})
 
 
 class AdminB40ListView(APIView):
