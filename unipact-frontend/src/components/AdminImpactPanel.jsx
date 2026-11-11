@@ -23,7 +23,7 @@ const ROWS = [
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
-const emptyWorkshop = () => ({ title: '', kind: 'B40', held_on: today(), location: '', attendees: '' });
+const emptyWorkshop = () => ({ title: '', kind: 'B40', held_on: today(), location: '', attendees: '', module_ids: [] });
 
 const AdminImpactPanel = () => {
   const { showToast } = useToast();
@@ -34,14 +34,16 @@ const AdminImpactPanel = () => {
   const [workshops, setWorkshops] = useState([]);
   const [b40, setB40] = useState([]);
   const [students, setStudents] = useState([]);
+  const [modules, setModules] = useState([]);
   const [saving, setSaving] = useState(false);
   const [workshop, setWorkshop] = useState(emptyWorkshop);
   const [pick, setPick] = useState({ student_id: '', evidence_note: '' });
 
   const load = useCallback(async () => {
     try {
-      const [impactRes, workshopRes, b40Res, studentRes] = await Promise.all([
+      const [impactRes, workshopRes, b40Res, studentRes, moduleRes] = await Promise.all([
         api.get('/impact/admin/'), api.get('/impact/admin/workshops/'), api.get('/impact/admin/b40/'), api.get('/users/admin/students/'),
+        api.get('/impact/admin/modules/'),
       ]);
       setStats(impactRes.data.stats);
       setConfig(impactRes.data.settings);
@@ -49,6 +51,7 @@ const AdminImpactPanel = () => {
       setWorkshops(workshopRes.data);
       setB40(b40Res.data);
       setStudents(studentRes.data);
+      setModules(moduleRes.data);
     } catch (err) {
       showToast(getErrorMessage(err, 'Could not load the impact figures.'), 'error');
     } finally {
@@ -215,6 +218,26 @@ const AdminImpactPanel = () => {
             <input className="input" type="date" required value={workshop.held_on} onChange={(e) => setWorkshop({ ...workshop, held_on: e.target.value })} aria-label="Date" />
             <input className="input" placeholder="Location" value={workshop.location} onChange={(e) => setWorkshop({ ...workshop, location: e.target.value })} />
             <input className="input" type="number" min="0" placeholder="Attendees" value={workshop.attendees} onChange={(e) => setWorkshop({ ...workshop, attendees: e.target.value })} />
+            {modules.length > 0 && (
+              <fieldset className="sm:col-span-2">
+                <legend className="field-label">Modules taught</legend>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {modules.map((m) => (
+                    <label key={m.id} className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={workshop.module_ids.includes(m.id)}
+                        onChange={(e) => setWorkshop({
+                          ...workshop,
+                          module_ids: e.target.checked ? [...workshop.module_ids, m.id] : workshop.module_ids.filter((id) => id !== m.id),
+                        })}
+                      />
+                      {m.title}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             <div className="sm:col-span-2">
               <button type="submit" className="btn btn-primary btn-sm"><Plus size={14} /> Log workshop</button>
             </div>
@@ -228,6 +251,7 @@ const AdminImpactPanel = () => {
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{w.title}</p>
                     <p className="text-sm text-[#5B6478]">{formatDate(w.held_on)} · {w.kind_label} · {w.attendees} attendees{w.location ? ` · ${w.location}` : ''}</p>
+                    {w.module_titles?.length > 0 && <p className="text-xs text-[#5B6478] mt-0.5">Modules: {w.module_titles.join(', ')}</p>}
                   </div>
                   <button type="button" className="text-[#5B6478] hover:text-red-600 p-1" onClick={() => removeWorkshop(w.id)} aria-label={`Remove ${w.title}`}>
                     <Trash2 size={16} />

@@ -8,19 +8,62 @@ from django.conf import settings
 from django.db import models
 
 
+class Topic(models.TextChoices):
+    B40 = 'B40', 'B40 upskilling'
+    DIGITAL_MARKETING = 'DIGITAL_MARKETING', 'Digital marketing'
+    SOFTWARE = 'SOFTWARE', 'Software development'
+    OTHER = 'OTHER', 'Other'
+
+
+class LearningModule(models.Model):
+    """A workshop module kept on the platform so students can come back to it: slides, notes and exercises."""
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True)
+    topic = models.CharField(max_length=30, choices=Topic.choices, default=Topic.OTHER)
+    order = models.PositiveIntegerField(default=0)  # lower comes first in the library
+    is_published = models.BooleanField(default=False)  # drafts are visible to admins only
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'title']
+
+    def __str__(self):
+        return self.title
+
+
+class ModuleItem(models.Model):
+    """One thing inside a module: reading material (slides, notes, a video link) or an exercise to try."""
+    class ItemType(models.TextChoices):
+        MATERIAL = 'MATERIAL', 'Material'
+        EXERCISE = 'EXERCISE', 'Exercise'
+
+    module = models.ForeignKey(LearningModule, on_delete=models.CASCADE, related_name='items')
+    item_type = models.CharField(max_length=20, choices=ItemType.choices, default=ItemType.MATERIAL)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)  # an exercise's instructions
+    file = models.FileField(upload_to='learning/', blank=True, null=True)
+    link_url = models.URLField(blank=True)  # Canva, Google Slides, YouTube...
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f'{self.module.title}: {self.title}'
+
+
 class Workshop(models.Model):
-    class Kind(models.TextChoices):
-        B40 = 'B40', 'B40 upskilling'
-        DIGITAL_MARKETING = 'DIGITAL_MARKETING', 'Digital marketing'
-        SOFTWARE = 'SOFTWARE', 'Software development'
-        OTHER = 'OTHER', 'Other'
+    Kind = Topic  # kept so Workshop.Kind.B40 still reads naturally
 
     title = models.CharField(max_length=255)
-    kind = models.CharField(max_length=30, choices=Kind.choices, default=Kind.OTHER)
+    kind = models.CharField(max_length=30, choices=Topic.choices, default=Topic.OTHER)
     held_on = models.DateField()
     location = models.CharField(max_length=255, blank=True)
     attendees = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True)
+    modules = models.ManyToManyField(LearningModule, blank=True, related_name='workshops')  # what was taught
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 

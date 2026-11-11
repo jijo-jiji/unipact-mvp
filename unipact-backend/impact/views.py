@@ -11,8 +11,12 @@ from users.models import StudentProfile, SystemLog, User
 from users.utils import log_event
 
 from . import stats
-from .models import B40Record, ImpactSettings, Workshop
-from .serializers import B40RecordSerializer, ImpactSettingsSerializer, WorkshopSerializer
+from .models import B40Record, ImpactSettings, LearningModule, ModuleItem, Workshop
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+
+from .serializers import (
+    B40RecordSerializer, ImpactSettingsSerializer, LearningModuleSerializer, ModuleItemSerializer, WorkshopSerializer,
+)
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -48,7 +52,7 @@ class AdminImpactView(APIView):
 class AdminWorkshopListView(generics.ListCreateAPIView):
     permission_classes = [IsPlatformAdmin]
     serializer_class = WorkshopSerializer
-    queryset = Workshop.objects.all()
+    queryset = Workshop.objects.prefetch_related('modules')
     pagination_class = None
 
     def perform_create(self, serializer):
@@ -101,3 +105,75 @@ class AdminB40DetailView(APIView):
     def delete(self, request, pk):
         get_object_or_404(B40Record, pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Learning library: workshop modules and exercises students can come back to ---
+
+class CanUseLibrary(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role in (User.Role.STUDENT, User.Role.ADMIN))
+
+
+class LibraryListView(generics.ListAPIView):
+    """Published modules, with their materials and exercises, for signed-in students."""
+    permission_classes = [CanUseLibrary]
+    serializer_class = LearningModuleSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return LearningModule.objects.filter(is_published=True).prefetch_related('items')
+
+
+class LibraryDetailView(generics.RetrieveAPIView):
+    permission_classes = [CanUseLibrary]
+    serializer_class = LearningModuleSerializer
+
+    def get_queryset(self):
+        return LearningModule.objects.filter(is_published=True).prefetch_related('items')
+
+
+class AdminModuleListView(generics.ListCreateAPIView):
+    permission_classes = [IsPlatformAdmin]
+    serializer_class = LearningModuleSerializer
+    pagination_class = None
+    queryset = LearningModule.objects.prefetch_related('items')
+
+
+class AdminModuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsPlatformAdmin]
+    serializer_class = LearningModuleSerializer
+    queryset = LearningModule.objects.prefetch_related('items')
+
+    def perform_destroy(self, instance):
+        for item in instance.items.all():
+            if item.file:
+                item.file.delete(save=False)
+        instance.delete()
+
+
+class AdminModuleItemCreateView(generics.CreateAPIView):
+    permission_classes = [IsPlatformAdmin]
+    serializer_class = ModuleItemSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def perform_create(self, serializer):
+        serializer.save(module=get_object_or_404(LearningModule, pk=self.kwargs['module_id']))
+
+
+class AdminModuleItemDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsPlatformAdmin]
+    serializer_class = ModuleItemSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = ModuleItem.objects.all()
+
+    def perform_update(self, serializer):
+        # A replaced or removed file is deleted from storage, so old slides don't pile up
+        old_name = serializer.instance.file.name if serializer.instance.file else None
+        item = serializer.save()
+        if old_name and old_name != (item.file.name if item.file else None):
+            ModuleItem._meta.get_field('file').storage.delete(old_name)
+
+    def perform_destroy(self, instance):
+        if instance.file:
+            instance.file.delete(save=False)
+        instance.delete()

@@ -16,6 +16,7 @@ const LINKS = {
     // Stays highlighted on a project's own page (/student/projects/<id>)
     { to: '/student/projects', label: 'Projects', end: false },
     { to: '/student/profile/:me', label: 'Portfolio' },
+    { to: '/learning', label: 'Learning' },
   ],
   CLUB: [
     { to: '/student/dashboard', label: 'Dashboard' },

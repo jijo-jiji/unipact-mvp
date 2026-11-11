@@ -1,15 +1,64 @@
 from rest_framework import serializers
 
-from .models import B40Record, ImpactSettings, Workshop
+from unipact_backend.validators import validate_project_file_upload
+
+from .models import B40Record, ImpactSettings, LearningModule, ModuleItem, Workshop
+
+
+class ModuleItemSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ModuleItem
+        fields = ['id', 'module', 'item_type', 'title', 'description', 'file', 'file_url', 'file_name', 'link_url', 'order', 'created_at']
+        read_only_fields = ['id', 'module', 'file_url', 'file_name', 'created_at']
+        extra_kwargs = {'file': {'write_only': True, 'required': False, 'allow_null': True}}
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+
+    def get_file_name(self, obj):
+        return obj.file.name.rsplit('/', 1)[-1] if obj.file else None
+
+    def validate_file(self, value):
+        return validate_project_file_upload(value, 'File') if value else value
+
+    def validate(self, attrs):
+        item_type = attrs.get('item_type', getattr(self.instance, 'item_type', ModuleItem.ItemType.MATERIAL))
+        file = attrs.get('file', getattr(self.instance, 'file', None))
+        link = attrs.get('link_url', getattr(self.instance, 'link_url', ''))
+        description = attrs.get('description', getattr(self.instance, 'description', ''))
+        if not file and not link and not (item_type == ModuleItem.ItemType.EXERCISE and description.strip()):
+            raise serializers.ValidationError('Upload a file or add a link (an exercise can also be just written instructions).')
+        return attrs
+
+
+class LearningModuleSerializer(serializers.ModelSerializer):
+    topic_label = serializers.CharField(source='get_topic_display', read_only=True)
+    items = ModuleItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = LearningModule
+        fields = ['id', 'title', 'summary', 'topic', 'topic_label', 'order', 'is_published', 'items', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'topic_label', 'items', 'created_at', 'updated_at']
 
 
 class WorkshopSerializer(serializers.ModelSerializer):
     kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    module_ids = serializers.PrimaryKeyRelatedField(source='modules', many=True, queryset=LearningModule.objects.all(), required=False)
+    module_titles = serializers.SerializerMethodField()
 
     class Meta:
         model = Workshop
-        fields = ['id', 'title', 'kind', 'kind_label', 'held_on', 'location', 'attendees', 'notes', 'created_at']
-        read_only_fields = ['id', 'kind_label', 'created_at']
+        fields = ['id', 'title', 'kind', 'kind_label', 'held_on', 'location', 'attendees', 'notes', 'module_ids', 'module_titles', 'created_at']
+        read_only_fields = ['id', 'kind_label', 'module_titles', 'created_at']
+
+    def get_module_titles(self, obj):
+        return [m.title for m in obj.modules.all()]
 
 
 class ImpactSettingsSerializer(serializers.ModelSerializer):
