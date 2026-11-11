@@ -48,3 +48,8 @@ class ProjectMessageThrottle(ScopedIPThrottle):
         if not request.user or not request.user.is_authenticated:
             return None
         return self.cache_format % {'scope': self.scope, 'ident': request.user.pk}
+
+
+class WorkshopCheckinThrottle(ScopedIPThrottle):
+    # A whole room checks in from the same campus Wi-Fi within minutes, so this is generous
+    scope = 'workshop_checkin'

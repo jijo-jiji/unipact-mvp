@@ -8,6 +8,7 @@ import SectionNav from '../components/home/SectionNav';
 import HowItWorks from '../components/home/HowItWorks';
 import { HowToVideo } from '../components/home/HowToVideo';
 import { ClosingCta, HomeFaq, PaymentsSection, WorkspaceSection } from '../components/home/HomeSections';
+import ImpactStrip from '../components/home/ImpactStrip';
 import { useAuth } from '../context/AuthContext';
 import { homePathForRole } from '../utils/routes';
 
@@ -66,6 +67,7 @@ const LandingPage = () => {
         />
         <WorkspaceSection />
         <PaymentsSection />
+        <ImpactStrip />
         <HomeFaq audience={tour.audience} onAudience={showAudience} />
         <ClosingCta dashboardPath={dashboardPath} />
       </main>

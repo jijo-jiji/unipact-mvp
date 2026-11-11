@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'users',
     'campaigns',
     'payments',
+    'impact',
 
     'rest_framework_simplejwt',
     'django_filters',
@@ -318,6 +319,8 @@ REST_FRAMEWORK = {
         'email_verify': os.getenv('THROTTLE_EMAIL_VERIFY', '5/hour'),
         # Posting in a project's conversation, per account
         'project_message': os.getenv('THROTTLE_PROJECT_MESSAGE', '30/min'),
+        # Workshop check-in and feedback forms, per IP (one room shares one Wi-Fi address)
+        'workshop_checkin': os.getenv('THROTTLE_WORKSHOP_CHECKIN', '300/hour'),
     },
     # Don't leak the browsable API in production
     'DEFAULT_RENDERER_CLASSES': (
@@ -332,7 +335,7 @@ if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({
         'login': '10000/min', 'register': '10000/min', 'token_refresh': '10000/min',
         'password_reset': '10000/min', 'password_change': '10000/min', 'email_verify': '10000/min',
-        'project_message': '10000/min',
+        'project_message': '10000/min', 'workshop_checkin': '10000/min',
     })
 
 # Throttle counters: set REDIS_URL when running more than one server process so limits are shared
