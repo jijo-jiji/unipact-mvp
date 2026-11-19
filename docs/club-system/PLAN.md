@@ -16,13 +16,13 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
 
 | Source | Read | Notes |
 |---|---|---|
-| UniKLSKILL SRS v2.0 (PDF) | Sections 1–3 in full (FR_001–FR_028 and all use cases) | Drive's text export stops after FR_028. Sections 4–6 (interfaces, NFRs) and FR_029–FR_032 were **not** readable, but the feature table in §2.2 lists all 32 features. |
-| UniKLSKILL FYP2 Report (PDF) | Chapters 1–3 and Chapter 4 up to Module 4 | The export stops partway through Chapter 4. **Not read:** Modules 5–8 detail, Chapter 5 (results), Chapter 6, and the ERD/UML appendices. |
+| UniKLSKILL SRS v2.0 (PDF, 150 pages) | In full, including the NFRs (§5), compliance (§6) and the UML class diagram | |
+| UniKLSKILL FYP2 Report (PDF, 149 pages) | In full, including all 8 modules, UAT results, the UML diagram, the database screenshot and the GHOCS form and transcript screenshots | |
 | UniKLSKILL STP v2 (PDF) | Module lists per role, test approach, risk table, sample cases | |
 | Research paper (PDF) | In full | UAT results (30 students) and future recommendations |
 | Presentation slides (PDF) | In full | Includes the radar-chart problem slide |
 | GHOC Mapping & point distribution (DOCX) | In full | DNA categories → SC1–SC5 skills, S.P.I.C.E.S elements |
-| `uniklskill.zip` (Laravel source, 235 MB) | **Not read** | Too large for the Drive connector (10 MB limit), and Drive downloads are blocked from the build container. Its database migrations would confirm the exact data model. **Please share `database/migrations/` and `routes/web.php` on their own.** |
+| `uniklskill.zip` (Laravel source, 235 MB) | **Not read** | Too large for the Drive connector (10 MB limit), and Drive downloads are blocked from the build container. The table names are known from the report (§2.1). Only the exact column lists are missing. |
 | UniPact SRS v2.2.1 (DOCX in repo) | In full | REQ-3.1.5, 3.1.12, 3.2.x, 3.4.x, 3.6.x |
 | UniPact codebase | Club track: `users/models.py`, `campaigns/models.py`, club views and serializers, `impact/` check-in, architecture lock | |
 
@@ -42,6 +42,44 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
 | 6 | News | F023–F025: SDCL posts site news |
 | 7 | Co-curricular points (GHOCS) | F026–F030: a student submits an achievement with a certificate → Secretary approves and allocates points → the student sees their total and prints a transcript |
 | 8 | FAQ chatbot | F031–F032 |
+
+### 2.1 What the full report and screenshots add
+
+- **Ashraf's real database tables** (phpMyAdmin screenshot in the report, Figure 4.3):
+  - Clubs and members: `clubs`, `club_members`, `club_join_requests`, `club_proposals`, `club_socials`, `club_announcements`, `announcement_comments`
+  - Activities: `activity_proposals`, `posted_activities`, `activity_comments`
+  - Reports: `club_reports` (with `reference_type`/`reference_id` pointing to an activity or announcement, an attachment, and `advisor_remarks`)
+  - News: `news`, `proposal_news`
+  - GHOCS: `merit_proposals`, `student_points`, `proposal_templates`
+  - Other: `faqs`, `notifications`
+
+  Each maps one-to-one onto a model in §4.
+- **News is not admin-only.** Any logged-in user can propose a news post or a non-club activity. The admin approves it. A post can be marked **"GHOCS-claimable"**, which adds activity level, UniKL DNA category, GHOCS element, start and end dates, and location.
+- **Staff accounts are created by the admin.** Staff never sign up themselves. This matches the invite-only `STAFF` plan.
+- **The GHOCS claim form ("My Excellence")** has these fields:
+  - optional reference to a posted activity or news item (this auto-fills the form)
+  - title
+  - activity level (Campus / University / National / …)
+  - DNA category
+  - GHOCS element (S.P.I.C.E.S)
+  - date
+  - achievement level
+  - description (group or individual, placement)
+  - evidence upload
+
+  The Secretary approves, or rejects with a reason. The student sees a request table with status and the rejection reason.
+- **The transcript groups points into five buckets:** Excellence, Skill Development, UniKL DNA, SPICE and Management Skills. It then shows SC1–SC5 percentages and a radar chart. In Ashraf's form the student still picks the DNA category even when they referenced an activity. Our change is to lock the category when the claim references an activity.
+- **Non-functional requirements** carried over:
+  - pages load in under 3 s
+  - email within 1 minute of the event
+  - 100 concurrent users
+  - uploads limited to PDF, DOCX and images
+  - role checks that cannot be bypassed through the URL
+  - PDPA consent and a Terms of Use
+  - mobile-friendly
+
+  UniPact already meets the upload, consent and email requirements.
+- **UAT baseline:** 30 MIIT students, 4 of them High-Committee. Functionality 61.3% strongly agree, usability 60.7%, satisfaction 62.0%. The weakest point was interface consistency, with 10% neutral. UniPact's style guide addresses that.
 
 **Problems it set out to solve:**
 - **P1:** Club information is scattered across ECITIE, WhatsApp and Teams.
@@ -248,7 +286,8 @@ Every phase must pass `python manage.py test` and `npm run build` with 0 errors,
 4. **GHOCS point table:** the official points per achievement level and role, and how UniKL weights DNA categories → SC1–SC5. Until then, pilot points are estimates.
 5. **Secretary scope:** one per campus, or per section?
 6. **Pilot clubs and advisors:** names, and the SDCL contact who will hold Campus Admin.
-7. **Laravel source:** please share `database/migrations/` and `routes/web.php` from `uniklskill.zip` so the data model can be checked against Ashraf's tables.
+7. **Laravel source (nice to have, not blocking):** a slimmed copy of `uniklskill.zip` (without `vendor/` and `node_modules/`) would confirm the exact columns of Ashraf's tables.
+9. **GHOCS point values:** how many points each of the five transcript buckets (Excellence, Skill Development, UniKL DNA, SPICE, Management Skills) gives per level and achievement. The GHOCS User Manual v2.0 or Ashraf's `proposal_templates` table may hold this.
 8. **Branding:** under UniPact ("UniPact Campus") or as "UniKLSKILL powered by UniPact"?
 
 Once §7.1, 7.2 and 7.3 are answered, Phase 0 can start. Points 7.4 and 7.5 are only needed before Phase 2.
