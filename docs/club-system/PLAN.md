@@ -23,6 +23,7 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
 | Presentation slides (PDF) | In full | Includes the radar-chart problem slide |
 | GHOC Mapping & point distribution (DOCX) | In full | DNA categories → SC1–SC5 skills, S.P.I.C.E.S elements |
 | `uniklskill.zip` (Laravel source, 235 MB) | **Not read** | Too large for the Drive connector (10 MB limit), and Drive downloads are blocked from the build container. The table names are known from the report (§2.1). Only the exact column lists are missing. |
+| GHOCS User Manual for Student v2.0, GHOCS paper (2017), 3 GHOCS UniKL screenshots | In full, including the form screenshots | Approval stages, form fields, point components (§2.2) |
 | UniPact SRS v2.2.1 (DOCX in repo) | In full | REQ-3.1.5, 3.1.12, 3.2.x, 3.4.x, 3.6.x |
 | UniPact codebase | Club track: `users/models.py`, `campaigns/models.py`, club views and serializers, `impact/` check-in, architecture lock | |
 
@@ -81,6 +82,40 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
   UniPact already meets the upload, consent and email requirements.
 - **UAT baseline:** 30 MIIT students, 4 of them High-Committee. Functionality 61.3% strongly agree, usability 60.7%, satisfaction 62.0%. The weakest point was interface consistency, with 10% neutral. UniPact's style guide addresses that.
 
+### 2.2 What the official GHOCS sources add
+
+Sources: *GHOCS User Manual for Student v2.0*, the GHOCS paper (Awang Long et al., 2017), and the 3 GHOCS UniKL story screenshots.
+
+- **Approvals have 2–3 stages, not one.** These are the stages GHOCS uses today:
+  - **Club proposal:** *verified* by the Advisor or SDCL staff, then *approved* by the Dean, Deputy Dean or SDCL head.
+  - **Activity proposals** (club and non-club): **Verification → Recommendation → Approval**.
+  - **Excellence claim:** has both a "Verify Reason" and an "Approve Reason" field, so it is two-stage too.
+  - **Activity report:** emails the applicant and SDCL staff.
+
+  This confirms the configurable approval chain in §3.4.
+- **Club management is not limited to clubs.** The "Club Management" component counts management skills from **Club High Committee, SRC, USRC and RCC** (Student Representative Council, University SRC, Residential College Committee). It is evaluated with a **CITC rubric (360° assessment)**. These bodies are added to the org tree in §3.2.
+- **Membership is per semester.** The activity profile lists each club per semester with position (MEMBER, COMMITTEE / EXCO), start date and end date. A student re-appears every semester. This matches the term on `RoleAssignment` in §3.3.
+- **GHOCS has four point components.** These are what students already see on the official transcript (sample in the paper):
+
+| Component | What earns points |
+|---|---|
+| **Skills Development** | General and language subjects from Student Development |
+| **UniKL DNA** | All activities. This is the main component and feeds SC1–SC5. |
+| **Excellence** | Awards, competitions, mobility |
+| **Management Skills** | Committee roles, via the CITC rubric |
+
+  The transcript shows: Total GHOCS Points, total activity count, SC1–SC5 percentages, and the spider web chart.
+- **Activity proposal fields:**
+  - email, name, level, category, merit elements (multi-select S.P.I.C.E.S), location, description, start and end, estimated participants, budget (RM)
+  - additional info: logistics (item × qty), vehicle, sponsor, participants, person in charge
+  - proposal file
+- **Activity report fields:** merit elements, participants, summary, budget used, file. Students see a dashboard reminder ("Please submit your activity report for …") until the report is in.
+- **Excellence claim fields:** title, level, merit element, achievement (from a fixed list), entrepreneurship flag, semester, type (Individual / Group), award title, year, date awarded, rank (1st place …), description, attachment (.doc, .docx, .pdf).
+- **Login:** students and staff log in through **UniKL SSO (CAS at `cas.unikl.edu.my`)**. SSO is the natural later integration (Phase 4). The pilot uses UniPact accounts plus university-email verification.
+- **Scale:** 65,487 activities were recorded in GHOCS from Sept 2015 across 12 campuses, about 27 activities per campus per week, with 136–774 students per graduating batch. MIIT recorded 7,152 activities (71% UniKL DNA, 6% Excellence, 23% Club Membership).
+
+**Still not found anywhere:** the number of points per level, achievement and role. GHOCS computes them internally. The pilot must get this table from SDCL, or label points as estimates.
+
 **Problems it set out to solve:**
 - **P1:** Club information is scattered across ECITIE, WhatsApp and Teams.
 - **P2:** GHOCS claims get rejected because students pick the wrong category.
@@ -126,9 +161,14 @@ graph TD
     SDCL --> C1[Club: Computer Society]
     SDCL --> C2[Club: Robotics Club]
     SDCL --> C3[Club: ...]
+    MIIT --> SRC[Body: SRC MIIT]
+    MIIT --> RCC[Body: Residential College Committee]
+    HQ --> USRC[Body: University SRC]
 ```
 
-`OrgUnit(id, parent, kind ∈ {UNIVERSITY, CAMPUS, SECTION, CLUB}, name, code, is_active)`.
+Student bodies that are not clubs (SRC, USRC, RCC) are units of kind `BODY`. Their committee roles earn Management Skills points the same way club committee roles do.
+
+`OrgUnit(id, parent, kind ∈ {UNIVERSITY, CAMPUS, SECTION, CLUB, BODY}, name, code, is_active)`.
 
 A **Club** is an `OrgUnit` of kind `CLUB`, plus a `Club` detail record (description, logo, DNA category, status, socials). Because clubs are part of the tree, the same permission rule works at every level.
 
@@ -167,13 +207,16 @@ This lives in one module (`campus/permissions.py`) with a DRF permission class, 
 
 UniSkill hard-codes "High-Committee proposes → Advisor approves", while the STP says "→ then SDCL". Real campuses differ, so each campus stores an `ApprovalPolicy` per item type:
 
+The default chains below copy today's GHOCS stages (§2.2). The extra conditions are examples to confirm with SDCL.
+
 ```
 ACTIVITY_PROPOSAL (MIIT):
-  step 1: ADVISOR of the club                  (always)
-  step 2: CAMPUS_ADMIN                         (if off-campus OR budget > RM 1,000 OR external sponsor)
-  step 3: DEAN_HEP                             (if overnight OR overseas)
-CLUB_ESTABLISHMENT: CAMPUS_ADMIN → DEAN_HEP
-GHOCS_CLAIM:        GHOCS_SECRETARY of the student's campus/section
+  VERIFY:     ADVISOR of the club (non-club activity: SDCL staff)
+  RECOMMEND:  CAMPUS_ADMIN (SDCL)
+  APPROVE:    DEAN_HEP     (or CAMPUS_ADMIN when below a threshold, e.g. campus-level and budget ≤ RM 1,000)
+CLUB_ESTABLISHMENT: VERIFY by ADVISOR or SDCL staff → APPROVE by DEAN / Deputy Dean / SDCL head
+EXCELLENCE_CLAIM:   VERIFY → APPROVE (GHOCS_SECRETARY, then the SDCL approver)
+ACTIVITY_REPORT:    ADVISOR remarks; SDCL notified
 SPONSORSHIP_APPLY:  ADVISOR (v2.2.1 plug-in)
 ```
 
@@ -287,7 +330,13 @@ Every phase must pass `python manage.py test` and `npm run build` with 0 errors,
 5. **Secretary scope:** one per campus, or per section?
 6. **Pilot clubs and advisors:** names, and the SDCL contact who will hold Campus Admin.
 7. **Laravel source (nice to have, not blocking):** a slimmed copy of `uniklskill.zip` (without `vendor/` and `node_modules/`) would confirm the exact columns of Ashraf's tables.
-9. **GHOCS point values:** how many points each of the five transcript buckets (Excellence, Skill Development, UniKL DNA, SPICE, Management Skills) gives per level and achievement. The GHOCS User Manual v2.0 or Ashraf's `proposal_templates` table may hold this.
+9. **GHOCS point values (needed before Phase 2):** the student manual, the GHOCS paper and Ashraf's documents do not contain them. Ask SDCL for:
+   - points per activity by level (campus / university / state / national / international) and role (participant / committee / organiser)
+   - points per Excellence achievement and rank
+   - the CITC rubric for Management Skills
+   - how a UniKL DNA activity's points split into SC1–SC5 percentages
+
+   A screenshot of an admin screen or an internal staff guide would be enough.
 8. **Branding:** under UniPact ("UniPact Campus") or as "UniKLSKILL powered by UniPact"?
 
 Once §7.1, 7.2 and 7.3 are answered, Phase 0 can start. Points 7.4 and 7.5 are only needed before Phase 2.
