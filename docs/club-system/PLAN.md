@@ -24,6 +24,7 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
 | GHOC Mapping & point distribution (DOCX) | In full | DNA categories → SC1–SC5 skills, S.P.I.C.E.S elements |
 | `uniklskill.zip` (Laravel source, 235 MB) | **Not read** | Too large for the Drive connector (10 MB limit), and Drive downloads are blocked from the build container. The table names are known from the report (§2.1). Only the exact column lists are missing. |
 | GHOCS User Manual for Student v2.0, GHOCS paper (2017), 3 GHOCS UniKL screenshots | In full, including the form screenshots | Approval stages, form fields, point components (§2.2) |
+| MIIT "Template Proposal SAF 2026" (SD and CL, Dean and Deputy Dean versions), Ashraf's club proposal template | In full | The real approval chain and hierarchy (§3.2, §3.4) |
 | UniPact SRS v2.2.1 (DOCX in repo) | In full | REQ-3.1.5, 3.1.12, 3.2.x, 3.4.x, 3.6.x |
 | UniPact codebase | Club track: `users/models.py`, `campaigns/models.py`, club views and serializers, `impact/` check-in, architecture lock | |
 
@@ -148,50 +149,64 @@ Nor can they express a student who is President of one club and an ordinary memb
 2. **Organisation tree:** UniKL's structure stored as data, not code. A new campus or section is a new row, not a migration.
 3. **Role assignments:** each one is *(person, role, scope node, term)*. Permissions come from the assignments, and a role granted on a node also covers everything below it.
 
-### 3.2 Organisation tree (assumed — please correct)
+### 3.2 Organisation tree (from MIIT's 2026 proposal templates)
+
+Source: the four *Template Proposal SAF 2026* forms (SD and CL versions, each with a Dean-approval and a Deputy-Dean-approval variant). Every person who signs a club proposal at MIIT appears on them. Only titles are used here, not names.
 
 ```mermaid
 graph TD
-    U[UniKL - University] --> HQ[HQ: Student Affairs / SDCL HQ]
-    U --> MIIT[Campus: UniKL MIIT]
-    U --> MSI[Campus: UniKL MSI]
-    U --> ETC[... other institutes]
-    MIIT --> SDCL[Section: SDCL MIIT]
-    MIIT --> SEC[Section: e.g. Software Engineering]
-    SDCL --> C1[Club: Computer Society]
-    SDCL --> C2[Club: Robotics Club]
-    SDCL --> C3[Club: ...]
-    MIIT --> SRC[Body: SRC MIIT]
-    MIIT --> RCC[Body: Residential College Committee]
-    HQ --> USRC[Body: University SRC]
+    U[UniKL] --> MIIT[Campus: UniKL MIIT<br/>Dean / Head of Campus]
+    MIIT --> HOMF[Management & Finance<br/>Head of Management & Finance]
+    MIIT --> DDAT[Deputy Dean A&T]
+    MIIT --> DDSDCL[Deputy Dean SDCL<br/>Student Development & Campus Lifestyle]
+    MIIT --> DDIIIP[Deputy Dean IIIP]
+    DDSDCL --> SD[Student Development Section<br/>Head of Section + Executives]
+    DDSDCL --> CL[Campus Lifestyle Section<br/>Head of Section + Executives]
+    MIIT --> SRC[Student Representative Committee<br/>President + Excos by portfolio]
+    SD --> C1[Clubs with academic / spiritual focus]
+    CL --> C2[Clubs with sports / recreation / cultural focus]
+    C1 --> M1[Advisor + President / Program Director + Committee + Members]
+    C2 --> M2[Advisor + President / Program Director + Committee + Members]
 ```
 
-Student bodies that are not clubs (SRC, USRC, RCC) are units of kind `BODY`. Their committee roles earn Management Skills points the same way club committee roles do.
+What the templates show:
+- **Each club or programme belongs to a "sector"**, either SD (Student Development) or CL (Campus Lifestyle). The sector decides which section's staff review it and which SRC Exco acknowledges it. For example, *Exco Academic & Spiritual* signs for SD and *Exco Sports, Recreational & Cultural* signs for CL.
+- **The SRC is part of the approval chain.** The portfolio Exco acknowledges the proposal and the SRC President endorses the budget. So SRC is not just a club-like body: its officers hold approval roles.
+- **There are three Deputy Deans:** A&T, SDCL and IIIP. The template is addressed to the relevant one. Club activities normally go to DD SDCL.
+- **Head of Management & Finance** recommends on every budget.
 
-`OrgUnit(id, parent, kind ∈ {UNIVERSITY, CAMPUS, SECTION, CLUB, BODY}, name, code, is_active)`.
+`OrgUnit(id, parent, kind ∈ {UNIVERSITY, CAMPUS, OFFICE, SECTION, CLUB, BODY}, name, code, sector, is_active)`:
+- `OFFICE` covers the Dean, the Deputy Deans and Management & Finance.
+- `SECTION` covers SD and CL.
+- `BODY` covers SRC and later RCC/USRC.
+- `sector` holds SD or CL on clubs and sections.
 
-A **Club** is an `OrgUnit` of kind `CLUB`, plus a `Club` detail record (description, logo, DNA category, status, socials). Because clubs are part of the tree, the same permission rule works at every level.
+A **Club** is an `OrgUnit` of kind `CLUB` plus a `Club` detail record (description, logo, DNA category, sector, status, socials). Other campuses get the same shape, with their own offices and sections as data.
 
 ### 3.3 Roles and where they apply
 
-| Role | Assigned at | Can do | Replaces in UniSkill |
+| Role | Assigned at | Signs on the MIIT form as | Can do in the system |
 |---|---|---|---|
-| `PLATFORM_ADMIN` | (global, `User.Role.ADMIN`) | Everything; onboards universities | — |
-| `UNI_ADMIN` | University | Manage campuses, appoint campus admins, set GHOCS point rules | — |
-| `CAMPUS_ADMIN` (SDCL head or officer) | Campus | Approve or reject new clubs, create and edit clubs, assign advisors, post news, final approval on escalated activities, pilot dashboard | SDCL Admin |
-| `DEAN_HEP` (Deputy Dean, Student Affairs) | Campus | Approve activities that need HEP sign-off (see §3.4); read-only reports | — (implied by the "signed by advisor and deputy dean" rule already in `CompanyProfile`) |
-| `GHOCS_SECRETARY` | Campus or Section | Review GHOCS claims in their scope, allocate points | Secretary |
-| `ADVISOR` / `CO_ADVISOR` | Club | Approve activities, promote and demote, set positions, remark on reports, approve sponsorship applications (v2.2.1) | Club Advisor |
-| `COMMITTEE` with a **position** | Club | Manage join requests, propose activities, post announcements, file reports | Student (High-Committee) |
-| `MEMBER` | Club | View activities, discuss, check in, claim GHOCS | Student |
+| `PLATFORM_ADMIN` | global (`User.Role.ADMIN`) | — | Everything; onboards universities and campuses |
+| `DEAN` | Campus | Dean / Head of Campus | Final approval for budget > RM 5K; campus reports |
+| `DEPUTY_DEAN` | Office (A&T, SDCL, IIIP) | Deputy Dean | Approves budget ≤ RM 5K; recommends budget > RM 5K; approves new clubs |
+| `HEAD_FINANCE` | Office (Management & Finance) | Head of Management & Finance | Recommends or not-recommends every budget |
+| `HEAD_OF_SECTION` | Section (SD / CL) | "Verified by" | Verifies proposals in their sector; assigns advisors; manages clubs and news for the sector |
+| `SECTION_EXECUTIVE` | Section (SD / CL) | "Reviewed by" | Reviews proposals; day-to-day club admin |
+| `GHOCS_SECRETARY` | Section or Campus | — | Verifies GHOCS / Excellence claims, allocates points (UniSkill "Secretary") |
+| `SRC_PRESIDENT` | Body (SRC) | "SRC Budget Endorsement" | Endorses the budget |
+| `SRC_EXCO` with portfolio | Body (SRC) | "Acknowledged by" | Acknowledges proposals in their portfolio |
+| `ADVISOR` / `CO_ADVISOR` | Club | "Supported by" | Supports proposals, promotes and demotes, remarks on reports, approves sponsorship applications (v2.2.1) |
+| `COMMITTEE` with a **position** | Club | "Prepared by" (President / Program Director) | Manages members, drafts proposals and reports, posts announcements |
+| `MEMBER` | Club | — | Views activities, discusses, checks in, claims GHOCS |
 
-**Committee positions** are data, not roles. Each university can edit its own list. The default list is: President, Vice President, Secretary, Treasurer, Exco/AJK, and Other (free text).
+One person can hold several of these at once. For example, a lecturer can be Advisor of one club and GHOCS Secretary for SD. A student can be SRC Exco, President of one club and a member of another.
 
-Position decides small things:
-- Only the **President** can hand over presidency.
-- Only the **President or Treasurer** can act on sponsorship money (v2.2.1).
+**Committee positions** are data, not roles: President, Program Director, Vice President, Secretary, Treasurer, Exco/AJK, and Other. Position decides small things:
+- Only the **President** hands over presidency.
+- Only the **President or Treasurer** acts on sponsorship money (v2.2.1).
 
-**Term:** every assignment has `session` (e.g. "2026/2027 Sem 1"), `starts_on`, `ends_on` and `ended_reason`. Handover at the end of a session ends one term and starts the next, so history is kept for transcripts ("President, 2026/27").
+**Term:** every assignment has `session` (e.g. "2026/2027 Sem 1"), `starts_on`, `ends_on` and `ended_reason`. GHOCS keeps one membership row per semester, and the templates name "SRC 2026", so terms are per semester or per year. Handover ends one term and starts the next, and history stays for transcripts.
 
 **Permission check:**
 ```
@@ -203,21 +218,43 @@ can(user, action, target) =
 ```
 This lives in one module (`campus/permissions.py`) with a DRF permission class, so every endpoint uses the same rule.
 
-### 3.4 Approval chains are configurable, not hard-coded
+### 3.4 Approval chains: MIIT's real chain, stored as data
 
-UniSkill hard-codes "High-Committee proposes → Advisor approves", while the STP says "→ then SDCL". Real campuses differ, so each campus stores an `ApprovalPolicy` per item type:
+The SAF 2026 template has one signature box per step. In the system each box becomes one approval step, in this order:
 
-The default chains below copy today's GHOCS stages (§2.2). The extra conditions are examples to confirm with SDCL.
+| # | Step on the form | Role | Decision |
+|---|---|---|---|
+| 1 | Prepared by | Club President / Program Director | submits |
+| 2 | Acknowledged by | SRC Exco for the club's sector portfolio | acknowledge |
+| 3 | Supported by | Club Advisor | support / not support |
+| 4 | Reviewed by | Section Executive (SD or CL) | review |
+| 5 | SRC Budget Endorsement | SRC President | endorse |
+| 6 | Verified by | Head of Section (SD or CL) | verify |
+| 7 | Recommendation | Head of Management & Finance | recommend / not recommend |
+| 8a | **Budget ≤ RM 5K** | Deputy Dean | **approve** / not approve, and the chain ends |
+| 8b | **Budget > RM 5K** | Deputy Dean | recommend / not recommend |
+| 9 | **Budget > RM 5K only** | Dean / Head of Campus | **approve** / not approve |
 
+**Rules taken from the form:**
+- **Template choice:** the RM 5,000 budget threshold decides whether the Deputy Dean or the Dean gives final approval.
+- **Funding:** each proposal is marked "with SAF" or "without SAF" (Student Activity Fund).
+- **Budget table:** splits funding into SAF, UniKL MIIT and Others. The secretariat fills in the budget code, allocation, amount used and balance.
+- **Routing:** the club's sector (SD or CL) decides which section and which SRC Exco the proposal goes to.
+- **Proposal content:** introduction, background, S.M.A.R.T. objectives, programme overview (name, date, time, venue), justification, financial items (item, price, qty, total) and conclusion.
+
+The system will generate this same document as a filled PDF with the digital sign-off trail. Staff can then keep their paper file while the approvals happen online.
+
+**Open questions on the chain:**
+- Does a proposal with no budget skip steps 5 and 7?
+- Which steps can run in parallel?
+- Who approves a **new club** (Ashraf's template says Advisor endorsement → SDCL approval; GHOCS says the Dean / DD / SDCL head)?
+
+Other chains (defaults to confirm):
 ```
-ACTIVITY_PROPOSAL (MIIT):
-  VERIFY:     ADVISOR of the club (non-club activity: SDCL staff)
-  RECOMMEND:  CAMPUS_ADMIN (SDCL)
-  APPROVE:    DEAN_HEP     (or CAMPUS_ADMIN when below a threshold, e.g. campus-level and budget ≤ RM 1,000)
-CLUB_ESTABLISHMENT: VERIFY by ADVISOR or SDCL staff → APPROVE by DEAN / Deputy Dean / SDCL head
-EXCELLENCE_CLAIM:   VERIFY → APPROVE (GHOCS_SECRETARY, then the SDCL approver)
-ACTIVITY_REPORT:    ADVISOR remarks; SDCL notified
-SPONSORSHIP_APPLY:  ADVISOR (v2.2.1 plug-in)
+CLUB_ESTABLISHMENT: ADVISOR endorse → HEAD_OF_SECTION review → DEPUTY_DEAN (SDCL) approve
+EXCELLENCE_CLAIM:   GHOCS_SECRETARY verify → HEAD_OF_SECTION approve
+ACTIVITY_REPORT:    ADVISOR remarks; Section notified
+SPONSORSHIP_APPLY:  ADVISOR (v2.2.1 plug-in); an awarded sponsorship then runs the SAF chain "without SAF"
 ```
 
 Each request keeps its own trail of `ApprovalStep(request, step_no, role, decided_by, decision, comment, decided_at)`. This trail is the evidence the Dean can audit.
@@ -323,9 +360,9 @@ Every phase must pass `python manage.py test` and `npm run build` with 0 errors,
 
 ## 7. Decisions needed from you or UniKL
 
-1. **Hierarchy:** is the tree in §3.2 right? Which levels exist between the university and a club (campus → section? faculty?), and who sits at each?
+1. **Hierarchy:** §3.2 now follows the MIIT SAF templates. Please confirm the SD/CL sector for each pilot club.
 2. **Account type `STAFF`:** OK to add it as a fifth `User.Role` (all four existing roles unchanged)?
-3. **Approval rules:** which activities need SDCL or HEP sign-off (budget threshold, off-campus, overnight, external sponsor)?
+3. **Approval rules:** the RM 5K Dean vs Deputy Dean rule is now known from the SAF templates (§3.4). Still open: whether a proposal with no budget skips the SRC endorsement and Finance steps, and who approves a new club.
 4. **GHOCS point table:** the official points per achievement level and role, and how UniKL weights DNA categories → SC1–SC5. Until then, pilot points are estimates.
 5. **Secretary scope:** one per campus, or per section?
 6. **Pilot clubs and advisors:** names, and the SDCL contact who will hold Campus Admin.
