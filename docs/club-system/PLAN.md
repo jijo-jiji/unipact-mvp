@@ -259,6 +259,61 @@ SPONSORSHIP_APPLY:  ADVISOR (v2.2.1 plug-in); an awarded sponsorship then runs t
 
 Each request keeps its own trail of `ApprovalStep(request, step_no, role, decided_by, decision, comment, decided_at)`. This trail is the evidence the Dean can audit.
 
+### 3.5 SRC funding (SAF / SWF): a second process after activity approval
+
+Source: SRC UniKL MIIT slides "Tatacara Permohonan", *Borang Permohonan Dana SAF* (effective 2027), and *Borang Deklarasi Etika Permohonan Dana*.
+
+Getting an activity approved and getting money for it are **two separate processes**:
+
+**A. Activity approval.** The advisor approves in **i-STAR**, then management signs the SAF 2026 chain in §3.4. The result is an **approval number**.
+
+**B. Fund application to the SRC.** The applicant chooses which fund to apply to:
+- **SAF:** Student Activity Fund
+- **SWF:** Student Welfare Fund
+
+The applicant is one of these types:
+- SRC
+- Residential College Committee
+- Faculty Student Association (*Persatuan Mahasiswa Fakulti*)
+- Club or society
+- Participation / competition
+
+**Five documents are always required:**
+- working paper
+- i-STAR approval (Advisor)
+- SAF budget
+- SAF application form
+- SRC pledge form (*Borang Aku Janji*)
+
+**Steps by amount requested:**
+
+| Amount requested | Extra step | Common steps |
+|---|---|---|
+| < RM 1,000 | — | Softcopy via the SRC "Permohonan Fasa" Google Form, hardcopy to the SRC room (level 1), result emailed by the **SRC Treasurer** |
+| < RM 5,000 | **Pitching** to the SRC President's office | same |
+| > RM 5,000 | **Pitching** to the SRC President's office, **both Heads of Section (SD & CL)** and the **Deputy Dean SDCL** | same |
+
+**Rules from the ethics declaration:**
+- The fund application must be sent **within 30 days of the i-STAR approval**, or it is cancelled.
+- A fund approval is valid for **3 months** from the programme start date.
+- The **financial report is due within 30 days** of the programme ending. Otherwise the SRC can take action against the club.
+
+**Approval number format:** `[1=SD / 2=CL][club number, 2 digits][activity number, 2 digits][year, 2 digits]`. For example, `1020525` is SD, club 02, activity 05, year 25. Each club has a fixed number within its sector, and the system can issue these numbers automatically.
+
+**What this means for the system:**
+- **New roles:** add `SRC_TREASURER` (sends the fund decision) to §3.3. Add Faculty Student Association as another `BODY` kind.
+- **New models:**
+  - `FundApplication(activity, fund ∈ {SAF, SWF}, applicant_type, amount_requested, amount_approved, status, decided_by, valid_until)`
+  - `FinancialReport(activity, due_on, submitted_at, files)`
+  - `PitchingSession(application, date, panel)`
+- **Deadlines handled by the system instead of people:**
+  - a countdown to the 30-day window after approval
+  - expiry of the 3-month validity
+  - financial report reminders at 7, 3 and 0 days, with overdue reports flagged to the SRC Treasurer
+
+  These are good pilot measures: on-time financial reports and applications lost to the 30-day rule.
+- **i-STAR:** the advisor's approval currently happens in **i-STAR**, an existing UniKL system. For the pilot, either the advisor approves in our system and i-STAR stays the official record (double entry), or UniKL accepts our approval in place of i-STAR. **This is a decision for UniKL.**
+
 ---
 
 ## 4. Data model (new Django app: `campus`)
@@ -367,7 +422,9 @@ Every phase must pass `python manage.py test` and `npm run build` with 0 errors,
 5. **Secretary scope:** one per campus, or per section?
 6. **Pilot clubs and advisors:** names, and the SDCL contact who will hold Campus Admin.
 7. **Laravel source (nice to have, not blocking):** a slimmed copy of `uniklskill.zip` (without `vendor/` and `node_modules/`) would confirm the exact columns of Ashraf's tables.
-9. **GHOCS point values (needed before Phase 2):** the student manual, the GHOCS paper and Ashraf's documents do not contain them. Ask SDCL for:
+9. **i-STAR:** what is it, who runs it, and can the pilot's advisor approval replace it, or must it feed into it (§3.5)?
+10. **No-budget proposals:** does an activity without SAF/SWF money still go through the full SAF 2026 chain?
+11. **GHOCS point values (needed before Phase 2):** the student manual, the GHOCS paper and Ashraf's documents do not contain them. Ask SDCL for:
    - points per activity by level (campus / university / state / national / international) and role (participant / committee / organiser)
    - points per Excellence achievement and rank
    - the CITC rubric for Management Skills
