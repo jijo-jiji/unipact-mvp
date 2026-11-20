@@ -22,7 +22,7 @@ UniKL has cleared UniPact to run a club system. The Dean wants a **pilot that sh
 | Research paper (PDF) | In full | UAT results (30 students) and future recommendations |
 | Presentation slides (PDF) | In full | Includes the radar-chart problem slide |
 | GHOC Mapping & point distribution (DOCX) | In full | DNA categories → SC1–SC5 skills, S.P.I.C.E.S elements |
-| `uniklskill.zip` (Laravel source, 235 MB) | **Not read** | Too large for the Drive connector (10 MB limit), and Drive downloads are blocked from the build container. The table names are known from the report (§2.1). Only the exact column lists are missing. |
+| `uniklskill.zip` (Laravel source, 235 MB) | Downloaded in full; point logic, models and migrations read | Point rules in §4.1.1 |
 | GHOCS User Manual for Student v2.0, GHOCS paper (2017), 3 GHOCS UniKL screenshots | In full, including the form screenshots | Approval stages, form fields, point components (§2.2) |
 | MIIT "Template Proposal SAF 2026" (SD and CL, Dean and Deputy Dean versions), Ashraf's club proposal template | In full | The real approval chain and hierarchy (§3.2, §3.4) |
 | UniPact SRS v2.2.1 (DOCX in repo) | In full | REQ-3.1.5, 3.1.12, 3.2.x, 3.4.x, 3.6.x |
@@ -362,7 +362,54 @@ From the GHOC mapping doc:
 | Graduate | SC2, SC3, SC4 |
 | Leadership | SC1, SC2, SC5 |
 
-- Approved points are spread evenly across the mapped SCs, and the student sees the calculation line by line. A "how to grow your web" hint names the weakest SC and the DNA categories that feed it. The ECITIE calculation is hidden; ours is shown. **The exact weighting must be confirmed by UniKL before points are called official.** In the pilot they are labelled "pilot estimate".
+- The student sees the calculation line by line. A "how to grow your web" hint names the weakest SC and the DNA categories that feed it. The ECITIE calculation is hidden; ours is shown.
+
+#### 4.1.1 UniSkill's point rules (from Ashraf's source code)
+
+Source: `uniklskill.zip` — `app/Models/StudentPoint.php`, `MeritProposalController::approve`, `SkillProposalController`, `resources/views/5_curriculumpage_module/transcript.blade.php`.
+
+**When a Secretary approves a merit (My Excellence) claim**, the system adds:
+
+| Part of the claim | Points added |
+|---|---|
+| DNA category (Active Programme, Sports & Recreation, Entrepreneur, Global, Graduate, Leadership) | **+1** to that category |
+| S.P.I.C.E.S element (Spiritual, Physical, Intellectual, Career, Emotional, Social) | **+1** to that element |
+| Achievement: Participate | **+5** |
+| Achievement: Representative | **+10** |
+| Achievement: Special Award | **+20** |
+| Achievement: International Short Sem / Exchange Short Sem | **+20** |
+| Achievement: International Full Sem / Exchange Full Sem | **+25** |
+
+**Other components:**
+- **Skill Development:** the student claims a subject and gets its points. Every subject in the list (Bahasa Melayu, Arabic, French, Italian, Korean, Mandarin, Spanish) is worth **5**.
+- **Management Skills:** calculated live from club memberships. **10 per club as High Committee, 5 per club as member.**
+
+**Totals on the transcript:**
+- UniKL DNA = the sum of the six DNA counters.
+- Excellence = the sum of the seven achievement counters.
+- SPICE = the sum of the six element counters.
+- Total GHOCS = DNA + SPICE + Excellence + Management Skills + Skill Development.
+
+**The spider web (SC1–SC5)** is built from the DNA counters only, using the mapping table above:
+- SC1 = Active + Sports + Leadership
+- SC2 = Active + Sports + Global + Graduate + Leadership
+- SC3 = Active + Sports + Global + Graduate
+- SC4 = Entrepreneur + Graduate
+- SC5 = Entrepreneur + Leadership
+
+Each SC's percentage is **its share of SC1+…+SC5**, so the five always add up to 100%. The chart's scale tops out at 5.
+
+Worked check against the transcript screenshot in the report: Excellence 25 + Skill Development 0 + DNA 3 + SPICE 3 + Management 50 = **81**, which matches.
+
+**What this means for us:**
+1. **These are Ashraf's numbers, not UniKL's official ones.** His code calls the achievement values a *"weighted example"*. The official GHOCS transcript in the 2017 paper shows SC percentages of 58%, 64%, 64%, 53% and 75%, which do **not** add up to 100%. So official GHOCS measures each SC against some target, not as a share of the total. The pilot uses Ashraf's rules as the default, stored in an editable `GhocsPointRule` table, labelled "pilot points", until SDCL confirms the official values.
+2. **The activity's level is ignored.** Campus, University, National and International level all give the same points. Official GHOCS asks for level on every form, so it almost certainly weights by level. The table has a level column ready for that.
+3. **Bugs we will not copy:**
+   - The UniKL DNA total adds Graduate twice.
+   - Management Skills counts each club once for all time, not once per semester.
+   - Because each SC is shown as a share of the total, a student with 1 activity and a student with 50 activities get the same-sized web. That is the same "more points ≠ bigger web" problem the GHOC mapping doc complains about (P4).
+
+   Our web will plot **absolute SC values against a target per SC**, matching the official transcript, with the share-of-total shown alongside.
 - The Secretary's queue is sorted **oldest first**. Each claim shows its age, and there are reminder emails at 3 and 7 days (fixes P3). The pilot measures median time to decision.
 - A claim from a club activity is pre-filled from the Attendance record (activity, DNA category, level, role), so the student only confirms it.
 
