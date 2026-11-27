@@ -268,6 +268,76 @@ const Semesters = ({ units }) => {
   );
 };
 
+// --- Pilot students ------------------------------------------------------------------------------------------
+const PilotStudents = ({ units }) => {
+  const { showToast } = useToast();
+  const campuses = units.filter((u) => u.kind === 'CAMPUS');
+  const [campus, setCampus] = useState(campuses[0]?.id || '');
+  const { data, error, loading, reload } = useLoad(campus ? '/campus/pilot/' : null, { campus });
+  const [emails, setEmails] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const add = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await api.post('/campus/pilot/', { campus, emails });
+      const { added, already_listed: listed, not_student_accounts: notStudents } = res.data;
+      const extra = [listed.length && `${listed.length} already listed`, notStudents.length && `${notStudents.length} not student accounts (skipped)`].filter(Boolean).join(', ');
+      showToast(`Added ${added.length} student${added.length === 1 ? '' : 's'}${extra ? `; ${extra}` : ''}.`, 'success');
+      setEmails('');
+      reload();
+    } catch (err) { showToast(errorText(err), 'error'); } finally { setBusy(false); }
+  };
+  const remove = async (row) => {
+    if (!window.confirm(`Take ${row.email} off the pilot? Campus disappears for them unless they hold a club role.`)) return;
+    try { await api.delete(`/campus/pilot/${row.id}/`); reload(); } catch (err) { showToast(errorText(err), 'error'); }
+  };
+
+  return (
+    <div className="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
+      <Card>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-heading font-bold text-xl">Pilot students</h2>
+            <p className="text-sm text-[#5B6478]">Campus is a closed pilot: only these students (plus staff and anyone holding a club role) can see it.</p>
+          </div>
+          {campuses.length > 1 && (
+            <select className="input w-auto" value={campus} onChange={(e) => setCampus(e.target.value)} aria-label="Campus">
+              {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+        </div>
+        {loading && !data && <Loading />}
+        <ErrorNote>{error}</ErrorNote>
+        {data && data.length === 0 && <p className="text-sm text-[#5B6478] mt-3">No students added yet.</p>}
+        <ul className="divide-y divide-[rgba(10,23,72,0.08)] mt-2">
+          {(data || []).map((r) => (
+            <li key={r.id} className="py-2.5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{r.name || r.email}</p>
+                <p className="text-sm text-[#5B6478] truncate">{r.name ? r.email : 'Not signed up yet'}{r.note ? ` · ${r.note}` : ''}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {r.signed_up && <span className="badge bg-emerald-50 text-emerald-700 border-emerald-200">Signed up</span>}
+                <button type="button" className="btn-secondary btn-sm" onClick={() => remove(r)}>Remove</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card>
+        <form onSubmit={add} className="space-y-3">
+          <h2 className="font-heading font-bold text-xl">Add students</h2>
+          <p className="text-sm text-[#5B6478]">Paste emails, one per line or separated by commas. Each student gets an email: sign in if they have an account, or sign up with that email.</p>
+          <textarea className="input min-h-[140px]" required placeholder={'aina@s.unikl.edu.my\nhakim@s.unikl.edu.my'} value={emails} onChange={(e) => setEmails(e.target.value)} aria-label="Student emails" />
+          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add to pilot'}</button>
+        </form>
+      </Card>
+    </div>
+  );
+};
+
 // Campus management for SDCL (and UniPact admins): structure and roles, staff invitations, semesters.
 const CampusManage = () => {
   usePageTitle('Manage campus');
@@ -275,10 +345,13 @@ const CampusManage = () => {
   const tab = params.get('tab') || 'structure';
   const units = useLoad('/campus/units/');
   const roles = useLoad('/campus/roles/');
+  const me = useLoad('/campus/me/');
+  const tabs = [['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters']];
+  if (me.data?.pilot_mode) tabs.push(['pilot', 'Pilot students']);
 
   return (
     <CampusPage title="Manage campus" intro="Set up your campus: clubs and who leads them, staff accounts, and semesters." back={{ to: '/campus', label: 'Campus' }}>
-      <Tabs tabs={[['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters']]} value={tab} onChange={(k) => setParams({ tab: k })} label="Manage campus" />
+      <Tabs tabs={tabs} value={tab} onChange={(k) => setParams({ tab: k })} label="Manage campus" />
       {(units.loading || roles.loading) && <Loading />}
       <ErrorNote>{units.error || roles.error}</ErrorNote>
       {units.data && roles.data && (
@@ -287,6 +360,7 @@ const CampusManage = () => {
           {units.data.length > 0 && tab === 'structure' && <Structure units={units.data} reloadUnits={units.reload} roles={roles.data} />}
           {units.data.length > 0 && tab === 'staff' && <Staff units={units.data} />}
           {units.data.length > 0 && tab === 'semesters' && <Semesters units={units.data} />}
+          {units.data.length > 0 && tab === 'pilot' && <PilotStudents units={units.data} />}
         </>
       )}
     </CampusPage>

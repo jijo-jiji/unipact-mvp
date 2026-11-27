@@ -50,7 +50,6 @@ def club_managers(club):
 class CampusListView(APIView):
     """Campuses and their sections, for sign-up style pickers (proposing a club, posting news)."""
     permission_classes = PUBLIC
-    authentication_classes = []
 
     def get(self, request):
         campuses = OrgUnit.objects.filter(kind=OrgUnit.Kind.CAMPUS, is_active=True).order_by('name')
@@ -561,3 +560,79 @@ class ApprovalWithdrawView(APIView):
     def post(self, request, pk):
         item = approvals.withdraw(get_object_or_404(ApprovalRequest, pk=pk), request.user)
         return Response(ApprovalRequestSerializer(item, context={'request': request}).data)
+
+
+# --- Pilot list ----------------------------------------------------------------------------------------------
+
+class PilotListView(APIView):
+    """GET ?campus=<id>: the students allowed into the closed pilot. POST {campus, emails, note}: add students
+    (a list, or text with one email per line or comma); each new one is emailed. Campus administrators only."""
+    permission_classes = CAMPUS
+
+    def campus(self, value):
+        campus = get_object_or_404(OrgUnit, pk=value, kind=OrgUnit.Kind.CAMPUS)
+        require(self.request.user, Action.MANAGE_STAFF, campus)
+        return campus
+
+    def get(self, request):
+        from .models import PilotAccess
+        campus = self.campus(request.query_params.get('campus'))
+        rows = PilotAccess.objects.filter(campus=campus)
+        accounts = {u.email.lower(): u for u in User.objects.filter(email__in=[r.email for r in rows])}
+        return Response([{'id': r.pk, 'email': r.email, 'note': r.note, 'created_at': r.created_at,
+                          'signed_up': r.email in accounts,
+                          'name': PersonSerializer(accounts[r.email]).data['name'] if r.email in accounts else None}
+                         for r in rows])
+
+    def post(self, request):
+        import re
+
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from .models import PilotAccess
+        campus = self.campus(request.data.get('campus'))
+        raw = request.data.get('emails') or []
+        if isinstance(raw, str):
+            raw = re.split(r'[\s,;]+', raw)
+        addresses, invalid = [], []
+        for value in raw:
+            value = str(value).strip().lower()
+            if not value:
+                continue
+            try:
+                validate_email(value)
+                addresses.append(value)
+            except DjangoValidationError:
+                invalid.append(value)
+        if invalid:
+            raise exceptions.ValidationError({'emails': [f'Not an email address: {", ".join(invalid[:5])}']})
+        if not addresses or len(addresses) > 500:
+            raise exceptions.ValidationError({'emails': ['Give between 1 and 500 email addresses.']})
+        taken = {e: c for e, c in PilotAccess.objects.filter(email__in=addresses).values_list('email', 'campus__name')}
+        not_students = set(User.objects.filter(email__in=addresses).exclude(role=User.Role.STUDENT)
+                           .values_list('email', flat=True))
+        added = []
+        for email in dict.fromkeys(addresses):
+            if email in taken or email in not_students:
+                continue
+            access = PilotAccess.objects.create(campus=campus, email=email, added_by=request.user,
+                                                note=str(request.data.get('note') or '')[:255])
+            emails.pilot_invited(access, has_account=User.objects.filter(email__iexact=email).exists())
+            added.append(email)
+        log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO,
+                  f'{len(added)} student(s) added to the {campus.name} Campus pilot by {request.user.email}')
+        return Response({'added': added, 'already_listed': sorted(taken),
+                         'not_student_accounts': sorted(not_students)}, status=status.HTTP_201_CREATED)
+
+
+class PilotDetailView(APIView):
+    """Take a student off the pilot list. Roles they already hold stay (end those under Structure and roles)."""
+    permission_classes = CAMPUS
+
+    def delete(self, request, pk):
+        from .models import PilotAccess
+        access = get_object_or_404(PilotAccess.objects.select_related('campus'), pk=pk)
+        require(request.user, Action.MANAGE_STAFF, access.campus)
+        access.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

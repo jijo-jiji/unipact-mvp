@@ -253,7 +253,7 @@ function App() {
           <Route
             path="/campus"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusHome />
               </ProtectedRoute>
             }
@@ -261,7 +261,7 @@ function App() {
           <Route
             path="/campus/clubs"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusClubs />
               </ProtectedRoute>
             }
@@ -269,7 +269,7 @@ function App() {
           <Route
             path="/campus/clubs/propose"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusProposeClub />
               </ProtectedRoute>
             }
@@ -277,7 +277,7 @@ function App() {
           <Route
             path="/campus/clubs/:id"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusClubPage />
               </ProtectedRoute>
             }
@@ -285,7 +285,7 @@ function App() {
           <Route
             path="/campus/news"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusNews />
               </ProtectedRoute>
             }
@@ -293,7 +293,7 @@ function App() {
           <Route
             path="/campus/approvals"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusApprovals />
               </ProtectedRoute>
             }
@@ -301,7 +301,7 @@ function App() {
           <Route
             path="/campus/manage"
             element={
-              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusManage />
               </ProtectedRoute>
             }

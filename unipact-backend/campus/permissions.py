@@ -58,6 +58,26 @@ def campus_enabled():
     return bool(getattr(settings, 'CAMPUS_ENABLED', False))
 
 
+def pilot_only():
+    return bool(getattr(settings, 'CAMPUS_PILOT_ONLY', True))
+
+
+def has_campus_access(user):
+    """Whether UniPact Campus exists for this person. With pilot mode on, only UniPact admins, staff accounts,
+    people who hold (or held) a campus role, and students on the pilot list get in."""
+    if not campus_enabled():
+        return False
+    if not pilot_only():
+        return True
+    if not (user and user.is_authenticated):
+        return False
+    if user.role in (User.Role.ADMIN, User.Role.STAFF):
+        return True
+    from .models import PilotAccess
+    return (RoleAssignment.objects.filter(user=user).exists()
+            or PilotAccess.objects.filter(email__iexact=user.email).exists())
+
+
 def is_platform_admin(user):
     return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
@@ -113,9 +133,10 @@ def role_action(role):
 
 
 class CampusEnabled(permissions.BasePermission):
-    """Every campus endpoint answers 404 while the feature is switched off."""
+    """Every campus endpoint answers 404 while the feature is switched off, and, in pilot mode, to anyone who
+    isn't part of the pilot (signed out visitors included), so Campus doesn't appear to exist for them."""
 
     def has_permission(self, request, view):
-        if not campus_enabled():
+        if not has_campus_access(request.user):
             raise Http404
         return True

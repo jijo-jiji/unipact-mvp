@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import OrgUnit, RoleAssignment, StaffProfile
+from .models import OrgUnit, PilotAccess, RoleAssignment, StaffProfile
 
 
 @admin.register(OrgUnit)
@@ -26,3 +26,10 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'unit__name', 'position')
     autocomplete_fields = ('unit',)
     raw_id_fields = ('user', 'assigned_by')
+
+
+@admin.register(PilotAccess)
+class PilotAccessAdmin(admin.ModelAdmin):
+    list_display = ('email', 'campus', 'note', 'added_by', 'created_at')
+    list_filter = ('campus',)
+    search_fields = ('email', 'note')

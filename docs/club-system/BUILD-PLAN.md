@@ -34,6 +34,12 @@ Each one ends with `python manage.py test` passing, `npm run build` compiling wi
 - Built with it: the general approval engine (`campus/approvals.py`) that M2's SAF chain reuses, and a
   Manage campus page (structure and roles, staff invitations, semesters)
 
+### Pilot mode — done 2026-11-27
+- `CAMPUS_PILOT_ONLY` (on by default): Campus exists only for UniPact admins, staff accounts, campus role holders
+  and students on the pilot list; everyone else gets "not found" and no menu item
+- Pilot list kept by email (SDCL adds students before or after they sign up; each one is emailed), managed under
+  Manage campus → Pilot students. How to switch it on: `DEPLOYMENT.md` → "UniPact Campus pilot"
+
 ### M2. Activities and the approval chain
 - Activity proposal: GHOCS fields + SAF 2026 template fields (objectives, programme, budget items, funding split)
 - The 9-step MIIT chain: RM 5,000 Dean/Deputy Dean rule, SD/CL routing, no-budget shortcut

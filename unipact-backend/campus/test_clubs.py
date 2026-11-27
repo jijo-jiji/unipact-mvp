@@ -16,7 +16,7 @@ from .models import (
 from .tests import MiitTreeMixin, appoint, make_user
 
 
-@override_settings(CAMPUS_ENABLED=True)
+@override_settings(CAMPUS_ENABLED=True, CAMPUS_PILOT_ONLY=False)
 class ClubTestBase(MiitTreeMixin, APITestCase):
     def setUp(self):
         self.build_tree()

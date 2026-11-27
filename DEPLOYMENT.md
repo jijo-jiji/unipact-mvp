@@ -141,6 +141,30 @@ If a student you are removing is on a project whose client you are keeping, the 
 
 Uploaded files are only removed from Cloudflare R2 if the command also has the R2 settings (`USE_S3=true` and the four `AWS_…` values from Render); it says which storage it used. Without them it removes the database records and tells you how many files are still in the bucket, which you can delete in the Cloudflare dashboard.
 
+### UniPact Campus pilot (clubs, approvals, GHOCS)
+
+Campus ships switched off. Two settings on the Render API service control it:
+
+| Setting | Value | What it does |
+|---|---|---|
+| `CAMPUS_ENABLED` | `false` (default) | Campus doesn't exist: no menu item, every `/api/campus/` address answers "not found". |
+| `CAMPUS_ENABLED` | `true` | Turns Campus on, limited by the next setting. |
+| `CAMPUS_PILOT_ONLY` | `true` (default) | Closed pilot. Only UniPact admins, staff accounts, anyone holding a campus role and students on the pilot list can see Campus. Everyone else, companies included, sees nothing. |
+| `CAMPUS_PILOT_ONLY` | `false` | Campus is open to every account, and the club directory and news are public. |
+
+To start the pilot:
+
+1. In Render, set `CAMPUS_ENABLED=true` and leave `CAMPUS_PILOT_ONLY` unset (so it stays a closed pilot). Deploy.
+2. In the Render Shell, run `python manage.py seed_campus_miit` once. It creates MIIT's offices, the SD and CL sections and the SRC, with no people.
+3. Sign in as a UniPact admin and open **Campus → Manage campus**:
+   - **Staff:** invite the SDCL officer and the club advisors. They get an email to set their password.
+   - **Structure and roles:** make the SDCL officer *Campus administrator* at MIIT, add the pilot clubs under SD or CL, and appoint each club's advisor and president.
+   - **Semesters:** add the current semester.
+   - **Pilot students:** paste the students' emails. Each one gets an email to sign in, or to sign up with that address.
+4. Students made president or member of a club get in automatically. You don't need to list them too.
+
+To end the pilot, set `CAMPUS_ENABLED=false`: Campus disappears again, and its data stays in the database.
+
 ### Sending email from Gmail (quick start)
 
 Until a domain is verified with an email provider, UniPact can send through the project Gmail account:

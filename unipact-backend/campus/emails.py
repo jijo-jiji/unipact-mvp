@@ -70,3 +70,18 @@ def role_ended(assignment):
                [f'Your role as {assignment.get_role_display()} of {assignment.unit.name} has ended.'] +
                ([f'Reason: {assignment.ended_reason}'] if assignment.ended_reason else []),
                action_label='Open UniPact Campus', action_path='/campus')
+
+
+def pilot_invited(access, has_account):
+    """A student was added to a campus's closed pilot."""
+    lines = [f'{access.campus.name} added you to the UniPact Campus pilot: clubs, activity approvals and GHOCS '
+             'points in one place.']
+    if has_account:
+        lines.append('Sign in to UniPact and open Campus from the menu.')
+        label, path = 'Open UniPact Campus', '/campus'
+    else:
+        lines.append(f'Sign up as a student with this email address ({access.email}) and Campus will appear in '
+                     'your menu.')
+        label, path = 'Create your account', '/register/student'
+    send_email(access.email, 'You are invited to the UniPact Campus pilot', "You're in the pilot", lines,
+               action_label=label, action_path=path)

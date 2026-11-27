@@ -162,7 +162,7 @@ class PermissionTests(MiitTreeMixin, TestCase):
         self.assertEqual(set(visible_units(head_cl)), {self.cl, self.badminton})
 
 
-@override_settings(CAMPUS_ENABLED=True)
+@override_settings(CAMPUS_ENABLED=True, CAMPUS_PILOT_ONLY=False)
 class CampusApiTests(MiitTreeMixin, APITestCase):
     def setUp(self):
         self.build_tree()

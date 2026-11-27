@@ -463,3 +463,22 @@ class ApprovalStep(models.Model):
     class Meta:
         ordering = ['order']
         constraints = [models.UniqueConstraint(fields=['request', 'order'], name='unique_step_order')]
+
+
+class PilotAccess(models.Model):
+    """A student allowed into UniPact Campus while it runs as a closed pilot (CAMPUS_PILOT_ONLY). Kept by email,
+    so SDCL can add students before they sign up; the email matches their UniPact account."""
+    campus = models.ForeignKey(OrgUnit, on_delete=models.CASCADE, related_name='pilot_access',
+                               limit_choices_to={'kind': OrgUnit.Kind.CAMPUS})
+    email = models.EmailField(unique=True)  # stored lower-case
+    note = models.CharField(max_length=255, blank=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['email']
+        verbose_name_plural = 'pilot access'
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)

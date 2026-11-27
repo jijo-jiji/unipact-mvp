@@ -72,6 +72,11 @@ def clear_auth_cookies(response):
     for name in ('access_token', 'refresh_token'):
         response.delete_cookie(name, path=options['path'], domain=options['domain'], samesite=options['samesite'])
 
+def campus_access(user):
+    from campus.permissions import has_campus_access
+    return has_campus_access(user)
+
+
 def account_payload(user):
     """The signed-in user's account as the frontend expects it (used by /me/ and the settings endpoint)."""
     ver_status = None
@@ -123,8 +128,8 @@ def account_payload(user):
         "id": user.id,
         "email": user.email,
         "role": user.role,
-        # Whether UniPact Campus (clubs, approvals, GHOCS) is switched on, so the menu can offer it
-        "campus_enabled": bool(getattr(settings, 'CAMPUS_ENABLED', False)),
+        # Whether UniPact Campus (clubs, approvals, GHOCS) is open to this person, so the menu can offer it
+        "campus_enabled": campus_access(user),
         "name": name,
         "avatar_url": avatar_url,
         "email_verified": user.email_verified,

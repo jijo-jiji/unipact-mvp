@@ -45,4 +45,6 @@ urlpatterns += [
     path('approvals/<int:pk>/', c.ApprovalDetailView.as_view(), name='campus_approval'),
     path('approvals/<int:pk>/decide/', c.ApprovalDecideView.as_view(), name='campus_approval_decide'),
     path('approvals/<int:pk>/withdraw/', c.ApprovalWithdrawView.as_view(), name='campus_approval_withdraw'),
+    path('pilot/', c.PilotListView.as_view(), name='campus_pilot'),
+    path('pilot/<int:pk>/', c.PilotDetailView.as_view(), name='campus_pilot_detail'),
 ]

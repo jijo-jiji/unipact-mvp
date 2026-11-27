@@ -11,7 +11,9 @@ from users.models import SystemLog
 from users.utils import invitation_path, log_event
 
 from .models import ROLE_UNIT_KINDS, STAFF_ROLES, OrgUnit, RoleAssignment, StaffProfile
-from .permissions import Action, CampusEnabled, can, current_assignments, is_platform_admin, role_action, visible_units
+from .permissions import (
+    Action, CampusEnabled, can, current_assignments, is_platform_admin, pilot_only, role_action, visible_units,
+)
 from .serializers import (
     ROLE_CHOICES, MyAssignmentSerializer, OrgUnitSerializer, RoleAssignmentSerializer, StaffSerializer,
 )
@@ -32,6 +34,7 @@ class MeView(APIView):
         assignments = current_assignments(request.user).order_by('unit__kind', 'role')
         return Response({
             'is_platform_admin': is_platform_admin(request.user),
+            'pilot_mode': pilot_only(),
             'assignments': MyAssignmentSerializer(assignments, many=True).data,
             'pending_approvals': len(approvals.inbox(request.user)),
             'can_manage_structure': is_platform_admin(request.user) or any(
