@@ -23,6 +23,10 @@ def approval_finished(request):
     if not approved and last and last.comment:
         lines.append(f'Reason: {last.comment}')
     path = '/campus/approvals?mine=1&open=' + str(request.pk)
+    if request.kind == request.Kind.GHOCS_CLAIM:
+        path = '/campus/ghocs'
+        if approved and getattr(request.ghocs_claim, 'entry', None):
+            lines.append(f'{request.ghocs_claim.entry.points.normalize():f} points were added to your GHOCS record.')
     if request.kind == request.Kind.ACTIVITY:
         path = f'/campus/activities/{request.activity_id}'
         if approved:
@@ -124,3 +128,13 @@ def activity_report_reviewed(report, committee):
         send_email(person.email, f'{"Report accepted" if accepted else "Changes requested"}: {activity.title}',
                    'Your activity report was reviewed', lines,
                    action_label='Open the activity', action_path=f'/campus/activities/{activity.pk}?tab=report')
+
+
+def claim_waiting(claim, people, days):
+    for person in people:
+        send_email(
+            person.email, f'GHOCS claim waiting {days} days: {claim.title}', 'A GHOCS claim is still waiting',
+            [f'{display_name(claim.student)} sent this claim {days} days ago and is waiting for your decision.'],
+            details=[('Claim', claim.title), ('Type', claim.get_kind_display())],
+            action_label='Review it', action_path=f'/campus/approvals?open={claim.approval.pk}',
+        )

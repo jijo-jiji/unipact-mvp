@@ -70,6 +70,7 @@ const CampusManage = page(() => import('./pages/CampusManage'));
 const CampusProposeActivity = page(() => import('./pages/CampusProposeActivity'));
 const CampusActivity = page(() => import('./pages/CampusActivity'));
 const CampusCheckIn = page(() => import('./pages/CampusCheckIn'));
+const CampusGhocs = page(() => import('./pages/CampusGhocs'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -306,6 +307,22 @@ function App() {
             element={
               <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusCheckIn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/ghocs"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusGhocs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/ghocs/students/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusGhocs />
               </ProtectedRoute>
             }
           />

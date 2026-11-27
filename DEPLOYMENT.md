@@ -164,7 +164,8 @@ To start the pilot:
 4. Students made president or member of a club get in automatically. You don't need to list them too.
 
 5. Under **Manage campus → Approval chain**, turn off the SRC or Finance steps if they aren't part of the pilot, so proposals don't wait for someone who isn't there.
-6. Add a daily **Render Cron Job** on the same repo and settings that runs `python manage.py campus_reminders` (e.g. at 01:00 UTC, 9am in Malaysia). It emails committees whose activity reports are due or late.
+6. Under **Staff** and **Structure and roles**, invite the GHOCS secretary and make them *GHOCS secretary* at the SD or CL section (or at MIIT). They verify students' claims in Approvals.
+7. Add a daily **Render Cron Job** on the same repo and settings that runs `python manage.py campus_reminders` (e.g. at 01:00 UTC, 9am in Malaysia). It emails committees whose activity reports are due or late, and GHOCS secretaries about claims waiting 3 or 7 days.
 
 To end the pilot, set `CAMPUS_ENABLED=false`: Campus disappears again, and its data stays in the database.
 

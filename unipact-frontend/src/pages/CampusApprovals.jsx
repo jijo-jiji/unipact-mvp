@@ -46,6 +46,24 @@ const Target = ({ target }) => {
       </dl>
     );
   }
+  if (target.type === 'ghocs_claim') {
+    return (
+      <dl className="divide-y divide-[rgba(10,23,72,0.06)]">
+        <Row label="Student">{target.student?.name}</Row>
+        <Row label="Type">{target.kind_label}</Row>
+        <Row label="Title">{target.title}</Row>
+        <Row label="Subject">{target.subject}</Row>
+        <Row label="Achievement">{target.achievement && `${target.achievement.replaceAll('_', ' ').toLowerCase()}${target.rank ? ` · ${target.rank}` : ''}${target.group_award ? ' · group' : ''}`}</Row>
+        <Row label="Level">{target.activity_level && labelOf(ACTIVITY_LEVELS, target.activity_level)}</Row>
+        <Row label="UniKL DNA category">{target.dna_category && labelOf(DNA_CATEGORIES, target.dna_category)}</Row>
+        <Row label="Role">{target.role && target.role.toLowerCase()}</Row>
+        <Row label="Date">{formatDate(target.date)}</Row>
+        <Row label="Description">{target.description}</Row>
+        <Row label="Evidence">{target.evidence && <a className="text-[#00729F] underline" href={target.evidence} target="_blank" rel="noopener noreferrer">Open the evidence</a>}</Row>
+        <Row label="Student's record">{target.student && <Link className="text-[#00729F] underline" to={`/campus/ghocs/students/${target.student.id}`}>See their GHOCS</Link>}</Row>
+      </dl>
+    );
+  }
   if (target.type === 'activity') {
     const rm = (n) => `RM ${Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return (

@@ -44,3 +44,23 @@ class Command(BaseCommand):
                                                     defaults={'count': count + 1, 'last_sent_at': now})
             sent += 1
         self.stdout.write(f'Sent {sent} activity report reminder(s).')
+        self.stdout.write(f'Sent {self.claim_reminders(now)} GHOCS claim reminder(s).')
+
+    def claim_reminders(self, now):
+        """Claims waiting 3 days, then 7 days, remind the GHOCS secretaries (UniKLSKILL problem 3: claims missed)."""
+        from campus.approvals import signers
+        from campus.models import GhocsClaim
+
+        sent = 0
+        for claim in GhocsClaim.objects.filter(status=GhocsClaim.Status.PENDING, reminders_sent__lt=2):
+            due = (3, 7)[claim.reminders_sent]
+            if (now - claim.created_at).days < due:
+                continue
+            step = claim.approval.current_step
+            if step is None:
+                continue
+            emails.claim_waiting(claim, signers(step), days=(now - claim.created_at).days)
+            claim.reminders_sent += 1
+            claim.save(update_fields=['reminders_sent'])
+            sent += 1
+        return sent

@@ -70,3 +70,14 @@ urlpatterns += [
     path('checkin/<str:code>/', a.CheckinCodeView.as_view(), name='campus_checkin'),
     path('policy/', a.ActivityPolicyView.as_view(), name='campus_policy'),
 ]
+
+from . import views_ghocs as g  # noqa: E402
+
+urlpatterns += [
+    path('ghocs/me/', g.MyGhocsView.as_view(), name='campus_ghocs_me'),
+    path('ghocs/claims/', g.ClaimListView.as_view(), name='campus_ghocs_claims'),
+    path('ghocs/claimable-events/', g.ClaimableEventsView.as_view(), name='campus_ghocs_events'),
+    path('ghocs/transcript.pdf', g.TranscriptPdfView.as_view(), name='campus_ghocs_transcript'),
+    path('ghocs/settings/', g.SettingsView.as_view(), name='campus_ghocs_settings'),
+    path('ghocs/students/<int:user_id>/', g.StudentGhocsView.as_view(), name='campus_ghocs_student'),
+]

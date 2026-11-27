@@ -268,6 +268,99 @@ const Semesters = ({ units }) => {
   );
 };
 
+// --- GHOCS points ---------------------------------------------------------------------------------------------
+const LEVEL_NAMES = { CAMPUS: 'Campus', UNIVERSITY: 'University', STATE: 'State', NATIONAL: 'National', INTERNATIONAL: 'International' };
+const ROLE_NAMES = { PARTICIPANT: 'Participant', COMMITTEE: 'Committee / AJK', ORGANISER: 'Program director' };
+const ACHIEVEMENT_NAMES = {
+  PARTICIPATE: 'Participation', REPRESENTATIVE: 'Representative', SPECIAL_AWARD: 'Special award',
+  INTERNATIONAL_SHORT: 'International, short sem', INTERNATIONAL_FULL: 'International, full sem',
+  EXCHANGE_SHORT: 'Exchange, short sem', EXCHANGE_FULL: 'Exchange, full sem',
+};
+const MANAGEMENT_NAMES = { COMMITTEE: 'Committee member', MEMBER: 'Club member', SRC_OFFICER: 'SRC officer' };
+
+const NumberTable = ({ title, hint, values, names, onChange }) => (
+  <div>
+    <h3 className="font-semibold">{title}</h3>
+    {hint && <p className="text-xs text-[#5B6478]">{hint}</p>}
+    <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 mt-2">
+      {Object.entries(values).map(([key, value]) => (
+        <label key={key} className="flex items-center justify-between gap-3 text-sm">
+          <span>{names?.[key] || key}</span>
+          <input type="number" min="0" step="0.5" className="input w-24" value={value} onChange={(e) => onChange({ ...values, [key]: e.target.value })} aria-label={`${title}: ${names?.[key] || key}`} />
+        </label>
+      ))}
+    </div>
+  </div>
+);
+
+const GhocsPoints = ({ units }) => {
+  const { showToast } = useToast();
+  const campuses = units.filter((u) => u.kind === 'CAMPUS');
+  const [campus, setCampus] = useState(campuses[0]?.id || '');
+  const { data, error, loading, setData } = useLoad(campus ? '/campus/ghocs/settings/' : null, { campus });
+  const [apply, setApply] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [saving, setSaving] = useState(false);
+  const tables = data?.tables;
+  const setTable = (key) => (value) => setData({ ...data, tables: { ...tables, [key]: value } });
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.patch(`/campus/ghocs/settings/?campus=${campus}`, { label: data.label, official: data.official, tables, apply_to_existing: apply });
+      setData(res.data);
+      showToast(apply ? `Saved. ${res.data.recalculated} existing entr${res.data.recalculated === 1 ? 'y' : 'ies'} recalculated.` : 'Saved. New points use these values.', 'success');
+      setApply(false);
+    } catch (err) { showToast(errorText(err), 'error'); } finally { setSaving(false); }
+  };
+
+  return (
+    <Card className="space-y-4 max-w-4xl">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading font-bold text-xl">GHOCS point values</h2>
+          <p className="text-sm text-[#5B6478]">Start from UniKLSKILL's values; replace them with SDCL's official table when you have it.</p>
+        </div>
+        {campuses.length > 1 && (
+          <select className="input w-auto" value={campus} onChange={(e) => setCampus(e.target.value)} aria-label="Campus">
+            {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+      </div>
+      {loading && !data && <Loading />}
+      <ErrorNote>{error}</ErrorNote>
+      {tables && (
+        <form onSubmit={save} className="space-y-6">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Name shown to students" htmlFor="ghocs-label"><input id="ghocs-label" className="input" value={data.label} onChange={(e) => setData({ ...data, label: e.target.value })} /></Field>
+            <label className="flex items-center gap-2 text-sm sm:mt-7"><input type="checkbox" checked={data.official} onChange={(e) => setData({ ...data, official: e.target.checked })} /> These are SDCL's official values (removes the "pilot" notice)</label>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="UniKL DNA points per activity" htmlFor="dna-points"><input id="dna-points" type="number" min="0" step="0.5" className="input" value={tables.dna_points} onChange={(e) => setData({ ...data, tables: { ...tables, dna_points: e.target.value } })} /></Field>
+            <Field label="Spider web target (points per skill)" htmlFor="sc-target"><input id="sc-target" type="number" min="1" step="1" className="input" value={tables.sc_target} onChange={(e) => setData({ ...data, tables: { ...tables, sc_target: e.target.value } })} /></Field>
+          </div>
+          <NumberTable title="Level weights" hint="Activity points × this. 1 means the level doesn't change the points." values={tables.level_weights} names={LEVEL_NAMES} onChange={setTable('level_weights')} />
+          <NumberTable title="Role weights" hint="Activity points × this, by the role on the attendance list." values={tables.role_weights} names={ROLE_NAMES} onChange={setTable('role_weights')} />
+          <NumberTable title="Excellence points" hint="Per achievement, × the level weight." values={tables.excellence} names={ACHIEVEMENT_NAMES} onChange={setTable('excellence')} />
+          <NumberTable title="Management Skills points" hint="Per club or body, per semester." values={tables.management} names={MANAGEMENT_NAMES} onChange={setTable('management')} />
+          <div>
+            <NumberTable title="Skill Development subjects" hint="Points when the subject is passed. Set to 0 to stop it counting." values={tables.skill_subjects} onChange={setTable('skill_subjects')} />
+            <div className="flex gap-2 mt-2 max-w-md">
+              <input className="input" placeholder="Add a subject" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} aria-label="New subject" />
+              <button type="button" className="btn-secondary btn-sm" onClick={() => { if (newSubject.trim()) { setTable('skill_subjects')({ ...tables.skill_subjects, [newSubject.trim()]: 5 }); setNewSubject(''); } }}>Add</button>
+            </div>
+          </div>
+          <label className="flex items-start gap-2 text-sm rounded-lg bg-[#F5F7FC] p-3"><input type="checkbox" className="mt-1" checked={apply} onChange={(e) => setApply(e.target.checked)} />
+            <span><span className="font-semibold">Apply to points already given.</span> Recalculates every student's existing activities and approved claims with these values. Leave it off to change only new points.</span>
+          </label>
+          <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </form>
+      )}
+    </Card>
+  );
+};
+
 // --- Approval chain -----------------------------------------------------------------------------------------
 const ApprovalChain = ({ units }) => {
   const { showToast } = useToast();
@@ -403,7 +496,7 @@ const CampusManage = () => {
   const units = useLoad('/campus/units/');
   const roles = useLoad('/campus/roles/');
   const me = useLoad('/campus/me/');
-  const tabs = [['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters'], ['chain', 'Approval chain']];
+  const tabs = [['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters'], ['chain', 'Approval chain'], ['ghocs', 'GHOCS points']];
   if (me.data?.pilot_mode) tabs.push(['pilot', 'Pilot students']);
 
   return (
@@ -419,6 +512,7 @@ const CampusManage = () => {
           {units.data.length > 0 && tab === 'semesters' && <Semesters units={units.data} />}
           {units.data.length > 0 && tab === 'pilot' && <PilotStudents units={units.data} />}
           {units.data.length > 0 && tab === 'chain' && <ApprovalChain units={units.data} />}
+          {units.data.length > 0 && tab === 'ghocs' && <GhocsPoints units={units.data} />}
         </>
       )}
     </CampusPage>

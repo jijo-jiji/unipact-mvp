@@ -18,6 +18,7 @@ from users.utils import log_event
 
 from . import approvals, emails
 from .activities import chain_for, new_checkin_code, render_saf_pdf
+from .points import award_activity
 from .clubs import ADVISOR_ROLES, MEMBERSHIP_ROLES
 from .models import (
     Activity, ActivityComment, ActivityPolicy, ActivityReport, ActivityReportFile, ApprovalRequest, Attendance,
@@ -266,6 +267,7 @@ class AttendanceListView(APIView):
         attendance, created = Attendance.objects.update_or_create(
             activity=activity, student=student,
             defaults={'role': role, 'method': Attendance.Method.MANUAL, 'added_by': request.user})
+        award_activity(activity)
         return Response(AttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
@@ -284,6 +286,7 @@ class AttendanceDetailView(APIView):
             raise exceptions.ValidationError({'role': ['Choose participant, committee or organiser.']})
         row.role = role
         row.save(update_fields=['role'])
+        award_activity(row.activity)
         return Response(AttendanceSerializer(row).data)
 
     def delete(self, request, pk, attendance_id):
@@ -395,6 +398,8 @@ class ActivityReportReviewView(APIView):
                 activity.status = Activity.Status.COMPLETED
                 activity.checkin_open = False
                 activity.save(update_fields=['status', 'checkin_open'])
+                # Everyone who attended gets their UniKL DNA points now: attendance + an accepted report
+                award_activity(activity)
         emails.activity_report_reviewed(report, committee_of(activity.club))
         return Response({'report': ActivityReportSerializer(report, context={'request': request}).data})
 

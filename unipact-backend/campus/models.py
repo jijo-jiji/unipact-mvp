@@ -415,6 +415,7 @@ class ApprovalRequest(models.Model):
         CLUB_PROPOSAL = 'CLUB_PROPOSAL', 'New club'
         NEWS = 'NEWS', 'News post'
         ACTIVITY = 'ACTIVITY', 'Activity proposal'
+        GHOCS_CLAIM = 'GHOCS_CLAIM', 'GHOCS claim'
 
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'In review'
@@ -431,6 +432,8 @@ class ApprovalRequest(models.Model):
                                          related_name='approval')
     news_post = models.OneToOneField(NewsPost, on_delete=models.CASCADE, null=True, blank=True, related_name='approval')
     activity = models.OneToOneField('Activity', on_delete=models.CASCADE, null=True, blank=True, related_name='approval')
+    ghocs_claim = models.OneToOneField('GhocsClaim', on_delete=models.CASCADE, null=True, blank=True,
+                                       related_name='approval')
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
 
@@ -653,3 +656,131 @@ class ReportReminder(models.Model):
     activity = models.OneToOneField(Activity, on_delete=models.CASCADE, related_name='report_reminder')
     count = models.PositiveSmallIntegerField(default=0)
     last_sent_at = models.DateTimeField()
+
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# M4: GHOCS points
+# ---------------------------------------------------------------------------------------------------------------
+
+def default_ghocs_tables():
+    """Pilot point values: UniKLSKILL's (Ashraf Rahimi's) defaults, until SDCL confirms the official table.
+    docs/club-system/PLAN.md §4.1.1."""
+    return {
+        'dna_points': 1,  # per activity, before the level and role weights
+        'level_weights': {'CAMPUS': 1, 'UNIVERSITY': 1, 'STATE': 1, 'NATIONAL': 1, 'INTERNATIONAL': 1},
+        'role_weights': {'PARTICIPANT': 1, 'COMMITTEE': 1, 'ORGANISER': 1},
+        'excellence': {'PARTICIPATE': 5, 'REPRESENTATIVE': 10, 'SPECIAL_AWARD': 20, 'INTERNATIONAL_SHORT': 20,
+                       'INTERNATIONAL_FULL': 25, 'EXCHANGE_SHORT': 20, 'EXCHANGE_FULL': 25},
+        'skill_subjects': {'Bahasa Melayu': 5, 'Arabic': 5, 'French': 5, 'Italian': 5, 'Korean': 5, 'Mandarin': 5,
+                           'Spanish': 5},
+        'management': {'COMMITTEE': 10, 'MEMBER': 5, 'SRC_OFFICER': 10},  # per club or body, per semester
+        'sc_target': 20,  # the spider web shows each SC as points out of this
+    }
+
+
+class GhocsSettings(models.Model):
+    """A campus's GHOCS point values. Labelled "pilot points" until replaced with the official table."""
+    campus = models.OneToOneField(OrgUnit, on_delete=models.CASCADE, related_name='ghocs_settings',
+                                  limit_choices_to={'kind': OrgUnit.Kind.CAMPUS})
+    label = models.CharField(max_length=100, default='Pilot points (UniKLSKILL defaults)')
+    official = models.BooleanField(default=False)  # True once SDCL confirms these are the official values
+    tables = models.JSONField(default=default_ghocs_tables)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'GHOCS settings'
+
+    @classmethod
+    def for_campus(cls, campus):
+        settings_, _ = cls.objects.get_or_create(campus=campus)
+        merged = default_ghocs_tables()
+        for key, value in (settings_.tables or {}).items():
+            merged[key] = {**merged[key], **value} if isinstance(merged.get(key), dict) and isinstance(value, dict) \
+                else value
+        settings_.tables = merged
+        return settings_
+
+
+class GhocsClaim(models.Model):
+    """A student's claim for points that UniPact can't see happen: a GHOCS-claimable event from the news,
+    an Excellence achievement (My Excellence), or a Skill Development subject. The GHOCS secretary verifies it."""
+
+    class Kind(models.TextChoices):
+        EVENT = 'EVENT', 'Event (from campus news)'
+        EXCELLENCE = 'EXCELLENCE', 'Excellence (award or competition)'
+        SKILL = 'SKILL', 'Skill Development (subject)'
+
+    class Achievement(models.TextChoices):
+        PARTICIPATE = 'PARTICIPATE', 'Participation'
+        REPRESENTATIVE = 'REPRESENTATIVE', 'Representative'
+        SPECIAL_AWARD = 'SPECIAL_AWARD', 'Special award'
+        INTERNATIONAL_SHORT = 'INTERNATIONAL_SHORT', 'International programme, short semester'
+        INTERNATIONAL_FULL = 'INTERNATIONAL_FULL', 'International programme, full semester'
+        EXCHANGE_SHORT = 'EXCHANGE_SHORT', 'Student exchange, short semester'
+        EXCHANGE_FULL = 'EXCHANGE_FULL', 'Student exchange, full semester'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Waiting for the GHOCS secretary'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Not approved'
+        WITHDRAWN = 'WITHDRAWN', 'Withdrawn'
+
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ghocs_claims')
+    campus = models.ForeignKey(OrgUnit, on_delete=models.PROTECT, related_name='ghocs_claims')
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    title = models.CharField(max_length=255)
+    news_post = models.ForeignKey(NewsPost, on_delete=models.SET_NULL, null=True, blank=True, related_name='claims')
+    activity_level = models.CharField(max_length=14, blank=True)
+    dna_category = models.CharField(max_length=20, blank=True)
+    merit_elements = models.JSONField(default=list, blank=True)
+    role = models.CharField(max_length=12, blank=True)  # event: Attendance.Role
+    achievement = models.CharField(max_length=20, blank=True)
+    rank = models.CharField(max_length=60, blank=True)  # e.g. "1st place"
+    group_award = models.BooleanField(default=False)
+    subject = models.CharField(max_length=100, blank=True)
+    date = models.DateField()
+    description = models.TextField(blank=True)
+    evidence = models.FileField(upload_to='campus/ghocs_evidence/')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reminders_sent = models.PositiveSmallIntegerField(default=0)  # to the secretary, at 3 and 7 days
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class GhocsEntry(models.Model):
+    """One line in a student's GHOCS record. DNA entries feed the spider web. Entries keep what they were
+    awarded for (level, role, achievement...), so SDCL can recalculate them when the official values arrive."""
+
+    class Component(models.TextChoices):
+        DNA = 'DNA', 'UniKL DNA'
+        EXCELLENCE = 'EXCELLENCE', 'Excellence'
+        SKILL = 'SKILL', 'Skill Development'
+
+    class Source(models.TextChoices):
+        ACTIVITY = 'ACTIVITY', 'Club activity'
+        CLAIM = 'CLAIM', 'Approved claim'
+
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ghocs_entries')
+    campus = models.ForeignKey(OrgUnit, on_delete=models.PROTECT, related_name='ghocs_entries')
+    component = models.CharField(max_length=10, choices=Component.choices)
+    source = models.CharField(max_length=10, choices=Source.choices)
+    attendance = models.OneToOneField('Attendance', on_delete=models.CASCADE, null=True, blank=True,
+                                      related_name='ghocs_entry')
+    claim = models.OneToOneField(GhocsClaim, on_delete=models.CASCADE, null=True, blank=True,
+                                 related_name='entry')
+    title = models.CharField(max_length=255)
+    activity_level = models.CharField(max_length=14, blank=True)
+    dna_category = models.CharField(max_length=20, blank=True)
+    merit_elements = models.JSONField(default=list, blank=True)
+    role = models.CharField(max_length=12, blank=True)
+    achievement = models.CharField(max_length=20, blank=True)
+    subject = models.CharField(max_length=100, blank=True)
+    points = models.DecimalField(max_digits=7, decimal_places=2)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']

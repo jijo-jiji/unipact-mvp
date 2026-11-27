@@ -18,6 +18,8 @@ def finished(request, decided_by=None):
         _news(request)
     elif request.kind == ApprovalRequest.Kind.ACTIVITY:
         _activity(request)
+    elif request.kind == ApprovalRequest.Kind.GHOCS_CLAIM:
+        _ghocs_claim(request)
     if request.status != S.WITHDRAWN:
         emails.approval_finished(request)
 
@@ -71,3 +73,18 @@ def _activity(request):
     else:
         activity.status = Activity.Status.WITHDRAWN
     activity.save(update_fields=['status', 'approval_number'])
+
+
+def _ghocs_claim(request):
+    from .models import GhocsClaim
+    from .points import award_claim
+
+    claim = request.ghocs_claim
+    if request.status == S.APPROVED:
+        claim.status = GhocsClaim.Status.APPROVED
+        award_claim(claim)
+    elif request.status == S.REJECTED:
+        claim.status = GhocsClaim.Status.REJECTED
+    else:
+        claim.status = GhocsClaim.Status.WITHDRAWN
+    claim.save(update_fields=['status'])

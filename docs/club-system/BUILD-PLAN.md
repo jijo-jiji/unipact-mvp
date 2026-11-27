@@ -77,12 +77,19 @@ One "UniPact" app for every role, built from the same React code with Capacitor.
 - SRC Treasurer decision with email
 - Deadlines: 30 days to apply after approval, 3-month validity, financial report 30 days after the event, overdue flags
 
-### M4. GHOCS
+### M4. GHOCS — done 2026-11-27
 - Point rules table (pilot values, editable)
 - Claims: from attended activities (pre-filled, category locked), My Excellence with evidence, Skill Development
 - Verify → approve; Secretary queue oldest first; reminders at 3 and 7 days
 - Management Skills per semester
 - Spider web as absolute values against a target, plus a printable transcript
+- How it works as built: club activities need no claim (attendance + the advisor-accepted report award UniKL DNA
+  points automatically); claims cover GHOCS-claimable news events (category locked to the event), My Excellence
+  and Skill Development, verified by the GHOCS secretary with reminders at 3 and 7 days. Four components as on
+  the official transcript (Skill Development, UniKL DNA, Excellence, Management Skills); S.P.I.C.E.S is tracked
+  but adds no points. Values, level and role weights, and the web target are editable under Manage campus →
+  GHOCS points, with "apply to points already given". Staff can open a student's record from a claim.
+- M3 (SRC funding) deferred: the SRC is not in the pilot
 
 ### M5. Pilot dashboard and survey
 - Dean's dashboard: approval turnaround, on-time reports, activities by DNA category, participation, CSV export

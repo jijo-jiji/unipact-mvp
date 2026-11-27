@@ -476,6 +476,9 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
         if request.activity_id:
             from .serializers_activities import ActivitySerializer
             return {'type': 'activity', **ActivitySerializer(request.activity, context=self.context).data}
+        if request.ghocs_claim_id:
+            from .views_ghocs import ClaimSerializer
+            return {'type': 'ghocs_claim', **ClaimSerializer(request.ghocs_claim, context=self.context).data}
         return None
 
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, CalendarDays, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
+import { Award, Building2, CalendarDays, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import InstallAppCard from '../components/InstallAppCard';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -72,6 +72,9 @@ const CampusHome = () => {
               badge={data.pending_approvals}
               text={data.pending_approvals ? 'Requests are waiting for your signature.' : 'Requests waiting for you, and the ones you sent.'}
             />
+            {isStudent && (
+              <Tile to="/campus/ghocs" icon={Award} title="My GHOCS" text="Your co-curricular points, your skills web, and claims." />
+            )}
             {isStudent && (
               <Tile to="/campus/clubs/propose" icon={PlusCircle} title="Start a club" text="Propose a new club. Your advisor, the Head of Section and the Deputy Dean approve it." />
             )}
