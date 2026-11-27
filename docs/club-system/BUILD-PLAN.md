@@ -40,12 +40,32 @@ Each one ends with `python manage.py test` passing, `npm run build` compiling wi
 - Pilot list kept by email (SDCL adds students before or after they sign up; each one is emailed), managed under
   Manage campus → Pilot students. How to switch it on: `DEPLOYMENT.md` → "UniPact Campus pilot"
 
+### Installable app (PWA) — done 2026-11-27
+- Web app manifest, app icons (standard + maskable), and a small service worker: pages always come from the
+  network (so a deploy never leaves anyone on an old version), hashed build files are cached, and an offline page
+  shows when there's no connection. Chrome reports it installable.
+- "Put UniPact on your home screen" card on Campus home: one-tap install on Android/desktop Chrome, Safari's
+  Share → Add to Home Screen steps on iPhone. Opens at /login, which sends signed-in people to their home.
+
 ### M2. Activities and the approval chain
 - Activity proposal: GHOCS fields + SAF 2026 template fields (objectives, programme, budget items, funding split)
 - The 9-step MIIT chain: RM 5,000 Dean/Deputy Dean rule, SD/CL routing, no-budget shortcut
 - Approvals inbox for each role, with the full sign-off trail
 - Generated SAF 2026 form as PDF; approval numbers (e.g. `1020525`)
 - Published activity: QR check-in, discussion, activity report with advisor remarks, reminder until the report is in
+
+### M2.5. Store apps (Google Play and App Store), after M2
+One "UniPact" app for every role, built from the same React code with Capacitor.
+- Token sign-in for the apps (phone apps don't send the website's cookies reliably); the website stays as is
+- Native push notifications (approvals, join requests, claim decisions), camera QR scanner for check-in,
+  email links that open the app
+- Delete account from inside the app (Apple requires it); no company upgrade/payment screens in the app, to stay
+  clear of Apple's in-app purchase rule for digital subscriptions
+- Store listings, privacy forms, closed testing, then public release
+- **Owner to start now (slow):** Apple Developer account as an organisation (USD 99/yr, needs a D-U-N-S number),
+  Google Play developer account as an organisation (USD 25 once); a Mac with Xcode or a cloud build service for iOS
+- Note for M2: `vercel.json` sets `Permissions-Policy: camera=()`, which blocks the camera on the website; QR
+  check-in in the browser needs `camera=(self)`
 
 ### M3. SRC funding (SAF/SWF)
 - Fund application with the 5-document checklist

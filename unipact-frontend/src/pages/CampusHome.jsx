@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import InstallAppCard from '../components/InstallAppCard';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Card, CampusPage, Empty, ErrorNote, Loading, useLoad } from '../components/campus/CampusUI';
 
@@ -37,6 +38,7 @@ const CampusHome = () => {
       <ErrorNote>{error}</ErrorNote>
       {data && (
         <>
+          <InstallAppCard />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Tile to="/campus/clubs" icon={Users} title="Clubs" text="Browse clubs, join one, or open the clubs you belong to." />
             <Tile to="/campus/news" icon={Newspaper} title="News" text="Campus news and activities, including GHOCS-claimable ones." />
