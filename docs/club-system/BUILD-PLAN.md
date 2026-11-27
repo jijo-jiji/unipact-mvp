@@ -18,7 +18,7 @@ Status: **approved 2026-11-27**. Milestones are built in order, M0 to M5.
 
 Each one ends with `python manage.py test` passing, `npm run build` compiling with 0 errors, and a commit.
 
-### M0. Foundations (backend only)
+### M0. Foundations (backend only) — done 2026-11-27
 - New app `campus`, separate from the v2.2.1 club and V3.0 student code
 - Org tree `OrgUnit`: UniKL → MIIT → Dean, Deputy Deans, Finance, SD and CL sections, SRC, clubs
 - `RoleAssignment` (person + role + unit + session) and one permission check used by every endpoint
@@ -26,11 +26,13 @@ Each one ends with `python manage.py test` passing, `npm run build` compiling wi
 - `seed_campus_miit` command: the MIIT tree with job titles only; real people are added as data
 - Feature switch `CAMPUS_ENABLED`; Django admin for all campus models
 
-### M1. Clubs and members
+### M1. Clubs and members — done 2026-11-27
 - Club directory and club page (about, activities, announcements, members)
 - Join request → committee or advisor approves; members, positions, promote and demote, membership per semester
 - Propose a new club (decision 2 chain); assign advisors (they get notified)
 - Announcements with comments; campus news (anyone can propose, SDCL approves, can be marked "GHOCS-claimable")
+- Built with it: the general approval engine (`campus/approvals.py`) that M2's SAF chain reuses, and a
+  Manage campus page (structure and roles, staff invitations, semesters)
 
 ### M2. Activities and the approval chain
 - Activity proposal: GHOCS fields + SAF 2026 template fields (objectives, programme, budget items, funding split)

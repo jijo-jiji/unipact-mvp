@@ -21,26 +21,32 @@ class Action:
     VIEW_STRUCTURE = 'view_structure'      # see the org tree and who holds which role
     MANAGE_UNITS = 'manage_units'          # add or rename sections, offices, bodies and clubs
     MANAGE_STAFF = 'manage_staff'          # invite staff accounts
-    ASSIGN_STAFF_ROLES = 'assign_staff_roles'  # appoint deans, heads, executives, secretaries, advisors
-    ASSIGN_STUDENT_ROLES = 'assign_student_roles'  # appoint committee members and SRC officers
+    ASSIGN_STAFF_ROLES = 'assign_staff_roles'  # appoint deans, heads, executives, secretaries, advisors, SRC officers
+    ASSIGN_STUDENT_ROLES = 'assign_student_roles'  # add members, appoint and change committee positions
+    MANAGE_CLUB = 'manage_club'            # edit the club page, decide join requests, post and moderate announcements
+    VIEW_CLUB = 'view_club'                # read members-only content: announcements, the full member list
 
 
 A = Action
+_OVERSIGHT = {A.VIEW_STRUCTURE, A.VIEW_CLUB}
 ROLE_ACTIONS = {
-    R.CAMPUS_ADMIN: {A.VIEW_STRUCTURE, A.MANAGE_UNITS, A.MANAGE_STAFF, A.ASSIGN_STAFF_ROLES, A.ASSIGN_STUDENT_ROLES},
-    R.DEAN: {A.VIEW_STRUCTURE},
-    R.DEPUTY_DEAN: {A.VIEW_STRUCTURE},
-    R.HEAD_FINANCE: {A.VIEW_STRUCTURE},
-    R.HEAD_OF_SECTION: {A.VIEW_STRUCTURE, A.MANAGE_UNITS, A.ASSIGN_STAFF_ROLES, A.ASSIGN_STUDENT_ROLES},
-    R.SECTION_EXECUTIVE: {A.VIEW_STRUCTURE, A.ASSIGN_STUDENT_ROLES},
-    R.GHOCS_SECRETARY: {A.VIEW_STRUCTURE},
-    R.ADVISOR: {A.VIEW_STRUCTURE, A.ASSIGN_STUDENT_ROLES},
-    R.CO_ADVISOR: {A.VIEW_STRUCTURE},
-    R.SRC_PRESIDENT: {A.VIEW_STRUCTURE},
-    R.SRC_TREASURER: {A.VIEW_STRUCTURE},
-    R.SRC_EXCO: {A.VIEW_STRUCTURE},
-    R.COMMITTEE: set(),
-    R.MEMBER: set(),
+    R.CAMPUS_ADMIN: {A.VIEW_STRUCTURE, A.MANAGE_UNITS, A.MANAGE_STAFF, A.ASSIGN_STAFF_ROLES, A.ASSIGN_STUDENT_ROLES,
+                     A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.DEAN: _OVERSIGHT,
+    R.DEPUTY_DEAN: _OVERSIGHT,
+    R.HEAD_FINANCE: _OVERSIGHT,
+    R.HEAD_OF_SECTION: {A.VIEW_STRUCTURE, A.MANAGE_UNITS, A.ASSIGN_STAFF_ROLES, A.ASSIGN_STUDENT_ROLES,
+                        A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.SECTION_EXECUTIVE: {A.VIEW_STRUCTURE, A.ASSIGN_STUDENT_ROLES, A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.GHOCS_SECRETARY: _OVERSIGHT,
+    R.ADVISOR: {A.VIEW_STRUCTURE, A.ASSIGN_STUDENT_ROLES, A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.CO_ADVISOR: {A.VIEW_STRUCTURE, A.ASSIGN_STUDENT_ROLES, A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.SRC_PRESIDENT: _OVERSIGHT,
+    R.SRC_TREASURER: _OVERSIGHT,
+    R.SRC_EXCO: _OVERSIGHT,
+    # UniKLSKILL: high committee members add and remove members, promote, and manage the club page
+    R.COMMITTEE: {A.ASSIGN_STUDENT_ROLES, A.MANAGE_CLUB, A.VIEW_CLUB},
+    R.MEMBER: {A.VIEW_CLUB},
 }
 
 CAMPUS_WIDE_ROLES = {
@@ -99,9 +105,11 @@ def visible_units(user):
 
 
 def role_action(role):
-    """The action needed to appoint someone to `role`."""
+    """The action needed to appoint someone to `role`. SRC officers are appointed by SDCL, like staff roles."""
     from .models import STAFF_ROLES
-    return A.ASSIGN_STAFF_ROLES if role in STAFF_ROLES else A.ASSIGN_STUDENT_ROLES
+    if role in STAFF_ROLES or role in (R.SRC_PRESIDENT, R.SRC_TREASURER, R.SRC_EXCO):
+        return A.ASSIGN_STAFF_ROLES
+    return A.ASSIGN_STUDENT_ROLES
 
 
 class CampusEnabled(permissions.BasePermission):

@@ -123,6 +123,8 @@ def account_payload(user):
         "id": user.id,
         "email": user.email,
         "role": user.role,
+        # Whether UniPact Campus (clubs, approvals, GHOCS) is switched on, so the menu can offer it
+        "campus_enabled": bool(getattr(settings, 'CAMPUS_ENABLED', False)),
         "name": name,
         "avatar_url": avatar_url,
         "email_verified": user.email_verified,

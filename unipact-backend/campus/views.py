@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from unipact_backend import notifications
+
+from . import approvals, emails
 from users.models import SystemLog
 from users.utils import invitation_path, log_event
 
@@ -31,6 +33,7 @@ class MeView(APIView):
         return Response({
             'is_platform_admin': is_platform_admin(request.user),
             'assignments': MyAssignmentSerializer(assignments, many=True).data,
+            'pending_approvals': len(approvals.inbox(request.user)),
             'can_manage_structure': is_platform_admin(request.user) or any(
                 can(request.user, Action.MANAGE_STAFF, a.unit) or can(request.user, Action.MANAGE_UNITS, a.unit)
                 for a in assignments),
@@ -109,6 +112,7 @@ class AssignmentListView(generics.ListCreateAPIView):
         data = serializer.validated_data
         require(self.request.user, role_action(data['role']), data['unit'])
         assignment = serializer.save(assigned_by=self.request.user)
+        emails.role_given(assignment)
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO,
                   f'Campus role {assignment.role} at {assignment.unit} given to {assignment.user.email} '
                   f'by {self.request.user.email}')
@@ -124,6 +128,8 @@ class AssignmentEndView(APIView):
         if assignment.ended_at:
             raise exceptions.ValidationError({'detail': 'This term has already ended.'})
         assignment.end(reason=str(request.data.get('reason') or '')[:255])
+        if assignment.role in STAFF_ROLES:
+            emails.role_ended(assignment)
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO,
                   f'Campus role {assignment.role} at {assignment.unit} ended for {assignment.user.email} '
                   f'by {request.user.email}')

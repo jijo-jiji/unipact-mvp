@@ -23,7 +23,7 @@ const LINKS = {
     { to: '/quests', label: 'Quest board' },
   ],
   ADMIN: [{ to: '/admin', label: 'Admin hub' }],
-  STAFF: [{ to: '/campus', label: 'Campus' }],
+  STAFF: [{ to: '/campus', label: 'Campus', end: false }],
 };
 
 const ROLE_LABEL = {
@@ -44,7 +44,10 @@ const WorkspaceNav = () => {
 
   // Club committee members (no ClubProfile of their own) can't apply to quests, so they only get the dashboard
   const isClubMember = user?.role === 'CLUB' && !user?.club_profile;
-  const links = (LINKS[user?.role] || [])
+  // UniPact Campus, once a university is switched on: students and admins get it next to their own links
+  const campusLink = user?.campus_enabled && ['STUDENT', 'ADMIN'].includes(user?.role)
+    ? [{ to: '/campus', label: 'Campus', end: false }] : [];
+  const links = [...(LINKS[user?.role] || []), ...campusLink]
     .filter((l) => !(isClubMember && l.to === '/quests'))
     .map((l) => ({ ...l, to: l.to.replace(':me', user?.id) }));
   const displayName = user?.company_profile?.company_name || user?.student_profile?.full_name || user?.club_profile?.club_name || user?.name || user?.email || '';

@@ -61,6 +61,12 @@ const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
 const WelcomePage = page(() => import('./pages/WelcomePage'));
 const CampusHome = page(() => import('./pages/CampusHome'));
+const CampusClubs = page(() => import('./pages/CampusClubs'));
+const CampusClubPage = page(() => import('./pages/CampusClubPage'));
+const CampusProposeClub = page(() => import('./pages/CampusProposeClub'));
+const CampusNews = page(() => import('./pages/CampusNews'));
+const CampusApprovals = page(() => import('./pages/CampusApprovals'));
+const CampusManage = page(() => import('./pages/CampusManage'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -249,6 +255,54 @@ function App() {
             element={
               <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
                 <CampusHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusClubs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/propose"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusProposeClub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusClubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/news"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusNews />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/approvals"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusApprovals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/manage"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusManage />
               </ProtectedRoute>
             }
           />
