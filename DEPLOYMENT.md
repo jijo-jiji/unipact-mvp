@@ -167,6 +167,8 @@ To start the pilot:
 6. Under **Staff** and **Structure and roles**, invite the GHOCS secretary and make them *GHOCS secretary* at the SD or CL section (or at MIIT). They verify students' claims in Approvals.
 7. Add a daily **Render Cron Job** on the same repo and settings that runs `python manage.py campus_reminders` (e.g. at 01:00 UTC, 9am in Malaysia). It emails committees whose activity reports are due or late, and GHOCS secretaries about claims waiting 3 or 7 days.
 
+Near the end of the pilot, open **Campus → Pilot dashboard** and press **Open the survey**: everyone in the pilot sees a prompt on their Campus home. The dashboard shows the results next to UniKLSKILL's baseline, and its CSV buttons export activities, GHOCS claims and approvals for a report.
+
 To end the pilot, set `CAMPUS_ENABLED=false`: Campus disappears again, and its data stays in the database.
 
 ### Sending email from Gmail (quick start)

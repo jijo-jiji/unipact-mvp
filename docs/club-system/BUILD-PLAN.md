@@ -91,9 +91,16 @@ One "UniPact" app for every role, built from the same React code with Capacitor.
   GHOCS points, with "apply to points already given". Staff can open a student's record from a claim.
 - M3 (SRC funding) deferred: the SRC is not in the pilot
 
-### M5. Pilot dashboard and survey
+### M5. Pilot dashboard and survey — done 2026-11-27
 - Dean's dashboard: approval turnaround, on-time reports, activities by DNA category, participation, CSV export
 - Ashraf's 15-question UAT survey, to compare with his 30-student baseline
+- As built: dashboard for the Dean, Deputy Deans, Heads of Section, section executives, the GHOCS secretary and
+  SDCL (Campus → Pilot dashboard), with a date range: students in clubs, activities held and check-ins,
+  GHOCS claim decision time, share of points that needed no claim, on-time reports, approvals by type (median
+  time, oldest waiting), the slowest signature in the activity chain, participation by UniKL DNA category,
+  balanced webs, and CSV exports (activities, claims, approvals). Survey opened and closed by SDCL from the
+  dashboard; pilot users see a prompt on Campus home; results by category next to the UniKLSKILL baseline,
+  with respondent types and comments (no names).
 
 ### Later (not in this build)
 v2.2.1 sponsorship switch-on, FAQ chatbot, UniKL SSO, other campuses.

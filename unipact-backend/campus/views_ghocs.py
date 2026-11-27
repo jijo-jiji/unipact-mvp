@@ -22,7 +22,7 @@ from .models import (
     ApprovalRequest, Attendance, GhocsClaim, GhocsEntry, GhocsSettings, NewsPost, OrgUnit, RoleAssignment,
 )
 from .models import CampusRole as R
-from .permissions import Action, can
+from .permissions import Action, can, works_at
 from .points import campus_of, recalculate, record
 from .serializers import MeritElementsField, PersonSerializer, UnitBriefSerializer
 from .views import CAMPUS, require
@@ -238,18 +238,6 @@ class SettingsView(APIView):
         log_event(SystemLog.Category.GROWTH, SystemLog.Level.INFO,
                   f'GHOCS point values for {campus.name} changed by {request.user.email}; {changed} entries recalculated')
         return Response({**serializer.data, 'recalculated': changed})
-
-
-OVERSIGHT_ROLES = (R.CAMPUS_ADMIN, R.DEAN, R.DEPUTY_DEAN, R.HEAD_OF_SECTION, R.SECTION_EXECUTIVE, R.GHOCS_SECRETARY)
-
-
-def works_at(user, campus):
-    """UniPact admins, and staff holding an oversight role anywhere in this campus (e.g. a GHOCS secretary at the
-    SD section), can open a student's record."""
-    if can(user, Action.MANAGE_UNITS, campus):
-        return True
-    return any(a.unit.campus == campus for a in RoleAssignment.objects.current()
-               .filter(user=user, role__in=OVERSIGHT_ROLES).select_related('unit'))
 
 
 class StudentGhocsView(APIView):

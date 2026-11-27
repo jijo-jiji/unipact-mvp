@@ -140,3 +140,15 @@ class CampusEnabled(permissions.BasePermission):
         if not has_campus_access(request.user):
             raise Http404
         return True
+
+
+OVERSIGHT_ROLES = (R.CAMPUS_ADMIN, R.DEAN, R.DEPUTY_DEAN, R.HEAD_FINANCE, R.HEAD_OF_SECTION, R.SECTION_EXECUTIVE,
+                   R.GHOCS_SECRETARY)
+
+
+def works_at(user, campus):
+    """UniPact admins, campus managers, and staff holding an oversight role anywhere in this campus (e.g. a GHOCS
+    secretary at the SD section) can see campus-wide records: students' GHOCS, the pilot dashboard."""
+    if can(user, Action.MANAGE_UNITS, campus):
+        return True
+    return any(a.unit.campus == campus for a in current_assignments(user).filter(role__in=OVERSIGHT_ROLES))

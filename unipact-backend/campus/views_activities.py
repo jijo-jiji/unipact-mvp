@@ -367,6 +367,9 @@ class ActivityReportView(APIView):
         with transaction.atomic():
             report = serializer.save(activity=activity, submitted_by=request.user,
                                      status=ActivityReport.Status.SUBMITTED)
+            if report.first_submitted_at is None:
+                report.first_submitted_at = timezone.now()
+                report.save(update_fields=['first_submitted_at'])
             for f in files:
                 ActivityReportFile.objects.create(report=report, file=f)
         emails.activity_report_submitted(report, advisors_of(activity.club))

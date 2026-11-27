@@ -81,3 +81,11 @@ urlpatterns += [
     path('ghocs/settings/', g.SettingsView.as_view(), name='campus_ghocs_settings'),
     path('ghocs/students/<int:user_id>/', g.StudentGhocsView.as_view(), name='campus_ghocs_student'),
 ]
+
+from . import views_dashboard as d  # noqa: E402
+
+urlpatterns += [
+    path('dashboard/', d.DashboardView.as_view(), name='campus_dashboard'),
+    path('survey/', d.SurveyView.as_view(), name='campus_survey'),
+    path('survey/settings/', d.SurveySettingsView.as_view(), name='campus_survey_settings'),
+]

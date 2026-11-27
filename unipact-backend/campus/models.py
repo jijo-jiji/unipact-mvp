@@ -639,6 +639,7 @@ class ActivityReport(models.Model):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.SUBMITTED)
     submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
     submitted_at = models.DateTimeField(auto_now=True)
+    first_submitted_at = models.DateTimeField(null=True, blank=True)  # for on-time reporting; edits don't move it
     advisor_remarks = models.TextField(blank=True)
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='+')
@@ -784,3 +785,35 @@ class GhocsEntry(models.Model):
 
     class Meta:
         ordering = ['-date', '-created_at']
+
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# M5: pilot evaluation survey
+# ---------------------------------------------------------------------------------------------------------------
+
+class SurveySettings(models.Model):
+    """Whether a campus's pilot survey is taking answers."""
+    campus = models.OneToOneField(OrgUnit, on_delete=models.CASCADE, related_name='survey_settings',
+                                  limit_choices_to={'kind': OrgUnit.Kind.CAMPUS})
+    is_open = models.BooleanField(default=False)
+    opened_at = models.DateTimeField(null=True, blank=True)
+
+    @classmethod
+    def for_campus(cls, campus):
+        return cls.objects.get_or_create(campus=campus)[0]
+
+
+class SurveyResponse(models.Model):
+    """One person's answers to the pilot survey (campus.survey): 1–5 per question. One per person per campus;
+    answering again replaces it."""
+    campus = models.ForeignKey(OrgUnit, on_delete=models.CASCADE, related_name='survey_responses')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campus_survey_responses')
+    respondent_type = models.CharField(max_length=20)  # STUDENT, COMMITTEE, STAFF: who answered, for the breakdown
+    answers = models.JSONField(default=dict)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['campus', 'user'], name='one_survey_response_per_person')]

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Award, Building2, CalendarDays, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
+import { Award, BarChart3, Building2, CalendarDays, ClipboardCheck, MessageSquareHeart, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import InstallAppCard from '../components/InstallAppCard';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -23,6 +23,17 @@ const Tile = ({ to, icon, title, text, badge }) => (
     </span>
   </Link>
 );
+
+const SurveyPrompt = () => {
+  const { data } = useLoad('/campus/survey/');
+  if (!data?.is_open || data.my_response) return null;
+  return (
+    <Link to="/campus/survey" className="card p-5 bg-[#0B1E63] text-white flex gap-4 items-center hover:bg-[#0A1748] transition-colors">
+      <MessageSquareHeart size={28} className="text-[#00AEEF] shrink-0" aria-hidden="true" />
+      <span><span className="font-heading font-bold text-lg block">How is the pilot going?</span><span className="text-sm text-white/80">15 quick questions, about 3 minutes. Your answers go to the Dean.</span></span>
+    </Link>
+  );
+};
 
 const UpcomingActivities = () => {
   const { data } = useLoad('/campus/activities/', { scope: 'mine' });
@@ -61,6 +72,7 @@ const CampusHome = () => {
       <ErrorNote>{error}</ErrorNote>
       {data && (
         <>
+          <SurveyPrompt />
           <InstallAppCard />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Tile to="/campus/clubs" icon={Users} title="Clubs" text="Browse clubs, join one, or open the clubs you belong to." />
@@ -77,6 +89,9 @@ const CampusHome = () => {
             )}
             {isStudent && (
               <Tile to="/campus/clubs/propose" icon={PlusCircle} title="Start a club" text="Propose a new club. Your advisor, the Head of Section and the Deputy Dean approve it." />
+            )}
+            {data.can_see_dashboard && (
+              <Tile to="/campus/dashboard" icon={BarChart3} title="Pilot dashboard" text="Approval times, participation, GHOCS and the survey." />
             )}
             {data.can_manage_structure && (
               <Tile to="/campus/manage" icon={Settings2} title="Manage campus" text="Clubs, staff, roles and semesters." />
