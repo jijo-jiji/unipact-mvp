@@ -8,6 +8,8 @@ class User(AbstractUser):
         CLUB = 'CLUB', _('Club')
         ADMIN = 'ADMIN', _('Admin')
         STUDENT = 'STUDENT', _('Student')
+        # University staff on UniPact Campus: lecturers (club advisors), SDCL officers, deans. Invited by an admin.
+        STAFF = 'STAFF', _('University staff')
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     email = models.EmailField(_('email address'), unique=True)

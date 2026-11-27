@@ -22,7 +22,8 @@ def site_url(path=''):
 
 def display_name(user):
     """The friendliest name we have for a user."""
-    for attr, field in (('student_profile', 'full_name'), ('company_profile', 'company_name'), ('club_profile', 'club_name')):
+    for attr, field in (('student_profile', 'full_name'), ('company_profile', 'company_name'), ('club_profile', 'club_name'),
+                        ('staff_profile', 'full_name')):
         profile = getattr(user, attr, None) if hasattr(user, attr) else None
         if profile and getattr(profile, field, ''):
             return getattr(profile, field)
@@ -181,7 +182,10 @@ def password_reset(user, reset_path):
 def account_invitation(user, invite_path):
     """An admin created this account: the owner picks their own password from the link."""
     days = max(1, settings.ACCOUNT_INVITE_TIMEOUT // 86400)
-    if user.role == 'COMPANY':
+    if user.role == 'STAFF':
+        about = ('UniPact Campus is where your university runs its clubs: membership, activity proposals and '
+                 'approvals, and GHOCS points. Your roles (for example club advisor) are set by your campus.')
+    elif user.role == 'COMPANY':
         about = ('Post projects for free, and UniPact proposes a team of verified university students for each one. '
                  'Your payment is held in escrow and released only as you approve the work.')
     else:

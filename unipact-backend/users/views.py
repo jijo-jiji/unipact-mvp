@@ -72,6 +72,11 @@ def clear_auth_cookies(response):
     for name in ('access_token', 'refresh_token'):
         response.delete_cookie(name, path=options['path'], domain=options['domain'], samesite=options['samesite'])
 
+def campus_access(user):
+    from campus.permissions import has_campus_access
+    return has_campus_access(user)
+
+
 def account_payload(user):
     """The signed-in user's account as the frontend expects it (used by /me/ and the settings endpoint)."""
     ver_status = None
@@ -106,6 +111,8 @@ def account_payload(user):
         student_profile_data = StudentProfileSerializer(user.student_profile).data
         if user.student_profile.profile_photo:
             avatar_url = user.student_profile.profile_photo.url
+    elif user.role == User.Role.STAFF and hasattr(user, 'staff_profile'):
+        name = user.staff_profile.full_name
     else:
         name = user.get_full_name() or user.username
 
@@ -121,6 +128,8 @@ def account_payload(user):
         "id": user.id,
         "email": user.email,
         "role": user.role,
+        # Whether UniPact Campus (clubs, approvals, GHOCS) is open to this person, so the menu can offer it
+        "campus_enabled": campus_access(user),
         "name": name,
         "avatar_url": avatar_url,
         "email_verified": user.email_verified,
@@ -289,7 +298,7 @@ class PasswordResetRequestView(views.APIView):
             query = urlencode({'uid': urlsafe_base64_encode(force_bytes(user.pk)), 'token': default_token_generator.make_token(user)})
             notifications.password_reset(user, f'/reset-password?{query}')
             log_event(SystemLog.Category.SECURITY, SystemLog.Level.INFO, f"Password reset requested: {user.email}")
-        elif user and user.role in (User.Role.STUDENT, User.Role.COMPANY):
+        elif user and user.role in (User.Role.STUDENT, User.Role.COMPANY, User.Role.STAFF):
             # An account an admin created whose owner hasn't set a password yet: a fresh invitation
             # does the same job, so an expired link doesn't need an admin to resend it
             notifications.account_invitation(user, invitation_path(user))

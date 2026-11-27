@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'campaigns',
     'payments',
     'impact',
+    'campus',
 
     'rest_framework_simplejwt',
     'django_filters',
@@ -420,6 +421,12 @@ CLUB_INVITE_TTL_DAYS = int(os.getenv('CLUB_INVITE_TTL_DAYS', '14'))
 EMAIL_VERIFY_TIMEOUT = int(os.getenv('EMAIL_VERIFY_TIMEOUT', str(3 * 24 * 3600)))
 # Seconds the "set your password" link in an account an admin created stays valid (default 7 days).
 # "Forgot password?" sends a fresh one, so an expired link doesn't need an admin.
+# UniPact Campus (UniKLSKILL club system). Off until a university is onboarded; tests switch it on per test.
+CAMPUS_ENABLED = env_bool('CAMPUS_ENABLED', default=False)
+# Pilot mode (default): Campus exists only for UniPact admins, staff accounts, people holding a campus role and
+# students on the campus pilot list. Everyone else gets 404s and no menu item. Turn off to open it to all.
+CAMPUS_PILOT_ONLY = env_bool('CAMPUS_PILOT_ONLY', default=True)
+
 ACCOUNT_INVITE_TIMEOUT = int(os.getenv('ACCOUNT_INVITE_TIMEOUT', str(7 * 24 * 3600)))
 
 

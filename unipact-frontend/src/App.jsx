@@ -60,6 +60,19 @@ const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
 const WelcomePage = page(() => import('./pages/WelcomePage'));
+const CampusHome = page(() => import('./pages/CampusHome'));
+const CampusClubs = page(() => import('./pages/CampusClubs'));
+const CampusClubPage = page(() => import('./pages/CampusClubPage'));
+const CampusProposeClub = page(() => import('./pages/CampusProposeClub'));
+const CampusNews = page(() => import('./pages/CampusNews'));
+const CampusApprovals = page(() => import('./pages/CampusApprovals'));
+const CampusManage = page(() => import('./pages/CampusManage'));
+const CampusProposeActivity = page(() => import('./pages/CampusProposeActivity'));
+const CampusActivity = page(() => import('./pages/CampusActivity'));
+const CampusCheckIn = page(() => import('./pages/CampusCheckIn'));
+const CampusGhocs = page(() => import('./pages/CampusGhocs'));
+const CampusDashboard = page(() => import('./pages/CampusDashboard'));
+const CampusSurvey = page(() => import('./pages/CampusSurvey'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -242,6 +255,119 @@ function App() {
           />
 
           {/* === ADMIN ROUTE === */}
+          {/* UniPact Campus: staff land here; students and admins with campus roles can open it too */}
+          <Route
+            path="/campus"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusClubs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/propose"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusProposeClub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusClubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/:id/activities/new"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusProposeActivity />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/activities/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusActivity />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/checkin/:code"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusCheckIn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/ghocs"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusGhocs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/ghocs/students/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusGhocs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/dashboard"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/survey"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusSurvey />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/news"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusNews />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/approvals"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusApprovals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/manage"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusManage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin"
             element={

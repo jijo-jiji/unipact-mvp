@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import PageLoader from './PageLoader';
 import { homePathForRole } from '../utils/routes';
 
-const ProtectedRoute = ({ children, allowedRole }) => {
+const ProtectedRoute = ({ children, allowedRole, campus = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -21,6 +21,12 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     if (!roles.includes(user.role)) {
       return <Navigate to={homePathForRole(user.role)} replace />;
     }
+  }
+
+  // UniPact Campus pages: in pilot mode they don't exist for people outside the pilot. Staff always keep their
+  // Campus home (it explains when Campus is switched off), so they never bounce between pages.
+  if (campus && !user.campus_enabled && user.role !== 'STAFF') {
+    return <Navigate to={homePathForRole(user.role)} replace />;
   }
 
   return children;
