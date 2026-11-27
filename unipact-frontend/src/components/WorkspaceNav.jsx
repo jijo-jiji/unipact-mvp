@@ -23,6 +23,7 @@ const LINKS = {
     { to: '/quests', label: 'Quest board' },
   ],
   ADMIN: [{ to: '/admin', label: 'Admin hub' }],
+  STAFF: [{ to: '/campus', label: 'Campus' }],
 };
 
 const ROLE_LABEL = {
@@ -30,6 +31,7 @@ const ROLE_LABEL = {
   STUDENT: 'Student',
   CLUB: 'Club',
   ADMIN: 'Admin',
+  STAFF: 'Staff',
 };
 
 // Top bar for signed-in pages (76px, sticky, blurred per STYLE_GUIDE.md). Two clean states:

@@ -60,6 +60,7 @@ const ResetPasswordPage = page(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = page(() => import('./pages/SettingsPage'));
 const JoinClubPage = page(() => import('./pages/JoinClubPage'));
 const WelcomePage = page(() => import('./pages/WelcomePage'));
+const CampusHome = page(() => import('./pages/CampusHome'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -242,6 +243,15 @@ function App() {
           />
 
           {/* === ADMIN ROUTE === */}
+          {/* UniPact Campus: staff land here; students and admins with campus roles can open it too */}
+          <Route
+            path="/campus"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']}>
+                <CampusHome />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin"
             element={

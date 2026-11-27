@@ -58,6 +58,7 @@ This skill is the **authoritative source of truth** for all code changes, refact
    - `role: "CLUB"` = v2.2.1 student clubs / guilds (presidents, rosters, rank S/A/B/C, sponsorship tiers).
    - `role: "COMPANY"` = Client / SME posting quests and funding projects.
    - `role: "ADMIN"` = Platform operators managing verifications and matchmaking.
+   - `role: "STAFF"` = University staff on UniPact Campus (club advisors, SDCL officers, deans). Invited by an admin, never self-registered. What they can do comes from `campus.RoleAssignment`, not from the role itself.
    - **RULE**: NEVER merge or replace `CLUB` with `STUDENT`. They must remain distinct in `users.models.User.Role` and all authorization policies.
 
 2. **Endpoint Isolation**:
@@ -67,7 +68,12 @@ This skill is the **authoritative source of truth** for all code changes, refact
    - `StudentProfile.club_affiliation` is a lightweight string field today (e.g., "Google Developer Student Club - MMU").
    - When v2.2.1 is reactivated, this will be safely linked via a foreign key to `ClubProfile` without breaking individual profiles.
 
-4. **Escrow & Platform Fee Structure**:
+4. **UniPact Campus (UniKLSKILL club system)**:
+   - Lives in the `campus` app under `/api/campus/`, behind `CAMPUS_ENABLED`. Design: `docs/club-system/PLAN.md`; order of work: `docs/club-system/BUILD-PLAN.md`.
+   - Who someone is (`User.role`) stays separate from what they can do where (`RoleAssignment`: person + role + `OrgUnit` + term). All checks go through `campus.permissions.can()`.
+   - Campus clubs are `OrgUnit`s, not `ClubProfile`s. The v2.2.1 `ClubProfile`/`ShadowUser` track is untouched and will be linked later, not replaced.
+
+5. **Escrow & Platform Fee Structure**:
    - V3.0 projects enforce a **10% platform fee** automatically captured upon admin match finalization (`POST /api/campaigns/<id>/finalize/`).
 
 ---
