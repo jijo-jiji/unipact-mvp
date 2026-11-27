@@ -16,6 +16,8 @@ def finished(request, decided_by=None):
         _club_proposal(request, decided_by)
     elif request.kind == ApprovalRequest.Kind.NEWS:
         _news(request)
+    elif request.kind == ApprovalRequest.Kind.ACTIVITY:
+        _activity(request)
     if request.status != S.WITHDRAWN:
         emails.approval_finished(request)
 
@@ -54,3 +56,18 @@ def _news(request):
     else:
         post.status = NewsPost.Status.WITHDRAWN
     post.save()
+
+
+def _activity(request):
+    from .activities import issue_approval_number
+    from .models import Activity
+
+    activity = request.activity
+    if request.status == S.APPROVED:
+        activity.status = Activity.Status.APPROVED
+        issue_approval_number(activity)
+    elif request.status == S.REJECTED:
+        activity.status = Activity.Status.REJECTED
+    else:
+        activity.status = Activity.Status.WITHDRAWN
+    activity.save(update_fields=['status', 'approval_number'])

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { Check, EyeOff, Megaphone, MessageSquare, Pin, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { CalendarDays, Check, EyeOff, Megaphone, MessageSquare, Pin, Plus, Trash2, UserPlus, Users, X } from 'lucide-react';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../utils/format';
 import { usePageTitle } from '../hooks/usePageTitle';
 import ConfirmationModal from '../components/ConfirmationModal';
 import {
-  CLUB_TYPES, Card, CampusPage, ChoiceChips, DNA_CATEGORIES, Empty, ErrorNote, Field, Loading, MERIT_ELEMENTS,
+  StatusPill, CLUB_TYPES, Card, CampusPage, ChoiceChips, DNA_CATEGORIES, Empty, ErrorNote, Field, Loading, MERIT_ELEMENTS,
   POSITIONS, SECTOR_LABEL, Tabs, formatDate, labelOf, useLoad,
 } from '../components/campus/CampusUI';
 
@@ -345,6 +345,42 @@ const EditClub = ({ club, onSaved }) => {
   );
 };
 
+// --- Activities ----------------------------------------------------------------------------------------------
+const Activities = ({ club }) => {
+  const { data, error, loading } = useLoad(`/campus/clubs/${club.id}/activities/`);
+  const now = new Date();
+  const upcoming = (data || []).filter((a) => new Date(a.ends_at) >= now);
+  const past = (data || []).filter((a) => new Date(a.ends_at) < now);
+  const row = (a) => (
+    <li key={a.id}>
+      <Link to={`/campus/activities/${a.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 hover:bg-[#F5F7FC] -mx-2 px-2 rounded">
+        <div className="min-w-0">
+          <p className="font-semibold truncate">{a.title}</p>
+          <p className="text-sm text-[#5B6478] flex items-center gap-1.5"><CalendarDays size={14} aria-hidden="true" />{formatDate(a.starts_at)} · {a.venue}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {a.approval_number && <span className="text-xs text-[#5B6478]">No. {a.approval_number}</span>}
+          <StatusPill status={a.status} label={a.status_label} />
+        </div>
+      </Link>
+    </li>
+  );
+  return (
+    <div className="space-y-4">
+      {club.me?.can_manage && (
+        <div className="flex justify-end">
+          <Link to={`/campus/clubs/${club.id}/activities/new`} className="btn-primary btn-sm"><Plus size={15} aria-hidden="true" /> Propose an activity</Link>
+        </div>
+      )}
+      {loading && !data && <Loading />}
+      <ErrorNote>{error}</ErrorNote>
+      {data && data.length === 0 && <Card><Empty icon={CalendarDays} title="No activities yet">{club.me?.can_manage ? 'Propose one: it goes through the campus approval chain.' : 'Check back soon.'}</Empty></Card>}
+      {upcoming.length > 0 && <Card><h2 className="font-heading font-bold text-lg">Upcoming and in review</h2><ul className="divide-y divide-[rgba(10,23,72,0.08)] mt-1">{upcoming.map(row)}</ul></Card>}
+      {past.length > 0 && <Card><h2 className="font-heading font-bold text-lg">Past</h2><ul className="divide-y divide-[rgba(10,23,72,0.08)] mt-1">{past.map(row)}</ul></Card>}
+    </div>
+  );
+};
+
 // --- Page ----------------------------------------------------------------------------------------------------
 const CampusClubPage = () => {
   const { id } = useParams();
@@ -356,7 +392,7 @@ const CampusClubPage = () => {
   usePageTitle(club?.name || 'Club');
 
   const me = club?.me;
-  const tabs = [['about', 'About']];
+  const tabs = [['about', 'About'], ['activities', 'Activities']];
   if (me?.can_view_internal) tabs.push(['announcements', 'Announcements']);
   tabs.push(['members', 'Members']);
   if (me?.can_manage) tabs.push(['manage', 'Manage']);
@@ -403,6 +439,7 @@ const CampusClubPage = () => {
         <>
           <Tabs tabs={tabs} value={tab} onChange={(key) => setParams(key === 'about' ? {} : { tab: key })} label="Club sections" />
           {tab === 'about' && <About club={club} />}
+          {tab === 'activities' && <Activities club={club} />}
           {tab === 'announcements' && <Announcements club={club} />}
           {tab === 'members' && <Members club={club} onChanged={reload} />}
           {tab === 'manage' && (

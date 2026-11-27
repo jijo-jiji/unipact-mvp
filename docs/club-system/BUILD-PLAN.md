@@ -47,12 +47,16 @@ Each one ends with `python manage.py test` passing, `npm run build` compiling wi
 - "Put UniPact on your home screen" card on Campus home: one-tap install on Android/desktop Chrome, Safari's
   Share → Add to Home Screen steps on iPhone. Opens at /login, which sends signed-in people to their home.
 
-### M2. Activities and the approval chain
+### M2. Activities and the approval chain — done 2026-11-27
 - Activity proposal: GHOCS fields + SAF 2026 template fields (objectives, programme, budget items, funding split)
 - The 9-step MIIT chain: RM 5,000 Dean/Deputy Dean rule, SD/CL routing, no-budget shortcut
 - Approvals inbox for each role, with the full sign-off trail
 - Generated SAF 2026 form as PDF; approval numbers (e.g. `1020525`)
 - Published activity: QR check-in, discussion, activity report with advisor remarks, reminder until the report is in
+- Built with it: per-campus approval settings (SRC steps, Finance step, Dean threshold, report due days) under
+  Manage campus → Approval chain; `campus_reminders` daily command for late reports; all Campus dates in Malaysia
+  time. Check-in uses the phone's own camera to open the QR link, so no in-app scanner (and no camera permission)
+  is needed on the website
 
 ### M2.5. Store apps (Google Play and App Store), after M2
 One "UniPact" app for every role, built from the same React code with Capacitor.
@@ -64,8 +68,8 @@ One "UniPact" app for every role, built from the same React code with Capacitor.
 - Store listings, privacy forms, closed testing, then public release
 - **Owner to start now (slow):** Apple Developer account as an organisation (USD 99/yr, needs a D-U-N-S number),
   Google Play developer account as an organisation (USD 25 once); a Mac with Xcode or a cloud build service for iOS
-- Note for M2: `vercel.json` sets `Permissions-Policy: camera=()`, which blocks the camera on the website; QR
-  check-in in the browser needs `camera=(self)`
+- QR check-in already works on the website by scanning with the phone's camera app; an in-app scanner is
+  optional for the store apps
 
 ### M3. SRC funding (SAF/SWF)
 - Fund application with the 5-document checklist

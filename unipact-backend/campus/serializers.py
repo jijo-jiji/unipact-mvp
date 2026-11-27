@@ -473,6 +473,9 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
                     **ClubProposalSerializer(request.club_proposal, context=self.context).data}
         if request.news_post_id:
             return {'type': 'news', **NewsSerializer(request.news_post, context=self.context).data}
+        if request.activity_id:
+            from .serializers_activities import ActivitySerializer
+            return {'type': 'activity', **ActivitySerializer(request.activity, context=self.context).data}
         return None
 
 

@@ -9,6 +9,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from campaigns.workdays import MALAYSIA
+
+
+def today_in_malaysia():
+    return timezone.localdate(timezone=MALAYSIA)
+
 
 class OrgUnit(models.Model):
     """One node of a university's tree: UniKL → UniKL MIIT → Deputy Dean (SDCL) office → Student Development
@@ -158,7 +164,7 @@ ROLE_UNIT_KINDS = {
 
 class RoleAssignmentQuerySet(models.QuerySet):
     def current(self, on=None):
-        today = on or timezone.localdate()
+        today = on or timezone.localdate(timezone=MALAYSIA)
         return self.filter(ended_at__isnull=True, starts_on__lte=today).filter(
             models.Q(ends_on__isnull=True) | models.Q(ends_on__gte=today))
 
@@ -172,7 +178,7 @@ class RoleAssignment(models.Model):
     # Committee position (President, Treasurer...) or SRC Exco portfolio (Academic & Spiritual...)
     position = models.CharField(max_length=100, blank=True)
     session = models.CharField(max_length=40, blank=True)  # e.g. "2026/2027 Sem 1"
-    starts_on = models.DateField(default=timezone.localdate)
+    starts_on = models.DateField(default=today_in_malaysia)
     ends_on = models.DateField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     ended_reason = models.CharField(max_length=255, blank=True)
@@ -191,7 +197,7 @@ class RoleAssignment(models.Model):
 
     @property
     def is_current(self):
-        today = timezone.localdate()
+        today = timezone.localdate(timezone=MALAYSIA)
         return (self.ended_at is None and self.starts_on <= today
                 and (self.ends_on is None or self.ends_on >= today))
 
@@ -248,7 +254,7 @@ class AcademicSession(models.Model):
     def current_for(cls, campus, on=None):
         if campus is None:
             return None
-        today = on or timezone.localdate()
+        today = on or timezone.localdate(timezone=MALAYSIA)
         return cls.objects.filter(campus=campus, starts_on__lte=today, ends_on__gte=today).first()
 
 
@@ -273,6 +279,8 @@ class CampusClub(models.Model):
     logo = models.ImageField(upload_to='campus/club_logos/', blank=True, null=True)
     socials = models.JSONField(default=dict, blank=True)  # {"instagram": url, ...}
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
+    # The club's number within its sector at its campus, used in approval numbers (1020525 = SD, club 02...)
+    number = models.PositiveSmallIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -406,6 +414,7 @@ class ApprovalRequest(models.Model):
     class Kind(models.TextChoices):
         CLUB_PROPOSAL = 'CLUB_PROPOSAL', 'New club'
         NEWS = 'NEWS', 'News post'
+        ACTIVITY = 'ACTIVITY', 'Activity proposal'
 
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'In review'
@@ -421,6 +430,7 @@ class ApprovalRequest(models.Model):
     club_proposal = models.OneToOneField(ClubProposal, on_delete=models.CASCADE, null=True, blank=True,
                                          related_name='approval')
     news_post = models.OneToOneField(NewsPost, on_delete=models.CASCADE, null=True, blank=True, related_name='approval')
+    activity = models.OneToOneField('Activity', on_delete=models.CASCADE, null=True, blank=True, related_name='approval')
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
 
@@ -482,3 +492,164 @@ class PilotAccess(models.Model):
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
+
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# M2: activities, their approval chain, attendance and reports
+# ---------------------------------------------------------------------------------------------------------------
+
+class ActivityPolicy(models.Model):
+    """How a campus approves activity proposals. Defaults follow MIIT's "Template Proposal SAF 2026"; a campus
+    can leave out the SRC or Finance steps (e.g. while the SRC isn't part of the pilot)."""
+    campus = models.OneToOneField(OrgUnit, on_delete=models.CASCADE, related_name='activity_policy',
+                                  limit_choices_to={'kind': OrgUnit.Kind.CAMPUS})
+    src_steps = models.BooleanField(default=True)  # SRC Exco acknowledgement and SRC President budget endorsement
+    finance_step = models.BooleanField(default=True)  # Head of Management & Finance recommendation
+    dean_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=5000)  # above this the Dean approves
+    report_due_days = models.PositiveSmallIntegerField(default=14)  # activity report due this many days after it ends
+
+    class Meta:
+        verbose_name_plural = 'activity policies'
+
+    @classmethod
+    def for_campus(cls, campus):
+        policy, _ = cls.objects.get_or_create(campus=campus)
+        return policy
+
+
+class Activity(models.Model):
+    """A club activity: proposed by the committee with the SAF 2026 / GHOCS details, approved through the campus
+    chain, then published, attended (QR check-in) and reported on."""
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'In review'
+        APPROVED = 'APPROVED', 'Approved'
+        PUBLISHED = 'PUBLISHED', 'Published'
+        COMPLETED = 'COMPLETED', 'Completed'
+        REJECTED = 'REJECTED', 'Not approved'
+        WITHDRAWN = 'WITHDRAWN', 'Withdrawn'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
+    club = models.ForeignKey(OrgUnit, on_delete=models.PROTECT, related_name='activities')
+    title = models.CharField(max_length=255)
+    background = models.TextField()
+    objectives = models.JSONField(default=list)  # S.M.A.R.T. objectives, as on the SAF form
+    activity_level = models.CharField(max_length=14)  # ghocs.ActivityLevel
+    dna_category = models.CharField(max_length=20)  # ghocs.DnaCategory
+    merit_elements = models.JSONField(default=list)
+    venue = models.CharField(max_length=255)
+    on_campus = models.BooleanField(default=True)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    expected_participants = models.PositiveIntegerField(null=True, blank=True)
+    justification = models.TextField(blank=True)
+    budget_items = models.JSONField(default=list, blank=True)  # [{item, price, quantity}] as text amounts
+    funding_saf = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Student Activity Fund
+    funding_campus = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # UniKL MIIT
+    funding_other = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # sponsors, fees, others
+    extra = models.JSONField(default=dict, blank=True)  # GHOCS "additional info": logistics, vehicle, sponsor...
+    document = models.FileField(upload_to='campus/activity_proposals/', blank=True, null=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    approval_number = models.CharField(max_length=20, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    checkin_code = models.CharField(max_length=32, blank=True, db_index=True)
+    checkin_open = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-starts_at']
+        verbose_name_plural = 'activities'
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def total_budget(self):
+        from decimal import Decimal
+        total = Decimal('0')
+        for row in self.budget_items or []:
+            total += Decimal(str(row.get('price') or 0)) * Decimal(str(row.get('quantity') or 1))
+        return total.quantize(Decimal('0.01'))
+
+    @property
+    def total_funding(self):
+        return self.funding_saf + self.funding_campus + self.funding_other
+
+    @property
+    def with_saf(self):
+        return self.funding_saf > 0
+
+
+class ActivityComment(models.Model):
+    """The members-only discussion under an activity (UniKLSKILL F013/F014)."""
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    body = models.TextField()
+    is_hidden = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+
+class Attendance(models.Model):
+    """A student who took part, from the QR check-in or added by the committee. Their role here decides their
+    GHOCS points later (M4)."""
+
+    class Role(models.TextChoices):
+        PARTICIPANT = 'PARTICIPANT', 'Participant'
+        COMMITTEE = 'COMMITTEE', 'Committee / AJK'
+        ORGANISER = 'ORGANISER', 'Program director / organiser'
+
+    class Method(models.TextChoices):
+        QR = 'QR', 'QR check-in'
+        MANUAL = 'MANUAL', 'Added by the committee'
+
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='attendance')
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campus_attendance')
+    role = models.CharField(max_length=12, choices=Role.choices, default=Role.PARTICIPANT)
+    method = models.CharField(max_length=6, choices=Method.choices, default=Method.QR)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='+')
+    checked_in_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['checked_in_at']
+        constraints = [models.UniqueConstraint(fields=['activity', 'student'], name='one_attendance_per_activity')]
+
+
+class ActivityReport(models.Model):
+    """The post-activity report (GHOCS "Activity Report"): what happened and what was spent. The advisor
+    accepts it or asks for changes, with remarks (UniKLSKILL)."""
+
+    class Status(models.TextChoices):
+        SUBMITTED = 'SUBMITTED', 'Waiting for the advisor'
+        ACCEPTED = 'ACCEPTED', 'Accepted'
+        CHANGES = 'CHANGES', 'Changes requested'
+
+    activity = models.OneToOneField(Activity, on_delete=models.CASCADE, related_name='report')
+    summary = models.TextField()
+    budget_used = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    merit_elements = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.SUBMITTED)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    submitted_at = models.DateTimeField(auto_now=True)
+    advisor_remarks = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='+')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+
+class ActivityReportFile(models.Model):
+    report = models.ForeignKey(ActivityReport, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(upload_to='campus/activity_reports/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ReportReminder(models.Model):
+    """When the committee was last reminded that an ended activity still has no report."""
+    activity = models.OneToOneField(Activity, on_delete=models.CASCADE, related_name='report_reminder')
+    count = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField()

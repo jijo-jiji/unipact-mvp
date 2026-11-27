@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
+import { Building2, CalendarDays, ClipboardCheck, Newspaper, PlusCircle, Settings2, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import InstallAppCard from '../components/InstallAppCard';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Card, CampusPage, Empty, ErrorNote, Loading, useLoad } from '../components/campus/CampusUI';
+import { Card, CampusPage, Empty, ErrorNote, Loading, formatDate, useLoad } from '../components/campus/CampusUI';
 
 const Tile = ({ to, icon, title, text, badge }) => (
   <Link
@@ -23,6 +23,29 @@ const Tile = ({ to, icon, title, text, badge }) => (
     </span>
   </Link>
 );
+
+const UpcomingActivities = () => {
+  const { data } = useLoad('/campus/activities/', { scope: 'mine' });
+  if (!data || data.length === 0) return null;
+  return (
+    <Card>
+      <h2 className="font-heading font-bold text-xl">Coming up</h2>
+      <ul className="divide-y divide-[rgba(10,23,72,0.08)] mt-2">
+        {data.slice(0, 6).map((a) => (
+          <li key={a.id}>
+            <Link to={`/campus/activities/${a.id}`} className="py-3 flex items-center gap-3 hover:bg-[#F5F7FC] -mx-2 px-2 rounded">
+              <CalendarDays size={18} className="text-[#00AEEF] shrink-0" aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block font-semibold truncate">{a.title}</span>
+                <span className="block text-sm text-[#5B6478]">{a.club_detail.name} · {formatDate(a.starts_at)} · {a.venue}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+};
 
 // UniPact Campus home: the person's roles, and the way into clubs, news and approvals.
 const CampusHome = () => {
@@ -56,6 +79,8 @@ const CampusHome = () => {
               <Tile to="/campus/manage" icon={Settings2} title="Manage campus" text="Clubs, staff, roles and semesters." />
             )}
           </div>
+
+          <UpcomingActivities />
 
           <Card>
             <h2 className="font-heading font-bold text-xl">Your roles</h2>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Circle, ClipboardCheck, MinusCircle, XCircle } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +44,35 @@ const Target = ({ target }) => {
         <Row label="Founding members">{target.founding_members?.join(', ')}</Row>
         <Row label="Proposal document">{target.document && <a className="text-[#00729F] underline" href={target.document} target="_blank" rel="noopener noreferrer">Open</a>}</Row>
       </dl>
+    );
+  }
+  if (target.type === 'activity') {
+    const rm = (n) => `RM ${Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/campus/activities/${target.id}`} className="btn-secondary btn-sm">Open the activity</Link>
+          <button type="button" className="btn-secondary btn-sm" onClick={async () => {
+            const res = await api.get(`/campus/activities/${target.id}/saf.pdf`, { responseType: 'blob' });
+            window.open(URL.createObjectURL(res.data), '_blank', 'noopener');
+          }}>SAF form (PDF)</button>
+        </div>
+        <dl className="divide-y divide-[rgba(10,23,72,0.06)]">
+          <Row label="Club">{target.club_detail?.name}</Row>
+          <Row label="Programme">{target.title}</Row>
+          <Row label="When">{`${formatDate(target.starts_at)} to ${formatDate(target.ends_at)}`}</Row>
+          <Row label="Venue">{`${target.venue}${target.on_campus ? '' : ' (off campus)'}`}</Row>
+          <Row label="Background">{target.background}</Row>
+          <Row label="Objectives">{target.objectives?.map((o, i) => `${i + 1}. ${o}`).join('\n')}</Row>
+          <Row label="Level">{labelOf(ACTIVITY_LEVELS, target.activity_level)}</Row>
+          <Row label="UniKL DNA category">{labelOf(DNA_CATEGORIES, target.dna_category)}</Row>
+          <Row label="S.P.I.C.E.S">{target.merit_elements?.map((m) => labelOf(MERIT_ELEMENTS, m)).join(', ')}</Row>
+          <Row label="Expected participants">{target.expected_participants}</Row>
+          <Row label="Budget">{Number(target.total_budget) > 0 ? `${target.budget_items.map((b) => `${b.item}: ${rm(Number(b.price) * Number(b.quantity))}`).join('\n')}\nTotal: ${rm(target.total_budget)}` : 'No budget'}</Row>
+          <Row label="Funding">{Number(target.total_budget) > 0 ? `SAF ${rm(target.funding_saf)} · UniKL ${rm(target.funding_campus)} · Others ${rm(target.funding_other)}` : null}</Row>
+          <Row label="Justification">{target.justification}</Row>
+        </dl>
+      </div>
     );
   }
   return (

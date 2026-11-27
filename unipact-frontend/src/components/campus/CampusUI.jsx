@@ -98,7 +98,9 @@ const PILL = {
   PUBLISHED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   REJECTED: 'bg-red-50 text-red-700 border-red-200',
+  COMPLETED: 'bg-[#0B1E63]/5 text-[#0B1E63] border-[#0B1E63]/20',
   WITHDRAWN: 'bg-slate-50 text-slate-600 border-slate-200',
+  CANCELLED: 'bg-slate-50 text-slate-600 border-slate-200',
   SKIPPED: 'bg-slate-50 text-slate-500 border-slate-200',
 };
 export const StatusPill = ({ status, label }) => (

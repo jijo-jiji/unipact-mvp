@@ -163,6 +163,9 @@ To start the pilot:
    - **Pilot students:** paste the students' emails. Each one gets an email to sign in, or to sign up with that address.
 4. Students made president or member of a club get in automatically. You don't need to list them too.
 
+5. Under **Manage campus → Approval chain**, turn off the SRC or Finance steps if they aren't part of the pilot, so proposals don't wait for someone who isn't there.
+6. Add a daily **Render Cron Job** on the same repo and settings that runs `python manage.py campus_reminders` (e.g. at 01:00 UTC, 9am in Malaysia). It emails committees whose activity reports are due or late.
+
 To end the pilot, set `CAMPUS_ENABLED=false`: Campus disappears again, and its data stays in the database.
 
 ### Sending email from Gmail (quick start)

@@ -67,6 +67,9 @@ const CampusProposeClub = page(() => import('./pages/CampusProposeClub'));
 const CampusNews = page(() => import('./pages/CampusNews'));
 const CampusApprovals = page(() => import('./pages/CampusApprovals'));
 const CampusManage = page(() => import('./pages/CampusManage'));
+const CampusProposeActivity = page(() => import('./pages/CampusProposeActivity'));
+const CampusActivity = page(() => import('./pages/CampusActivity'));
+const CampusCheckIn = page(() => import('./pages/CampusCheckIn'));
 const SoftwareDeveloperApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.SoftwareDeveloperApplyPage);
 const DigitalMarketingApplyPage = page(() => import('./pages/ApplyPages'), (m) => m.DigitalMarketingApplyPage);
 const VerifyEmailPage = page(() => import('./pages/VerifyEmailPage'));
@@ -279,6 +282,30 @@ function App() {
             element={
               <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
                 <CampusClubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/clubs/:id/activities/new"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusProposeActivity />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/activities/:id"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusActivity />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campus/checkin/:code"
+            element={
+              <ProtectedRoute allowedRole={['STAFF', 'STUDENT', 'ADMIN']} campus>
+                <CampusCheckIn />
               </ProtectedRoute>
             }
           />

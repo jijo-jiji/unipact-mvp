@@ -23,6 +23,11 @@ def approval_finished(request):
     if not approved and last and last.comment:
         lines.append(f'Reason: {last.comment}')
     path = '/campus/approvals?mine=1&open=' + str(request.pk)
+    if request.kind == request.Kind.ACTIVITY:
+        path = f'/campus/activities/{request.activity_id}'
+        if approved:
+            lines.append(f'Approval number: {request.activity.approval_number}. Publish it on its page when '
+                         "you're ready for members to see it and check in.")
     if approved and request.kind == request.Kind.CLUB_PROPOSAL and request.club_proposal.created_club_id:
         lines.append('Your club is now open on UniPact Campus, with you as its president.')
         path = f'/campus/clubs/{request.club_proposal.created_club_id}'
@@ -85,3 +90,37 @@ def pilot_invited(access, has_account):
         label, path = 'Create your account', '/register/student'
     send_email(access.email, 'You are invited to the UniPact Campus pilot', "You're in the pilot", lines,
                action_label=label, action_path=path)
+
+
+def activity_report_reminder(activity, people, days_late):
+    for person in people:
+        send_email(
+            person.email, f'Activity report due: {activity.title}', 'Please submit your activity report',
+            [f'"{activity.title}" ended and its activity report is '
+             f'{"due" if days_late <= 0 else f"{days_late} day{"s" if days_late != 1 else ""} late"}.',
+             'Add a summary, the amount spent and photos on the activity page. Your advisor reviews it.'],
+            details=[('Club', activity.club.name), ('Approval number', activity.approval_number or '-')],
+            action_label='Write the report', action_path=f'/campus/activities/{activity.pk}?tab=report',
+        )
+
+
+def activity_report_submitted(report, advisors):
+    activity = report.activity
+    for person in advisors:
+        send_email(
+            person.email, f'Activity report to review: {activity.title}', 'An activity report needs your review',
+            [f'{activity.club.name} submitted the report for "{activity.title}".'],
+            action_label='Review the report', action_path=f'/campus/activities/{activity.pk}?tab=report',
+        )
+
+
+def activity_report_reviewed(report, committee):
+    activity = report.activity
+    accepted = report.status == report.Status.ACCEPTED
+    lines = [f'The advisor {"accepted" if accepted else "asked for changes to"} the report for "{activity.title}".']
+    if report.advisor_remarks:
+        lines.append(f'Remarks: {report.advisor_remarks}')
+    for person in committee:
+        send_email(person.email, f'{"Report accepted" if accepted else "Changes requested"}: {activity.title}',
+                   'Your activity report was reviewed', lines,
+                   action_label='Open the activity', action_path=f'/campus/activities/{activity.pk}?tab=report')

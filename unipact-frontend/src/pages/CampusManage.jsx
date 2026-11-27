@@ -268,6 +268,63 @@ const Semesters = ({ units }) => {
   );
 };
 
+// --- Approval chain -----------------------------------------------------------------------------------------
+const ApprovalChain = ({ units }) => {
+  const { showToast } = useToast();
+  const campuses = units.filter((u) => u.kind === 'CAMPUS');
+  const [campus, setCampus] = useState(campuses[0]?.id || '');
+  const { data, error, loading, setData } = useLoad(campus ? '/campus/policy/' : null, { campus });
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.patch(`/campus/policy/?campus=${campus}`, data);
+      setData(res.data);
+      showToast('Saved. New proposals follow these steps.', 'success');
+    } catch (err) { showToast(errorText(err), 'error'); } finally { setSaving(false); }
+  };
+
+  return (
+    <Card className="space-y-4 max-w-3xl">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading font-bold text-xl">Activity approval chain</h2>
+          <p className="text-sm text-[#5B6478]">Follows MIIT's Template Proposal SAF 2026. Changes apply to proposals sent from now on.</p>
+        </div>
+        {campuses.length > 1 && (
+          <select className="input w-auto" value={campus} onChange={(e) => setCampus(e.target.value)} aria-label="Campus">
+            {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+      </div>
+      {loading && !data && <Loading />}
+      <ErrorNote>{error}</ErrorNote>
+      {data && (
+        <form onSubmit={save} className="space-y-4">
+          <ol className="text-sm space-y-1.5 list-decimal pl-5">
+            {data.src_steps && <li>Acknowledged by the SRC Exco for the club's sector</li>}
+            <li>Supported by the club advisor</li>
+            <li>Reviewed by the section executive (SD or CL)</li>
+            {data.src_steps && <li>Budget endorsed by the SRC President <span className="text-[#5B6478]">(if there's a budget)</span></li>}
+            <li>Verified by the Head of Section</li>
+            {data.finance_step && <li>Recommended by the Head of Management &amp; Finance <span className="text-[#5B6478]">(if there's a budget)</span></li>}
+            <li>Approved by the Deputy Dean, or above RM {Number(data.dean_threshold).toLocaleString('en-MY')} recommended by the Deputy Dean and approved by the Dean</li>
+          </ol>
+          <label className="flex gap-2 text-sm"><input type="checkbox" checked={data.src_steps} onChange={(e) => setData({ ...data, src_steps: e.target.checked })} /> Include the SRC steps (turn off if the SRC isn't part of the pilot)</label>
+          <label className="flex gap-2 text-sm"><input type="checkbox" checked={data.finance_step} onChange={(e) => setData({ ...data, finance_step: e.target.checked })} /> Include the Finance recommendation</label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Dean approves above (RM)" htmlFor="threshold"><input id="threshold" type="number" min="1" step="0.01" className="input" value={data.dean_threshold} onChange={(e) => setData({ ...data, dean_threshold: e.target.value })} /></Field>
+            <Field label="Activity report due (days after it ends)" htmlFor="due"><input id="due" type="number" min="1" max="90" className="input" value={data.report_due_days} onChange={(e) => setData({ ...data, report_due_days: e.target.value })} /></Field>
+          </div>
+          <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </form>
+      )}
+    </Card>
+  );
+};
+
 // --- Pilot students ------------------------------------------------------------------------------------------
 const PilotStudents = ({ units }) => {
   const { showToast } = useToast();
@@ -346,7 +403,7 @@ const CampusManage = () => {
   const units = useLoad('/campus/units/');
   const roles = useLoad('/campus/roles/');
   const me = useLoad('/campus/me/');
-  const tabs = [['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters']];
+  const tabs = [['structure', 'Structure and roles'], ['staff', 'Staff'], ['semesters', 'Semesters'], ['chain', 'Approval chain']];
   if (me.data?.pilot_mode) tabs.push(['pilot', 'Pilot students']);
 
   return (
@@ -361,6 +418,7 @@ const CampusManage = () => {
           {units.data.length > 0 && tab === 'staff' && <Staff units={units.data} />}
           {units.data.length > 0 && tab === 'semesters' && <Semesters units={units.data} />}
           {units.data.length > 0 && tab === 'pilot' && <PilotStudents units={units.data} />}
+          {units.data.length > 0 && tab === 'chain' && <ApprovalChain units={units.data} />}
         </>
       )}
     </CampusPage>

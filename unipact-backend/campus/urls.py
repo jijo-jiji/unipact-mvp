@@ -48,3 +48,25 @@ urlpatterns += [
     path('pilot/', c.PilotListView.as_view(), name='campus_pilot'),
     path('pilot/<int:pk>/', c.PilotDetailView.as_view(), name='campus_pilot_detail'),
 ]
+
+from . import views_activities as a  # noqa: E402
+
+urlpatterns += [
+    path('clubs/<int:pk>/activities/', a.ClubActivityListView.as_view(), name='campus_club_activities'),
+    path('activities/', a.ActivityListView.as_view(), name='campus_activities'),
+    path('activities/<int:pk>/', a.ActivityDetailView.as_view(), name='campus_activity'),
+    path('activities/<int:pk>/publish/', a.ActivityPublishView.as_view(), name='campus_activity_publish'),
+    path('activities/<int:pk>/cancel/', a.ActivityCancelView.as_view(), name='campus_activity_cancel'),
+    path('activities/<int:pk>/saf.pdf', a.ActivitySafPdfView.as_view(), name='campus_activity_pdf'),
+    path('activities/<int:pk>/checkin/', a.CheckinControlView.as_view(), name='campus_activity_checkin'),
+    path('activities/<int:pk>/attendance/', a.AttendanceListView.as_view(), name='campus_attendance'),
+    path('activities/<int:pk>/attendance/<int:attendance_id>/', a.AttendanceDetailView.as_view(),
+         name='campus_attendance_detail'),
+    path('activities/<int:pk>/comments/', a.ActivityCommentListView.as_view(), name='campus_activity_comments'),
+    path('activities/<int:pk>/comments/<int:comment_id>/hide/', a.ActivityCommentHideView.as_view(),
+         name='campus_activity_comment_hide'),
+    path('activities/<int:pk>/report/', a.ActivityReportView.as_view(), name='campus_activity_report'),
+    path('activities/<int:pk>/report/review/', a.ActivityReportReviewView.as_view(), name='campus_report_review'),
+    path('checkin/<str:code>/', a.CheckinCodeView.as_view(), name='campus_checkin'),
+    path('policy/', a.ActivityPolicyView.as_view(), name='campus_policy'),
+]
